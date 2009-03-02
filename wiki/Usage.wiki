@@ -1,0 +1,30 @@
+#summary Useage instructions
+
+= Useage =
+
+AmFast can encode and decode Python objects to AMF3 format.
+
+
+= Encoding =
+{{{
+import amfast.encoder as encoder
+byte_string = encoder.encode(value)
+}}}
+
+encode(...)
+    Description:
+    =============
+    Encode a Python object in AMF3 format.
+    
+    Useage:
+    ===========
+    byte_string = encode(value, **kwargs)
+    
+    Optional keyword arguments:
+    ============================
+     * use_array_collections - bool - True to encode lists and tuples as ArrayCollections - Default = False
+     * use_object_proxies - bool - True to encode dicts as ObjectProxys - Default = False
+     * use_references - bool - True to encode multiply occuring objects as references - Default = True
+     * use_legacy_xml - bool - True to encode XML as old XMLDocument instead of E4X - Default = False
+     * include_private - bool - True to encode attributes starting with a underscore  - Default = False
+     * get_class_def - function - Function that retrieves a ClassDef object used for customizing serialization of objects - Default = amfast.class_def.get_class_def_by_class Custom functions must have the signature: class_def = function(class_), where class_ is the class of the object being encoded and class_def is a ClassDef instance, or None if no ClassDef was found.
