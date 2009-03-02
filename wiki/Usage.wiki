@@ -7,7 +7,7 @@ AmFast can encode and decode Python objects to AMF3 format.
 
 = Type Map =
 
-== Encoding ==
+== Python -> AS3 ==
 
 || Python || AS3 ||
 || None || NULL ||
@@ -21,7 +21,7 @@ AmFast can encode and decode Python objects to AMF3 format.
 || xml.dom.minidom.Document || XML, XMLDocument ||
 || datetime || Date ||
 
-== Decoding ==
+== AS3 -> Python ==
 
 || AS3 || Python ||
 || NULL || None ||
