@@ -48,6 +48,4 @@ decode(...)
     ============================
      * use_array_collections - bool - True to decode ArrayCollections to lists. - Default = False
      * use_object_proxies - bool - True to decode ObjectProxies to dicts. - Default = False
-     * get_class_def - function - Function that retrieves a ClassDef object used for customizing 
-        serialization of objects - Default = amfast.class_def.get_class_def_by_class
-        Custom functions must have the signature: class_def = function(class_), where class_ is the class of the object being decoded and class_def is a ClassDef instance, or None if no ClassDef was found.
+     * get_class_def - function - Function that retrieves a ClassDef object used for customizing de-serialization of objects - Default = amfast.class_def.get_class_def_by_alias Custom functions must have the signature: class_def = function(alias), where alias is the class alias of the object being decoded and class_def is a ClassDef instance, or None if no ClassDef was found.
