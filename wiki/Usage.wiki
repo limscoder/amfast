@@ -36,7 +36,9 @@ AmFast can encode and decode Python objects to AMF3 format.
 || Date || datetime || 
 
 
+
 = Encoding =
+
 {{{
 import amfast.encoder as encoder
 byte_string = encoder.encode(value)
@@ -60,7 +62,10 @@ encode(...)
      * include_private - bool - True to encode attributes starting with a underscore  - Default = False
      * get_class_def - function - Function that retrieves a ClassDef object used for customizing serialization of objects - Default = amfast.class_def.get_class_def_by_class Custom functions must have the signature: class_def = function(class_), where class_ is the class of the object being encoded and class_def is a ClassDef instance, or None if no ClassDef was found.
 
+
+
 = Decoding =
+
 {{{
 import amfast.decoder as decoder
 py_obj = decoder.decode(byte_string)
@@ -80,3 +85,26 @@ decode(...)
      * use_array_collections - bool - True to decode ArrayCollections to lists. - Default = False
      * use_object_proxies - bool - True to decode ObjectProxies to dicts. - Default = False
      * get_class_def - function - Function that retrieves a ClassDef object used for customizing de-serialization of objects - Default = amfast.class_def.get_class_def_by_alias Custom functions must have the signature: class_def = function(alias), where alias is the class alias of the object being decoded and class_def is a ClassDef instance, or None if no ClassDef was found.
+
+
+= Custom Object Types =
+
+AmFast supports user-defined object types.
+
+{{{
+from amfast import class_def
+
+# Map a custom class with static attributes
+class_def.map_class(MyCustomClass, class_def.ClassDef, 'class.alias', (tuple, of, static, attributes))
+
+# Map a custom class with dynamic attributes
+class_def.map_class(MyCustomClass, class_def.DynamicClassDef, 'class.alias', ())
+
+# Map a custom class implementing IExternizeable
+# ExternizeableClassDef must be sub-classed, and the
+# methods readByteString and writeByteString must be implemented.
+class_def.map_class(MyCustomClass, class_def.ExternizeableClassDef, 'class.alias')
+
+# Map a custom class that is also mapped with SQLAlchemy
+class_def.map_class(MyCustomClass, class_def.sa_class_def.SaClassDef, 'class.alias')
+}}}
