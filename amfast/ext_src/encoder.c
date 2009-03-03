@@ -34,7 +34,8 @@ typedef struct {
     int use_references; // Flag == 1 to encode multiply occuring objects as references
     int use_legacy_xml; // Flag == 1 to encode XML as legacy XMLDocument instead of E4X
     PyObject *include_private; // PyBool, if True encode attributes starting with '_'.
-    PyObject *get_class_def; // PyFunction for getting a ClassDef for an object.
+    PyObject *class_def_mapper; // Object for getting a ClassDef for an object.
+    PyObject *get_class_def_method_name; // Name of the method to call to retrieve a class def.
     PyObject *array_collection_def; // Keep a copy of a ClassDef for array collections
     PyObject *object_proxy_def; // Keep a copy of a ClassDef for ObjectProxies
     ObjectContext *string_refs; // Keep track of string references
@@ -140,7 +141,8 @@ static EncoderContext* _create_encoder_context(size_t size)
     }
 
     context->include_private = NULL;
-    context->get_class_def = NULL;
+    context->class_def_mapper = NULL;
+    context->get_class_def_method_name = NULL;
     context->array_collection_def = NULL;
     context->object_proxy_def = NULL;
 
@@ -154,8 +156,12 @@ static int _destroy_encoder_context(EncoderContext *context)
     destroy_object_context(context->object_refs);
     destroy_object_context(context->class_refs);
 
-    if (context->get_class_def) {
-        Py_DECREF(context->get_class_def);
+    if (context->class_def_mapper) {
+        Py_DECREF(context->class_def_mapper);
+    }
+
+    if (context->get_class_def_method_name) {
+        Py_DECREF(context->get_class_def_method_name);
     }
 
     if (context->include_private) {
@@ -896,7 +902,17 @@ static int encode_object(EncoderContext *context, PyObject *value)
     if (!class_)
         return 0;
 
-    PyObject *class_def = PyObject_CallFunctionObjArgs(context->get_class_def, class_, NULL);
+    // Create method name, if it does not exist already.
+    if (!context->get_class_def_method_name) {
+        context->get_class_def_method_name = PyString_FromString("getClassDefByClass");
+        if (!context->get_class_def_method_name) {
+            Py_DECREF(class_);
+            return 0;
+        }
+    }
+
+    PyObject *class_def = PyObject_CallMethodObjArgs(context->class_def_mapper, context->get_class_def_method_name,
+        class_, NULL);
     Py_DECREF(class_);
     if (!class_def)
         return 0;
@@ -1178,8 +1194,8 @@ static int _encode(EncoderContext *context, PyObject *value)
 static PyObject* encode(PyObject *self, PyObject *args, PyObject *kwargs)
 {
     PyObject *value;
-    PyObject *get_class_def = Py_None;
-    Py_INCREF(get_class_def);
+    PyObject *class_def_mapper = Py_None;
+    Py_INCREF(class_def_mapper);
     PyObject *include_private = Py_False;
     Py_INCREF(include_private);
     int use_array_collections = 0;
@@ -1188,10 +1204,10 @@ static PyObject* encode(PyObject *self, PyObject *args, PyObject *kwargs)
     int use_legacy_xml = 0;
 
     static char *kwlist[] = {"value", "use_array_collections", "use_object_proxies",
-        "use_references", "use_legacy_xml", "include_private", "get_class_def", NULL};
+        "use_references", "use_legacy_xml", "include_private", "class_def_mapper", NULL};
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|iiiiOO", kwlist,
         &value, &use_array_collections, &use_object_proxies, &use_references,
-        &use_legacy_xml, &include_private, &get_class_def))
+        &use_legacy_xml, &include_private, &class_def_mapper))
         return NULL;
 
     EncoderContext *context = _create_encoder_context(1024);
@@ -1204,26 +1220,28 @@ static PyObject* encode(PyObject *self, PyObject *args, PyObject *kwargs)
     context->use_references = use_references;
     context->use_legacy_xml = use_legacy_xml;
     
-    if (get_class_def != Py_None) {
-        // User supplied function
-        context->get_class_def = get_class_def;
-        Py_INCREF(context->get_class_def);
+    if (class_def_mapper != Py_None) {
+        // Use user supplied ClassDefMapper.
+        context->class_def_mapper = class_def_mapper;
+        Py_INCREF(context->class_def_mapper);
         Py_DECREF(Py_None);
     } else {
+        // Create anonymous ClassDefMapper
         if (!class_def_mod) {
             class_def_mod = PyImport_ImportModule("amfast.class_def");
-            if(!class_def_mod) {
-                Py_DECREF(Py_None);
+            if(!class_def_mod)
                 return NULL;
-            }
         }
 
-        context->get_class_def = PyObject_GetAttrString(class_def_mod, "get_class_def_by_class");
-        Py_DECREF(Py_None);
-        if (!context->get_class_def) {
-            Py_DECREF(class_def_mod);
+        PyObject *class_def = PyObject_GetAttrString(class_def_mod, "ClassDefMapper");
+        if (!class_def)
             return NULL;
-        }
+
+        context->class_def_mapper = PyObject_CallFunctionObjArgs(class_def, NULL);
+        Py_DECREF(class_def);
+        if (!context->class_def_mapper)
+            return NULL;
+        Py_DECREF(Py_None);
     }
 
     if (include_private != Py_None) {
@@ -1259,17 +1277,14 @@ static PyMethodDef encoder_methods[] = {
     "===========\n"
     "byte_string = encode(value, **kwargs)\n\n"
     "Optional keyword arguments:\n"
-    "===========\n"
+    "============================\n"
     " * use_array_collections - bool - True to encode lists and tuples as ArrayCollections - Default = False\n"
     " * use_object_proxies - bool - True to encode dicts as ObjectProxys - Default = False\n"
     " * use_references - bool - True to encode multiply occuring objects as references - Default = True\n"
     " * use_legacy_xml - bool - True to encode XML as old XMLDocument instead of E4X - Default = False\n"
     " * include_private - bool - True to encode attributes starting with '_'  - Default = False\n"
-    " * get_class_def - function - Function that retrieves a ClassDef object used for customizing \n"
-    "    serialization of objects - Default = amfast.class_def.get_class_def_by_class\n"
-    "    Custom functions must have the signature: class_def = function(class_), where class_\n"
-    "    is the class of the object being encoded and class_def is a ClassDef instance, \n"
-    "    or None if no ClassDef was found.\n"},
+    " * class_def_mapper - ClassDefMapper - object that retrieves a ClassDef object used for customizing \n"
+    "    serialization of objects - Default = None (all objects are anonymous)\n"},
     {NULL, NULL, 0, NULL}   /* sentinel */
 };
 

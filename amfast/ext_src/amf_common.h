@@ -30,6 +30,11 @@
 #define XML_TYPE 0x0B
 #define BYTE_ARRAY_TYPE 0x0C
 
+// Client types defined in AMF remoting message
+#define FLASH_8 0x00
+#define FLASH_COM 0x01
+#define FLASH_9 0x03
+
 /* A dynamic array of ObjectRefs. */
 typedef struct {
     PyObject **data;
