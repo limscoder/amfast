@@ -4,5 +4,5 @@
 
 These projects gave great implementation examples:
 
-[http://pyamf.org PyAmf]
-[http://www.teslacore.it/wiki/index.php?title=AMFEXT AMFEXT]
+ * [http://pyamf.org PyAmf]
+ * [http://www.teslacore.it/wiki/index.php?title=AMFEXT AMFEXT]
