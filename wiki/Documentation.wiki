@@ -88,7 +88,7 @@ decode(...)
 
 = Custom Object Types =
 
-AmFast supports user-defined object types.
+!AmFast supports user-defined object types.
 
 {{{
 from amfast import class_def
