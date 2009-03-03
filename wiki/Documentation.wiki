@@ -1,9 +1,8 @@
-#summary Useage instructions
+#summary Documentation and instructions
 
-= Useage =
+= Documentation =
 
-AmFast can encode and decode Python objects to AMF3 format.
-
+!AmFast can encode and decode Python objects to AMF3 format.
 
 = Type Map =
 
