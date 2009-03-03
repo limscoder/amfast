@@ -13,13 +13,13 @@ extensions = [
 
 setup(name="AmFast",
     version = "0.1.0",
-    description = "Encode/Decode AMF.",
+    description = "A C extension to encode/decode Python objects with AMF3.",
     url = "http://code.google.com/p/amfast/",
     author = "Dave Thompson",
     author_email = "dthomp325@gmail.com",
     maintainer = "Dave Thompson",
     maintainer_email = "dthomp325@gmail.com",
-    keywords = "amf amf3 flash flex serialize pyamf"
+    keywords = "amf amf3 flash flex pyamf",
     platforms = ["any"],
     test_suite = "tests.suite",
     packages = ['amfast', 'amfast.class_def'],

@@ -31,7 +31,8 @@ typedef struct {
     int use_object_proxies; // Flag == 1 to decode ObjectProxies to dicts.
     int object_proxy_set; // Flag == 1 if an ObjectProxyClassDef has been decoded.
     int array_collection_set; // Flag == 1 if an ArrayCollectionClassDef has been decode.
-    PyObject *get_class_def; // PyFunction for getting a ClassDef for an object.
+    PyObject *class_def_mapper; // Object for getting a ClassDef for an object.
+    PyObject *get_class_def_method_name; // Name of the method to call to retrieve a class def.
     ObjectContext *string_refs; // Keep track of string references
     ObjectContext *object_refs; // Keep track of object references
     ObjectContext *class_refs; // Keep track of class definitions references
@@ -68,6 +69,7 @@ static PyObject* decode_proxy_class_def(DecoderContext *context, PyObject *class
 static int decode_typed_object(DecoderContext *context, PyObject *obj_value, PyObject *class_def);
 static int decode_externizeable(DecoderContext *context, PyObject *obj_value, PyObject *class_def);
 static int _decode_dynamic_dict(DecoderContext *context, PyObject *dict);
+static PyObject* decode_message(DecoderContext *context);
 
 static PyObject* decode(PyObject *self, PyObject *args, PyObject *kwargs);
 static PyObject* _decode(DecoderContext *context);
@@ -112,6 +114,8 @@ static DecoderContext* _create_decoder_context(PyObject *value)
 
     context->array_collection_set = 0;
     context->object_proxy_set = 0;
+    context->class_def_mapper = NULL;
+    context->get_class_def_method_name = NULL;
 
     return context;
 }
@@ -123,7 +127,13 @@ static int _destroy_decoder_context(DecoderContext *context)
     destroy_object_context(context->object_refs);
     destroy_object_context(context->class_refs);
 
-    Py_DECREF(context->get_class_def);
+    if (context->class_def_mapper) {
+        Py_DECREF(context->class_def_mapper);
+    }
+
+    if (context->get_class_def_method_name) {
+        Py_DECREF(context->get_class_def_method_name);
+    }
 
     //free(context->buf);
     free(context);
@@ -401,7 +411,17 @@ static PyObject* decode_class_def(DecoderContext *context)
     }
 
     // Get ClassDef object from map.
-    PyObject *class_def = PyObject_CallFunctionObjArgs(context->get_class_def, class_alias, NULL);
+    // Create method name, if it does not exist already.
+    if (!context->get_class_def_method_name) {
+        context->get_class_def_method_name = PyString_FromString("getClassDefByAlias");
+        if (!context->get_class_def_method_name) {
+            Py_DECREF(class_alias);
+            return 0;
+        }
+    }
+
+    PyObject *class_def = PyObject_CallMethodObjArgs(context->class_def_mapper, context->get_class_def_method_name,
+        class_alias, NULL);
     Py_DECREF(class_alias);
 
     // Check for an externizeable class def.
@@ -418,8 +438,15 @@ static PyObject* decode_class_def(DecoderContext *context)
         return NULL;
     }
 
-    // Raise exception if number of encoded static attrs
-    // does not match number of static attrs defined in Class
+    // Check for no class def
+    if (class_def == Py_None)
+        // The encoded object is not anonymous,
+        // but there is no mapped ClassDef on the Python
+        // side, so we'll have to treat it as an anonymous
+        // object.
+        return class_def;
+
+    // Decode static attrs
     PyObject *static_attrs = PyObject_GetAttrString(class_def, "static_attrs");
     if (!static_attrs) {
         Py_DECREF(class_def);
@@ -992,14 +1019,17 @@ static PyObject* _decode(DecoderContext *context)
 static PyObject* decode(PyObject *self, PyObject *args, PyObject *kwargs)
 {
     PyObject *value;
-    PyObject *get_class_def = Py_None;
+    PyObject *class_def_mapper = Py_None;
+    Py_INCREF(class_def_mapper);
     int use_array_collections = 0;
     int use_object_proxies = 0;
+    int message = 0;
 
     static char *kwlist[] = {"value", "use_array_collections", "use_object_proxies",
-        "get_class_def", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|iiO", kwlist,
-        &value, &use_array_collections, &use_object_proxies, &get_class_def))
+        "message", "class_def_mapper", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|iiiO", kwlist,
+        &value, &use_array_collections, &use_object_proxies,
+        &message, &class_def_mapper))
         return NULL;
 
     DecoderContext *context = _create_decoder_context(value);
@@ -1009,23 +1039,38 @@ static PyObject* decode(PyObject *self, PyObject *args, PyObject *kwargs)
     // Set defaults
     context->use_array_collections = use_array_collections;
     context->use_object_proxies = use_object_proxies;
-    if (get_class_def != Py_None) {
-        // User supplied function
-        context->get_class_def = get_class_def;
-        Py_INCREF(context->get_class_def);
+
+    if (class_def_mapper != Py_None) {
+        // Use user supplied ClassDefMapper.
+        context->class_def_mapper = class_def_mapper;
+        Py_INCREF(context->class_def_mapper);
+        Py_DECREF(Py_None);
     } else {
+        // Create anonymous ClassDefMapper
         if (!class_def_mod) {
             class_def_mod = PyImport_ImportModule("amfast.class_def");
             if(!class_def_mod)
                 return NULL;
         }
 
-        context->get_class_def = PyObject_GetAttrString(class_def_mod, "get_class_def_by_alias");
-        if (!context->get_class_def)
+        PyObject *class_def = PyObject_GetAttrString(class_def_mod, "ClassDefMapper");
+        if (!class_def)
             return NULL;
+
+        context->class_def_mapper = PyObject_CallFunctionObjArgs(class_def, NULL);
+        Py_DECREF(class_def);
+        if (!context->class_def_mapper)
+            return NULL;
+        Py_DECREF(Py_None);
     }
 
-    PyObject *return_value = _decode(context);
+
+    PyObject *return_value;
+    /*if (decode_message) {
+        return_value = decode_message(context);
+    } else {*/
+        return_value = _decode(context);
+
     _destroy_decoder_context(context);
     return return_value;
 }
@@ -1043,11 +1088,9 @@ static PyMethodDef decoder_methods[] = {
     "============================\n"
     " * use_array_collections - bool - True to decode ArrayCollections to lists. - Default = False\n"
     " * use_object_proxies - bool - True to decode ObjectProxies to dicts. - Default = False\n"
-    " * get_class_def - function - Function that retrieves a ClassDef object used for customizing \n"
-    "    de-serialization of objects - Default = amfast.class_def.get_class_def_by_alias\n"
-    "    Custom functions must have the signature: class_def = function(alias), where alias\n"
-    "    is the class alias of the object being decoded and class_def is a ClassDef instance, \n"
-    "    or None if no ClassDef was found.\n"},
+    " * message - bool - True to decode as an AMF message (decode a remoting call). - Default = False\n"
+    " * class_def_mapper - ClassDefMapper - object that retrieves a ClassDef object used for customizing \n"
+    "    de-serialization of objects - Default = None (all objects are anonymous)\n"},
     {NULL, NULL, 0, NULL}   /* sentinel */
 };
 

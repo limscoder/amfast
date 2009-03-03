@@ -132,10 +132,95 @@ class _ObjectProxyClassDef(ExternizeableClassDef):
     def __init__(self):
         ExternizeableClassDef.__init__(self, None, self.PROXY_ALIAS, ())
 
-# ---- module attributes ---- #
+class ClassDefMapper(object):
+    """Map classes to ClassDefs."""
+    def __init__(self, alias_attr='_amf_alias'):
+        """
+        arguments
+        =========
+        * alias_attr - string, an attribute with this name will be added
+            mapped classes. Default = '_amf_alias'
+        """
+        self._mapped_classes = {}
+        self.alias_attr = alias_attr
 
-ALIAS_ATTR = '_amf_alias' # this attribute is added to a mapped class and holds the class's AMF alias.
-_mapped_classes = {} # used internally to keep track of ClassDef objects.
+    def mapClass(self, class_, class_def_class=ClassDef, alias=None, static_attrs=None):
+        """Map a class to a class_def implementation.
+
+        arguments
+        ==========
+         * class_ - class, the class being mapped.
+         * class_def_class - class, ClassDef or a class that inherits from ClassDef. Default = ClassDef.
+         * alias - string, the class alias to use. Default = fully qualified Python class name.
+         * static_attrs - tuple, tuple of static attribute names. Default = empty tuple.
+        """
+        if not hasattr(class_, '__module__'):
+            raise ClassDefError("class_ argument must be a class object.")
+
+        if not hasattr(class_def_class, 'CLASS_DEF'):
+            raise ClassDefError("class_def_class argument must be class object: ClassDef or sub-class of ClassDef.")
+
+        if static_attrs is None:
+            static_attrs = ()
+
+        if alias is None:
+            alias = '.'.join(class_.__module__, class_.__name__)
+
+        setattr(class_, self.alias_attr, alias)
+        class_def = class_def_class(class_, alias, static_attrs)
+    
+        self._mapped_classes[alias] = class_def
+
+    def getClassDefByClass(self, class_):
+        """Get a ClassDef.
+
+        Returns None in not ClassDef is found.
+
+        arguments
+        ==========
+         * class_ - class, the class to find a ClassDef for.
+        """
+        if not hasattr(class_, self.alias_attr):
+            return None
+
+        alias = getattr(class_, self.alias_attr)
+
+        if not self._mapped_classes.has_key(alias):
+            raise ClassDefError("ClassDef for alias '%s' could not be found." % alias)
+
+        return self._mapped_classes[alias]
+
+    def getClassDefByAlias(self, alias):
+        """Get a ClassDef.
+
+        Returns None in not ClassDef is found.
+
+        arguments
+        ==========
+         * alias - string, the alias to find a ClassDef for.
+        """
+
+        if not self._mapped_classes.has_key(alias):
+            return None
+
+        return self._mapped_classes[alias]
+
+    def unmapClass(self, class_):
+        """Unmap a class definition.
+
+        arguments
+        ==========
+         * class_ - class, the class to remove a ClassDef for.
+        """
+        class_def = self.getClassDefByClass(class_)
+        if class_def is None:
+            raise ClassDefError("ClassDef not found.")
+
+        alias = getattr(class_, self.alias_attr)
+        delattr(class_, self.alias_attr)
+        del self._mapped_classes[alias]
+
+# ---- module attributes ---- #
 
 def get_dynamic_attr_vals(obj, ignore_attrs=None, include_private=False):
     """Returns a dict of attribute values to encode.
@@ -167,78 +252,3 @@ def get_dynamic_attr_vals(obj, ignore_attrs=None, include_private=False):
         vals[attr] = val
 
     return vals
-
-def map_class(class_, class_def_class, alias=None, static_attrs=None):
-    """Map a class to a class_def implementation.
-
-    arguments
-    ==========
-     * class_ - class, the class being mapped.
-     * class_def_class - class, ClassDef or a class that inherits from ClassDef
-     * alias - string, the class alias to use. Default = fully qualified Python class name.
-     * static_attrs - tuple, tuple of static attribute names. Default = empty tuple.
-    """
-    if not hasattr(class_, '__module__'):
-        raise ClassDefError("class_ argument must be a class object.")
-
-    if not hasattr(class_def_class, 'CLASS_DEF'):
-        raise ClassDefError("class_def_class argument must be class object: ClassDef or sub-class of ClassDef.")
-
-    if static_attrs is None:
-        static_attrs = ()
-
-    if alias is None:
-        alias = '.'.join(class_.__module__, class_.__name__)
-
-    setattr(class_, ALIAS_ATTR, alias)
-    class_def = class_def_class(class_, alias, static_attrs)
-    _mapped_classes[alias] = class_def
-
-def get_class_def_by_class(class_):
-    """Get a ClassDef.
-
-    Returns None in not ClassDef is found.
-
-    arguments
-    ==========
-     * class_ - class, the class to find a ClassDef for.
-    """
-    if not hasattr(class_, ALIAS_ATTR):
-        return None
-
-    alias = getattr(class_, ALIAS_ATTR)
-
-    if not _mapped_classes.has_key(alias):
-        raise ClassDefError("ClassDef for alias '%s' could not be found." % alias)
-
-    return _mapped_classes[alias]
-
-def get_class_def_by_alias(alias):
-    """Get a ClassDef.
-
-    Returns None in not ClassDef is found.
-
-    arguments
-    ==========
-     * alias - string, the alias to find a ClassDef for.
-    """
-
-    if not _mapped_classes.has_key(alias):
-        return None
-
-    return _mapped_classes[alias]
-
-def unmap_class(class_):
-    """Unmap a class definition.
-
-    arguments
-    ==========
-     * class_ - class, the class to remove a ClassDef for.
-    """
-    class_def = get_class_def_by_class(class_)
-    if class_def is None:
-        raise ClassDefError("ClassDef not found.")
-
-    alias = getattr(class_, ALIAS_ATTR)
-    delattr(class_, ALIAS_ATTR)
-    del _mapped_classes[alias]

@@ -21,15 +21,17 @@ class RoundTripTestCase(unittest.TestCase):
             self.number = None
 
     def setUp(self):
-        class_def.map_class(self.TestObject, class_def.DynamicClassDef, 'test_complex.test', ())
-        class_def.map_class(self.TestSubObject, class_def.DynamicClassDef, 'test_complex.sub', ())
+        self.class_mapper = class_def.ClassDefMapper()
+
+        self.class_mapper.mapClass(self.TestObject, class_def.DynamicClassDef, 'test_complex.test', ())
+        self.class_mapper.mapClass(self.TestSubObject, class_def.DynamicClassDef, 'test_complex.sub', ())
 
         pyamf.register_class(self.TestObject, 'test_complex.test')
         pyamf.register_class(self.TestSubObject, 'test_complex.sub')
 
     def tearDown(self):
-        class_def.unmap_class(self.TestObject)
-        class_def.unmap_class(self.TestSubObject)
+        self.class_mapper.unmapClass(self.TestObject)
+        self.class_mapper.unmapClass(self.TestSubObject)
 
         pyamf.unregister_class(self.TestObject)
         pyamf.unregister_class(self.TestSubObject)
@@ -53,14 +55,14 @@ class RoundTripTestCase(unittest.TestCase):
 
     def testComplexDict(self):
         complex = {'element': 'ignore', 'objects': self.buildComplex()}
-        encoded = encoder.encode(complex)
-        decoded = decoder.decode(encoded)
+        encoded = encoder.encode(complex, class_def_mapper=self.class_mapper)
+        decoded = decoder.decode(encoded, class_def_mapper=self.class_mapper)
         self.resultTest(decoded['objects'])
 
     def testComplexDictProxies(self):
         complex = {'element': 'ignore', 'objects': self.buildComplex()}
-        encoded = encoder.encode(complex, use_array_collections=True, use_object_proxies=True)
-        decoded = decoder.decode(encoded, use_array_collections=True, use_object_proxies=True)
+        encoded = encoder.encode(complex, use_array_collections=True, use_object_proxies=True, class_def_mapper=self.class_mapper)
+        decoded = decoder.decode(encoded, use_array_collections=True, use_object_proxies=True, class_def_mapper=self.class_mapper)
         self.resultTest(decoded['objects'])
 
     def testPyamfComplexDict(self):
