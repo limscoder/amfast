@@ -1,0 +1,8 @@
+#summary Thanks to people who helped with this project.
+
+= Thanks =
+
+These projects gave great implementation examples:
+
+[http://pyamf.org PyAmf]
+[http://www.teslacore.it/wiki/index.php?title=AMFEXT AMFEXT]
