@@ -22,7 +22,7 @@ setup(name="AmFast",
     keywords = "amf amf3 flash flex pyamf",
     platforms = ["any"],
     test_suite = "tests.suite",
-    packages = ['amfast', 'amfast.class_def'],
+    packages = ['amfast', 'amfast.class_def', 'amfast.remoting'],
     ext_modules = extensions,
     classifiers = [
         "Development Status :: 3 - Alpha",

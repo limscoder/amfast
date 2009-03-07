@@ -354,7 +354,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
         self.assertEquals(result, buf)
 
     def testStaticObj(self):
-        self.class_mapper.mapClass(self.Spam, class_def.ClassDef, 'alias.spam', ('spam',))
+        self.class_mapper.mapClass(class_def.ClassDef(self.Spam, 'alias.spam', ('spam',)))
         test = self.Spam()
 
         result = '\x0A\x13\x15alias.spam'
@@ -367,7 +367,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
         self.assertEquals(result, buf)
 
     def testClassRef(self):
-        self.class_mapper.mapClass(self.Spam, class_def.ClassDef, 'alias.spam', ('spam',))
+        self.class_mapper.mapClass(class_def.ClassDef(self.Spam, 'alias.spam', ('spam',)))
         test_obj_1 = self.Spam()
         test_obj_2 = self.Spam()
         test_obj_2.spam = 'foo'
@@ -383,7 +383,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
         self.assertEquals(result, buf)
 
     def testTypedObjectRef(self):
-        self.class_mapper.mapClass(self.Spam, class_def.ClassDef, 'alias.spam', ('spam',))
+        self.class_mapper.mapClass(class_def.ClassDef(self.Spam, 'alias.spam', ('spam',)))
         test_obj = self.Spam()
         test = (test_obj, test_obj)
 
@@ -397,7 +397,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
         self.assertEquals(result, buf)
 
     def testDynamicObj(self):
-        self.class_mapper.mapClass(self.Spam, class_def.DynamicClassDef, 'alias.spam', ())
+        self.class_mapper.mapClass(class_def.DynamicClassDef(self.Spam, 'alias.spam', ()))
         test = self.Spam()
         
         result = '\x0A\x0B\x15alias.spam'
@@ -409,7 +409,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
         self.assertEquals(result, buf)
 
     def testStaticDynamicObj(self):
-        self.class_mapper.mapClass(self.Spam, class_def.DynamicClassDef, 'alias.spam', ('spam',))
+        self.class_mapper.mapClass(class_def.DynamicClassDef(self.Spam, 'alias.spam', ('spam',)))
         test = self.Spam()
         test.ham = 'foo'
 
@@ -430,7 +430,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
             def writeByteString(self, obj):
                 return custom_encoding
 
-        self.class_mapper.mapClass(self.Spam, ExternClass, 'alias.spam', ('spam',))
+        self.class_mapper.mapClass(ExternClass(self.Spam, 'alias.spam', ('spam',)))
         test = self.Spam()
 
         result = '\x0A\x07\x15alias.spam'

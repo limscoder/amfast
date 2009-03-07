@@ -23,8 +23,8 @@ class RoundTripTestCase(unittest.TestCase):
     def setUp(self):
         self.class_mapper = class_def.ClassDefMapper()
 
-        self.class_mapper.mapClass(self.TestObject, class_def.DynamicClassDef, 'test_complex.test', ())
-        self.class_mapper.mapClass(self.TestSubObject, class_def.DynamicClassDef, 'test_complex.sub', ())
+        self.class_mapper.mapClass(class_def.DynamicClassDef(self.TestObject, 'test_complex.test', ()))
+        self.class_mapper.mapClass(class_def.DynamicClassDef(self.TestSubObject, 'test_complex.sub', ()))
 
         pyamf.register_class(self.TestObject, 'test_complex.test')
         pyamf.register_class(self.TestSubObject, 'test_complex.sub')
@@ -56,13 +56,13 @@ class RoundTripTestCase(unittest.TestCase):
     def testComplexDict(self):
         complex = {'element': 'ignore', 'objects': self.buildComplex()}
         encoded = encoder.encode(complex, class_def_mapper=self.class_mapper)
-        decoded = decoder.decode(encoded, class_def_mapper=self.class_mapper)
+        decoded = decoder.decode(encoded, class_def_mapper=self.class_mapper, amf3=True)
         self.resultTest(decoded['objects'])
 
     def testComplexDictProxies(self):
         complex = {'element': 'ignore', 'objects': self.buildComplex()}
         encoded = encoder.encode(complex, use_array_collections=True, use_object_proxies=True, class_def_mapper=self.class_mapper)
-        decoded = decoder.decode(encoded, use_array_collections=True, use_object_proxies=True, class_def_mapper=self.class_mapper)
+        decoded = decoder.decode(encoded, class_def_mapper=self.class_mapper, amf3=True)
         self.resultTest(decoded['objects'])
 
     def testPyamfComplexDict(self):

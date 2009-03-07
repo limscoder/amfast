@@ -35,6 +35,28 @@
 #define FLASH_COM 0x01
 #define FLASH_9 0x03
 
+// AMF0 Types
+#define NUMBER_AMF0 0x00
+#define BOOL_AMF0 0x01
+#define FALSE_AMF0 0x00
+#define TRUE_AMF0 0x01
+#define STRING_AMF0 0x02
+#define OBJECT_AMF0 0x03
+#define MOVIE_AMF0 0x04
+#define NULL_AMF0 0x05
+#define UNDEFINED_AMF0 0x06
+#define REF_AMF0 0x07
+#define MIXED_ARRAY_AMF0 0x08
+#define OBJECT_END_AMF0 0x09
+#define ARRAY_AMF0 0x0A
+#define DATE_AMF0 0x0B
+#define LONG_STRING_AMF0 0x0C
+#define UNSUPPORTED_AMF0 0x0D
+#define RECORDSET_AMF0 0x0E
+#define XML_DOC_AMF0 0x0F
+#define TYPED_OBJ_AMF0 0x10
+#define AMF3_AMF0 0x11
+
 /* A dynamic array of ObjectRefs. */
 typedef struct {
     PyObject **data;
