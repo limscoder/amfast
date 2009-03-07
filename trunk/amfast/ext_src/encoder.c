@@ -477,16 +477,24 @@ static int _encode_array_collection_header(EncoderContext *context)
     // If ClassDef object has not been created,
     // for ArrayCollection, create it.
     if (!context->array_collection_def) {
-        PyObject *class_def = PyObject_GetAttrString(class_def_mod, "_ArrayCollectionClassDef");
+        PyObject *method_name = PyString_FromString("getClassDefByAlias");
+        if (!method_name)
+            return 0;
+
+        PyObject *alias = PyString_FromString("flex.messaging.io.ArrayCollection");
+        if (!alias) {
+            Py_DECREF(method_name);
+            return 0;
+        }
+
+        PyObject *class_def = PyObject_CallMethodObjArgs(context->class_def_mapper, method_name, alias, NULL);
+        Py_DECREF(method_name);
+        Py_DECREF(alias);
+
         if (!class_def)
             return 0;
 
-        PyObject *class_def_obj = PyObject_CallFunctionObjArgs(class_def, NULL);
-        Py_DECREF(class_def);
-        if (!class_def_obj)
-            return 0;
-
-        context->array_collection_def = class_def_obj;
+        context->array_collection_def = class_def;
     }
 
     // Write ArrayCollectionClassDef to buf.
@@ -614,16 +622,24 @@ static int _encode_object_proxy_header(EncoderContext *context)
     // If ClassDef object has not been created
     // for ObjectProxy, create it.
     if (!context->object_proxy_def) {
-        PyObject *class_def = PyObject_GetAttrString(class_def_mod, "_ObjectProxyClassDef");
+        PyObject *method_name = PyString_FromString("getClassDefByAlias");
+        if (!method_name) 
+            return 0;
+
+        PyObject *alias = PyString_FromString("flex.messaging.io.ObjectProxy");
+        if (!alias) {
+            Py_DECREF(method_name);
+            return 0;
+        }
+
+        PyObject *class_def = PyObject_CallMethodObjArgs(context->class_def_mapper, method_name, alias, NULL);
+        Py_DECREF(method_name);
+        Py_DECREF(alias);
+
         if (!class_def)
             return 0;
 
-        PyObject *class_def_obj = PyObject_CallFunctionObjArgs(class_def, NULL);
-        Py_DECREF(class_def);
-        if (!class_def_obj)
-            return 0;
-
-        context->object_proxy_def = class_def_obj;
+        context->object_proxy_def = class_def;
     }
 
     // Encode object proxy class def.

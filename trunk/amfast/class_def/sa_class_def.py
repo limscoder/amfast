@@ -67,13 +67,13 @@ class SaClassDef(class_def.ClassDef):
 
     def applyAttrVals(self, obj, vals):
         # Delete lazy-loaded attrs from vals
-        if vals.has_key(self.LAZY_ATTR):
+        if self.LAZY_ATTR in vals:
             for lazy_attr in vals[self.LAZY_ATTR]:
-                if vals.has_key(lazy_attr):
+                if lazy_attr in vals:
                     del vals[lazy_attr]
             del vals[self.LAZY_ATTR]
             
-        if vals.has_key(self.KEY_ATTR):
+        if self.KEY_ATTR in vals:
             del vals[self.KEY_ATTR]
 
         class_def.ClassDef.applyAttrVals(self, obj, vals)
