@@ -90,8 +90,8 @@ class DynamicClassDef(ClassDef):
 
     DYNAMIC_CLASS_DEF = True
 
-    def __init__(self, class_, alias=None, static_attrs=None):
-        ClassDef.__init__(self, class_, alias, static_attrs)
+    def __init__(self, class_, alias=None, static_attrs=None, amf3=True):
+        ClassDef.__init__(self, class_, alias, static_attrs, amf3)
 
     def getDynamicAttrVals(self, obj, include_private=False):
         """Returns a dict where keys are attribute names and values are attribute values.
