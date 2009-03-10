@@ -13,15 +13,15 @@ class Amf3EncoderTestCase(unittest.TestCase):
         self.class_mapper = class_def.ClassDefMapper()
 
     def testNull(self):
-        buf = encoder.encode(None)
+        buf = encoder.encode(None, amf3=True)
         self.assertEquals('\x01', buf)
 
     def testFalse(self):
-        buf = encoder.encode(False)
+        buf = encoder.encode(False, amf3=True)
         self.assertEquals('\x02', buf)
 
     def testTrue(self):
-        buf = encoder.encode(True)
+        buf = encoder.encode(True, amf3=True)
         self.assertEquals('\x03', buf)
 
     def testInt(self):
@@ -42,7 +42,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
         }
 
         for integer, encoding in tests.iteritems():
-            buf = encoder.encode(integer)
+            buf = encoder.encode(integer, amf3=True)
             self.assertEquals(encoding, buf)
 
     def testFloat(self):
@@ -52,7 +52,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
         }
 
         for number, encoding in tests.iteritems():
-            buf = encoder.encode(number)
+            buf = encoder.encode(number, amf3=True)
             self.assertEquals(encoding, buf)
 
     def testLong(self):
@@ -63,7 +63,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
         }
 
         for number, encoding in tests.iteritems():
-            buf = encoder.encode(number)
+            buf = encoder.encode(number, amf3=True)
             self.assertEquals(encoding, buf)
 
     def testUnicode(self):
@@ -74,7 +74,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
         }
 
         for string, encoding in tests.iteritems():
-            buf = encoder.encode(string)
+            buf = encoder.encode(string, amf3=True)
             self.assertEquals(encoding, buf)
 
     def testUnicodeRefs(self):
@@ -87,7 +87,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
         result += '\x06\x01' #array element 3 (empty string)
         result += '\x06\x00' #array element 4 (reference to hello)
 
-        buf = encoder.encode(test)
+        buf = encoder.encode(test, amf3=True)
         self.assertEquals(result, buf)
 
     def testRefsOff(self):
@@ -100,7 +100,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
         result += '\x06\x01' #array element 3 (empty string)
         result += '\x06\x0bhello' #array element 4 (hello encoded)
 
-        buf = encoder.encode(test, use_references=False)
+        buf = encoder.encode(test, use_references=False, amf3=True)
         self.assertEquals(result, buf)
 
 
@@ -111,7 +111,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
         }
 
         for string, encoding in tests.iteritems():
-            buf = encoder.encode(string)
+            buf = encoder.encode(string, amf3=True)
             self.assertEquals(encoding, buf)
 
     def testStringRefs(self):
@@ -124,7 +124,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
         result += '\x06\x01' #array element 3 (empty string)
         result += '\x06\x00' #array element 4 (reference to hello)
 
-        buf = encoder.encode(test)
+        buf = encoder.encode(test, amf3=True)
         self.assertEquals(result, buf)
 
     def testTuple(self):
@@ -136,7 +136,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
         result += '\x04\x02' #array element 3
         result += '\x04\x03' #array element 4
 
-        buf = encoder.encode(test);
+        buf = encoder.encode(test, amf3=True);
         self.assertEquals(result, buf);
 
     def testTupleRefs(self):
@@ -147,7 +147,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
         result += '\x09\x09\x01\x04\x00\x04\x01\x04\x02\x04\x03' # array element 1 (test_tuple encoded)
         result += '\x09\x02' # array element 2 (reference to test_tuple)
 
-        buf = encoder.encode(test)
+        buf = encoder.encode(test, amf3=True)
         self.assertEquals(result, buf)
 
     def testTupleAsCollection(self):
@@ -160,7 +160,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
         result += '\x04\x02' #array element 3
         result += '\x04\x03' #array element 4
 
-        buf = encoder.encode(test, use_array_collections=True)
+        buf = encoder.encode(test, use_array_collections=True, amf3=True)
         self.assertEquals(result, buf)
 
     def testArrayCollectionRef(self):
@@ -171,7 +171,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
         result += '\x0A\x01\x09\x09\x01\x04\x00\x04\x01\x04\x02\x04\x03' # array element 1 (test_tuple encoded)
         result += '\x0A\x04' # array element 2 (reference to test_tuple)
 
-        buf = encoder.encode(test, use_array_collections=True)
+        buf = encoder.encode(test, use_array_collections=True, amf3=True)
         self.assertEquals(result, buf)
 
     def testList(self):
@@ -183,7 +183,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
         result += '\x04\x02' #array element 3
         result += '\x04\x03' #array element 
 
-        buf = encoder.encode(test); 
+        buf = encoder.encode(test, amf3=True);
         self.assertEquals(result, buf);
 
     def testListRefs(self):
@@ -194,7 +194,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
         result += '\x09\x09\x01\x04\x00\x04\x01\x04\x02\x04\x03' # array element 1 (test_list encoded)
         result += '\x09\x02' # array element 2 (reference to test_list)
 
-        buf = encoder.encode(test)
+        buf = encoder.encode(test, amf3=True)
         self.assertEquals(result, buf)
 
     def testListAsCollection(self):
@@ -207,7 +207,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
         result += '\x04\x02' #array element 3
         result += '\x04\x03' #array element 4
 
-        buf = encoder.encode(test, use_array_collections=True);
+        buf = encoder.encode(test, use_array_collections=True, amf3=True);
         self.assertEquals(result, buf)
 
     def testDict(self):
@@ -216,7 +216,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
         result += '\x06\x09eggs' #value
         result += '\x01' # empty string terminator
 
-        buf = encoder.encode({'spam': 'eggs'})
+        buf = encoder.encode({'spam': 'eggs'}, amf3=True)
         self.assertEquals(result, buf)
 
     def testDictRef(self):
@@ -227,7 +227,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
         result += '\x0A\x0B\x01\x09spam\x06\x09eggs\x01' #array element 1 (test_dict encoded)
         result += '\x0A\x02' # array element 2 (reference to test_dict)
 
-        buf = encoder.encode(test)
+        buf = encoder.encode(test, amf3=True)
         self.assertEquals(result, buf)
 
     def testDictAsObjectProxy(self):
@@ -237,7 +237,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
         result += '\x06\x09eggs' #value
         result += '\x01' # empty string terminator
 
-        buf = encoder.encode({'spam': 'eggs'}, use_object_proxies=True)
+        buf = encoder.encode({'spam': 'eggs'}, use_object_proxies=True, amf3=True)
         self.assertEquals(result, buf)
 
     def testObjectProxyRef(self):
@@ -248,21 +248,21 @@ class Amf3EncoderTestCase(unittest.TestCase):
         result += '\x0A\x07\x3Bflex.messaging.io.ObjectProxy\x0A\x0B\x01\x09spam\x06\x09eggs\x01' #array element 1 (test_dict encoded)
         result += '\x0A\x02' # array element 2 (reference to test_dict)
 
-        buf = encoder.encode(test, use_object_proxies=True)
+        buf = encoder.encode(test, use_object_proxies=True, amf3=True)
         self.assertEquals(result, buf)
 
     def testDictBadKeyRaisesError(self):
-        self.assertRaises(encoder.EncodeError, encoder.encode, {1: 'fail'})
+        self.assertRaises(encoder.EncodeError, encoder.encode, {1: 'fail'}, amf3=True)
 
     def testDate(self):
         import datetime
 
         test = datetime.datetime(2005, 3, 18, 1, 58, 31)
-        buf = encoder.encode(test)
+        buf = encoder.encode(test, amf3=True)
         self.assertEquals('\x08\x01Bp+6!\x15\x80\x00', buf)
 
         test = datetime.date(2003, 12, 1)
-        buf = encoder.encode(test)
+        buf = encoder.encode(test, amf3=True)
         self.assertEquals('\x08\x01Bo%\xe2\xb2\x80\x00\x00', buf)
 
     def testDateReferences(self):
@@ -275,7 +275,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
         result += '\x08\x01Bp+6!\x15\x80\x00' #array element 1 (test_date encoded)
         result += '\x08\x02' # array element 2 (reference to test_date)
 
-        buf = encoder.encode(test)
+        buf = encoder.encode(test, amf3=True)
         self.assertEquals(result, buf)
 
     def testXml(self):
@@ -292,7 +292,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
         result += '<?xml version="1.0" ?><test>\n            <test_me>tester</test_me>\n           </test>' # encoded XML
 
         dom = xml.dom.minidom.parseString(document)
-        buf = encoder.encode(dom)
+        buf = encoder.encode(dom, amf3=True)
         self.assertEquals(result, buf)
 
     def testXmlRef(self):
@@ -311,7 +311,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
         result += '\x0B\x81\x2B<?xml version="1.0" ?><test>\n            <test_me>tester</test_me>\n           </test>' # array element 1 (encoded dom)
         result += '\x0B\x02' # array element 2 (reference to dom)
 
-        buf = encoder.encode(test)
+        buf = encoder.encode(test, amf3=True)
         self.assertEquals(result, buf)
 
     def testLegacyXml(self):
@@ -328,7 +328,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
         result += '<?xml version="1.0" ?><test>\n            <test_me>tester</test_me>\n           </test>' # encoded XML
 
         dom = xml.dom.minidom.parseString(document)
-        buf = encoder.encode(dom, use_legacy_xml=True)
+        buf = encoder.encode(dom, use_legacy_xml=True, amf3=True)
         self.assertEquals(result, buf)
 
     def testAnonObj(self):
@@ -339,7 +339,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
         result += '\x06\x09eggs' #value
         result += '\x01' # empty string terminator
 
-        buf = encoder.encode(test)
+        buf = encoder.encode(test, amf3=True)
         self.assertEquals(result, buf)
 
     def testAnonObjRef(self):
@@ -350,7 +350,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
         result += '\x0A\x0B\x01\x09spam\x06\x09eggs\x01' #array element 1 (test_obj encoded)
         result += '\x0A\x02' # array element 2 (reference to test_obj)
 
-        buf = encoder.encode(test)
+        buf = encoder.encode(test, amf3=True)
         self.assertEquals(result, buf)
 
     def testStaticObj(self):
@@ -361,7 +361,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
         result += '\x09spam' # static attr definition
         result += '\x06\x09eggs' # static attrs
 
-        buf = encoder.encode(test, class_def_mapper=self.class_mapper)
+        buf = encoder.encode(test, class_def_mapper=self.class_mapper, amf3=True)
         self.class_mapper.unmapClass(self.Spam)
 
         self.assertEquals(result, buf)
@@ -377,7 +377,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
         result += '\x0A\x13\x15alias.spam\x09spam\x06\x09eggs' # array element 1
         result += '\x0A\x01\x06\x07foo' # array element 2
 
-        buf = encoder.encode(test, class_def_mapper=self.class_mapper)
+        buf = encoder.encode(test, class_def_mapper=self.class_mapper, amf3=True)
         self.class_mapper.unmapClass(self.Spam)
 
         self.assertEquals(result, buf)
@@ -391,7 +391,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
         result += '\x0A\x13\x15alias.spam\x09spam\x06\x09eggs' # test_obj_encoded
         result += '\x0A\x02' # array element 2 (reference to test_obj)
 
-        buf = encoder.encode(test, class_def_mapper=self.class_mapper)
+        buf = encoder.encode(test, class_def_mapper=self.class_mapper, amf3=True)
         self.class_mapper.unmapClass(self.Spam)
 
         self.assertEquals(result, buf)
@@ -403,7 +403,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
         result = '\x0A\x0B\x15alias.spam'
         result += '\x09spam\x06\x09eggs\x01' # dynamic attrs
 
-        buf = encoder.encode(test, class_def_mapper=self.class_mapper)
+        buf = encoder.encode(test, class_def_mapper=self.class_mapper, amf3=True)
         self.class_mapper.unmapClass(self.Spam)
 
         self.assertEquals(result, buf)
@@ -418,7 +418,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
         result += '\x06\x09eggs' # static attrs
         result += '\x07ham\x06\x07foo\x01' #dynamic attrs
 
-        buf = encoder.encode(test, class_def_mapper=self.class_mapper)
+        buf = encoder.encode(test, class_def_mapper=self.class_mapper, amf3=True)
         self.class_mapper.unmapClass(self.Spam)
 
         self.assertEquals(result, buf)
@@ -436,7 +436,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
         result = '\x0A\x07\x15alias.spam'
         result += custom_encoding # raw bytes
 
-        buf = encoder.encode(test, class_def_mapper=self.class_mapper)
+        buf = encoder.encode(test, class_def_mapper=self.class_mapper, amf3=True)
         self.class_mapper.unmapClass(self.Spam)
 
         self.assertEquals(result, buf)
@@ -444,7 +444,7 @@ class Amf3EncoderTestCase(unittest.TestCase):
 
     def testUnknownRaisesError(self):
        import sets
-       self.assertRaises(class_def.ClassDefError, encoder.encode, sets.Set())
+       self.assertRaises(class_def.ClassDefError, encoder.encode, sets.Set(), amf3=True)
 
 def suite():
     return unittest.TestLoader().loadTestsFromTestCase(Amf3EncoderTestCase)

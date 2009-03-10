@@ -42,7 +42,7 @@ class AbstractMessage(object):
         """Invoke all message headers."""
         if self.headers is not None:
             for name, val in self.headers.iteritems():
-                target = service_mapper.getTargetByName(remoting.Service.MESSAGE_HEADER_SERVICE, name)
+                target = service_mapper.message_header_service.getTarget(name)
                 if target is not None:
                     return target.invoke(request_packet, response_packet, request_msg, response_msg, (val,))
 
@@ -81,7 +81,7 @@ class AbstractMessage(object):
     def __str__(self):
         header_str = ''
         if self.headers is not None:
-            header_str = '\n'.join(["<header name=\"%s\">%s</header>" % (key, val) for key, val in self.headers.iteritems()])
+            header_str = '\n  '.join(["<header name=\"%s\">%s</header>" % (key, val) for key, val in self.headers.iteritems()])
         
         attrs = {}
         for key, val in self.__dict__.iteritems():
@@ -91,21 +91,21 @@ class AbstractMessage(object):
                 continue
             attrs[key] = val
         
-        attrs_str = '\n'.join(["<attr name=\"%s\">%s</attr>" % (key, val) for key, val in attrs.iteritems()])
+        attrs_str = '\n  '.join(["<attr name=\"%s\">%s</attr>" % (key, val) for key, val in attrs.iteritems()])
 
         str = """
 <FlexMessage>
-<headers>
-%s
-</headers>
+ <headers>
+  %s
+ </headers>
 
-<body>
-%s
-</body>
+ <body>
+  %s
+ </body>
 
-<attributes>
-%s
-</attributes>
+ <attributes>
+  %s
+ </attributes>
 </FlexMessage>
 """ % (header_str, self.body, attrs_str)
         return str
@@ -159,7 +159,7 @@ class CommandMessage(AsyncMessage):
     def invoke(self, service_mapper, request_packet, response_packet, request_msg, response_msg):
         AbstractMessage.invoke(self, service_mapper, request_packet, response_packet, request_msg, response_msg)
 
-        target = service_mapper.getTargetByName(remoting.Service.COMMAND_SERVICE, self.operation)
+        target = service_mapper.command_service.getTarget(self.operation)
         if target is None:
             raise FlexMessageError("Command '%s' not found." % self.operation)
         response_msg.value.body = target.invoke(request_packet, response_packet, request_msg, response_msg, self.body)

@@ -5,9 +5,9 @@ import sys
 from amfast import remoting, logger
 from amfast.remoting import flex_messages as messaging
 
-handler = logging.StreamHandler(sys.stdout)
-handler.setLevel(logging.DEBUG)
-logger.addHandler(handler)
+#handler = logging.StreamHandler(sys.stdout)
+#handler.setLevel(logging.DEBUG)
+#logger.addHandler(handler)
 
 class RemotingTestCase(unittest.TestCase):
 
@@ -76,6 +76,25 @@ class RemotingTestCase(unittest.TestCase):
         self.assertEquals('eggs', packet.messages[1].target)
         self.assertEquals('spam', packet.messages[1].response)
         self.assertEquals(False, packet.messages[1].value)
+
+    def testRoundTripPacket(self):
+        encoded = '\x00\x00' # AMF0 version marker
+        encoded += '\x00\x02' # Header count
+        encoded += '\x00\x04spam\x00\x00\x00\x00\x07\x02\x00\x04eggs' # Optional Header
+        encoded += '\x00\x04eggs\x01\x00\x00\x00\x07\x02\x00\x04spam' # Required Header , 32 bytes
+        encoded += '\x00\x02' # Body count
+        encoded += '\x00\x04spam' # Body 1 target
+        encoded += '\x00\x04eggs' # Body 1 response
+        encoded += '\x00\x00\x00\x02' # Body 1 byte length
+        encoded += '\x01\x01' # Body 1 value
+        encoded += '\x00\x04eggs' # Body 2 target
+        encoded += '\x00\x04spam' # Body 2 response
+        encoded += '\x00\x00\x00\x02' # Body 2 byte length
+        encoded += '\x01\x00' # Body 2 value
+
+        packet = self.gateway.decode_packet(encoded)
+        encoded_packet = self.gateway.encode_packet(packet)
+        self.assertEquals(encoded, encoded_packet)
 
     def testHeaderTarget(self):
         header = remoting.Header(self.target_name, False, self.arg)
@@ -161,6 +180,31 @@ class RemotingTestCase(unittest.TestCase):
 
         packet = remoting.Packet(messages=[outter_msg])
         response = packet.process(self.gateway.service_mapper)
+
+        # Check outer msg
+        self.assertEquals(1, len(response.messages))
+        self.assertEquals(True, response.messages[0].target.endswith('onResult'))
+        self.assertEquals('', response.messages[0].response)
+
+        # Check inner msg
+        self.assertEquals(messaging.AcknowledgeMessage, response.messages[0].value.__class__)
+        self.assertEquals('123', response.messages[0].value.correlationId)
+        self.assertEquals(True, response.messages[0].value.body)
+
+    def testProcessPacket(self):
+        outter_msg = remoting.Message(target='', response='/1')
+        inner_msg = messaging.CommandMessage()
+        inner_msg.destination = self.service_name
+        inner_msg.operation = messaging.CommandMessage.CLIENT_PING_OPERATION
+        inner_msg.headers = {}
+        inner_msg.body = (None, )
+        inner_msg.messageId = '123'
+        outter_msg.value = inner_msg
+
+        packet = remoting.Packet(messages=[outter_msg])
+        encoded_packet = self.gateway.encode_packet(packet)
+        encoded_response = self.gateway.process_packet(encoded_packet)
+        response = self.gateway.decode_packet(encoded_response)
 
         # Check outer msg
         self.assertEquals(1, len(response.messages))

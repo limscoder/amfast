@@ -1,6 +1,6 @@
 """Provides an interface for performing remoting calls."""
 import amfast
-from amfast import AmFastError, class_def, decoder
+from amfast import AmFastError, class_def, decoder, encoder
 
 class RemotingError(AmFastError):
     """Remoting related errors."""
@@ -140,7 +140,7 @@ class Header(object):
 
     def invoke(self, service_mapper, request_packet, response_packet):
         """Invoke an action on this header if one has been mapped."""
-        target = service_mapper.getTargetByName(Service.PACKET_HEADER_SERVICE, self.name)
+        target = service_mapper.packet_header_service.getTarget(self.name)
         if target is not None:
             return target.invoke(request_packet, response_packet, None, None, (self.value,))
 
@@ -258,23 +258,23 @@ class Packet(object):
         self.messages = messages
 
     def __str__(self):
-        header_msg = "\n".join(["%s" % header for header in self.headers])
+        header_msg = "\n  ".join(["%s" % header for header in self.headers])
 
-        message_msg = "\n".join(["%s" % message for message in self.messages])
+        message_msg = "\n  ".join(["%s" % message for message in self.messages])
 
         return """
 <Packet>
-<headers>
-%s
-</headers>
+ <headers>
+  %s
+ </headers>
 
-<messages>
-%s
-</messages>
+ <messages>
+  %s
+ </messages>
 
-<attributes>
-<attr name="version">%s</attr>
-</attributes>
+ <attributes>
+  <attr name="version">%s</attr>
+ </attributes>
 </Packet>
 """ % (header_msg, message_msg, self.version)
 
@@ -343,12 +343,17 @@ class Gateway(object):
 
         request_packet = None
         try:
-            request_packet = decode_packet(raw_packet)
+            request_packet = self.decode_packet(raw_packet)
             response_packet = request_packet.process(self.service_mapper)
             return self.encode_packet(response_packet)
         except Exception, exc:
-            # Send an error message back to the client.
-            message = handle_exc(exc)
+            amfast.log_exc()
+            if request_packet is not None:
+                return request_packet.fail(exc)
+            else:
+                # There isn't much we can do if
+                # the request was not decoded correctly.
+                raise exc
 
     def decode_packet(self, raw_packet):
         if amfast.log_debug:
@@ -358,9 +363,11 @@ class Gateway(object):
         return decoder.decode(raw_packet, packet=True, class_def_mapper=self.class_def_mapper)
 
     def encode_packet(self, packet):
-        raw_packet = encoder.encode(packet, class_def_mapper=self.class_def_mapper,
-            use_array_collections=self.use_array_collections, use_object_proxies=self.use_object_proxies,
-            use_references=self.use_references, use_legaxy_xml=self.use_legacy_xml,
+        raw_packet = encoder.encode(packet, packet=True, 
+            class_def_mapper=self.class_def_mapper,
+            use_array_collections=self.use_array_collections,
+            use_object_proxies=self.use_object_proxies,
+            use_references=self.use_references, use_legacy_xml=self.use_legacy_xml,
             include_private=self.include_private)
 
         if amfast.log_debug:
@@ -368,10 +375,6 @@ class Gateway(object):
             amfast.logger.debug("<rawResponsePacket>%s</rawResponsePacket>" % raw)
 
         return raw_packet
-
-    def handle_exc(self, exc):
-        """Logs exception and returns error message."""
-        amfast.log_exc()
 
 class ServiceMapper(object):
     """Maps service to service name.
@@ -400,25 +403,15 @@ class ServiceMapper(object):
         import targets
 
         # Map built in targets
-        self.mapService(Service(Service.PACKET_HEADER_SERVICE))
-        self.mapService(Service(Service.MESSAGE_HEADER_SERVICE))
-        self.mapService(Service(Service.COMMAND_SERVICE))
+        self.packet_header_service = Service(Service.PACKET_HEADER_SERVICE)
+        self.mapService(self.packet_header_service)
+        self.message_header_service = Service(Service.MESSAGE_HEADER_SERVICE)
+        self.mapService(self.message_header_service)
+        self.command_service = Service(Service.COMMAND_SERVICE)
+        self.mapService(self.command_service)
 
-        command_service = self.command_service
-        command_service.setTarget(ExtCallableTarget(targets.ro_ping,
+        self.command_service.setTarget(ExtCallableTarget(targets.ro_ping,
             messaging.CommandMessage.CLIENT_PING_OPERATION))
-
-    def _getPacketHeaderService(self):
-        return self.getServiceByName(Service.PACKET_HEADER_SERVICE)
-    packet_header_service = property(_getPacketHeaderService)
-
-    def _getMessageHeaderService(self):
-        return self.getServiceByName(Service.MESSAGE_HEADER_SERVICE)
-    message_header_service = property(_getMessageHeaderService)
-
-    def _getCommandService(self):
-        return self.getServiceByName(Service.COMMAND_SERVICE)
-    command_service = property(_getCommandService)
 
     def mapService(self, service):
         """Maps a service

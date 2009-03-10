@@ -53,20 +53,19 @@ static int _decode_int(DecoderContext *context);
 static PyObject* decode_double(DecoderContext *context);
 static double _decode_double(DecoderContext *context);
 static PyObject* deserialize_string(DecoderContext *context);
-static PyObject* decode_string(DecoderContext *context);
-static PyObject* decode_string_size(DecoderContext *context, unsigned int string_size);
+static PyObject* decode_string(DecoderContext *context, unsigned int string_size);
 static PyObject* deserialize_array(DecoderContext *context, int collection);
 static int decode_array(DecoderContext *context, PyObject *list_value, int array_len);
-static PyObject* decode_reference(DecoderContext *context, ObjectContext *object_context, int bit);
+static PyObject* decode_reference(ObjectContext *object_context, int value);
 static PyObject* deserialize_xml(DecoderContext *context);
 static PyObject* xml_from_string(PyObject *xml_string);
 static PyObject* deserialize_byte_array(DecoderContext *context);
 static PyObject* deserialize_byte_array(DecoderContext *context);
-static PyObject* decode_byte_array(DecoderContext *context);
+static PyObject* decode_byte_array(DecoderContext *context, int byte_len);
 static PyObject* decode_date(DecoderContext *context);
 static PyObject* deserialize_object(DecoderContext *context, int proxy);
-static PyObject* deserialize_class_def(DecoderContext *context);
-static PyObject* decode_class_def(DecoderContext *context);
+static PyObject* deserialize_class_def(DecoderContext *context, int header);
+static PyObject* decode_class_def(DecoderContext *context, int header);
 static PyObject* class_def_from_alias(DecoderContext *context, PyObject *alias);
 static int decode_typed_object(DecoderContext *context, PyObject *obj_value, PyObject *class_def);
 static int decode_externizeable(DecoderContext *context, PyObject *obj_value, PyObject *class_def);
@@ -197,18 +196,15 @@ static int _destroy_decoder_context(DecoderContext *context)
  */
 static PyObject* deserialize_object(DecoderContext *context, int proxy)
 {
-    // TODO: this is a little hairy, should probably be split up.
-
-    PyObject *obj_value;
+    int header = _decode_int(context);
 
     // Check for object reference
-    obj_value = decode_reference(context, context->object_refs, 0);
+    PyObject *obj_value = decode_reference(context->object_refs, header);
     if (!obj_value)
         return NULL;
 
     if (obj_value != Py_None) {
         // Ref found
-
         if (proxy) {
             // Map ObjectProxy idx to ref, since
             // it points to the same object.
@@ -217,19 +213,18 @@ static PyObject* deserialize_object(DecoderContext *context, int proxy)
                 return NULL;
             }
         }
-
         return obj_value;
+    } else {
+        Py_DECREF(Py_None);
     }
-    Py_DECREF(Py_None);
 
     // Ref not found
     // Create instance based on class def
-    PyObject *class_def = deserialize_class_def(context);
+    PyObject *class_def = deserialize_class_def(context, header);
     if (!class_def)
         return NULL;
 
     int obj_type; // 0 = anonymous, 1 == externizeable, 2 == typed
-   
     if (class_def == Py_None) {
         // Anonymous object.
         obj_type = 0;
@@ -410,10 +405,14 @@ static int decode_externizeable(DecoderContext *context, PyObject *obj_value, Py
     return 1; 
 }
 
-/* Deserialize a ClassDef. */
-static PyObject* deserialize_class_def(DecoderContext *context)
+/*
+ * Deserialize a ClassDef.
+ *
+ * header argument is the parsed object header.
+ */
+static PyObject* deserialize_class_def(DecoderContext *context, int header)
 {
-    PyObject *class_def = decode_reference(context, context->class_refs, 1);
+    PyObject *class_def = decode_reference(context->class_refs, header >> 1);
     if (!class_def)
         return NULL;
 
@@ -421,7 +420,7 @@ static PyObject* deserialize_class_def(DecoderContext *context)
         return class_def;
     Py_DECREF(Py_None);
 
-    class_def = decode_class_def(context);
+    class_def = decode_class_def(context, header);
     if (!class_def)
         return 0;
 
@@ -432,10 +431,13 @@ static PyObject* deserialize_class_def(DecoderContext *context)
     return class_def;
 }
 
-/* Decode a ClassDef. */
-static PyObject* decode_class_def(DecoderContext *context)
+/*
+ * Decode a ClassDef.
+ *
+ * header argument is parsed the object header.
+ */
+static PyObject* decode_class_def(DecoderContext *context, int header)
 {
-    int header = _decode_int(context);
     PyObject *alias = deserialize_string(context);
     if (!alias)
         return NULL;
@@ -458,23 +460,6 @@ static PyObject* decode_class_def(DecoderContext *context)
     if (class_def == Py_None)
         return class_def;
 
-    // Decode static attrs
-    PyObject *static_attrs = PyObject_GetAttrString(class_def, "static_attrs");
-    if (!static_attrs) {
-        Py_DECREF(class_def);
-        return NULL;
-    }
-
-    if (!PyTuple_Check(static_attrs)) {
-       Py_DECREF(static_attrs);
-       Py_DECREF(class_def);
-       PyErr_SetString(amfast_DecodeError, "ClassDef.static_attrs must be a tuple.");
-       return NULL;
-    }
-
-    int static_attr_len = PyTuple_GET_SIZE(static_attrs);
-    Py_DECREF(static_attrs);
-
     // Raise exception if ClassDef is dynamic,
     // but encoding is static
     if (PyObject_HasAttrString(class_def, "DYNAMIC_CLASS_DEF") && (!((header & DYNAMIC) == DYNAMIC))) {
@@ -483,9 +468,12 @@ static PyObject* decode_class_def(DecoderContext *context)
         return NULL;
     } else if ((header & DYNAMIC) == DYNAMIC && (!PyObject_HasAttrString(class_def, "DYNAMIC_CLASS_DEF"))) {
         Py_DECREF(class_def);
-        PyErr_SetString(amfast_DecodeError, "Encoded class is dynamic, but ClassDef is not.");
+        PyErr_SetString(amfast_DecodeError, "Encoded class is dynamic, but ClassDef is static.");
         return NULL;
     }
+
+    // Decode static attrs
+    int static_attr_len = header >> 4;
 
     // Get static attr name from encoding
     // since attrs may be in a different order
@@ -554,6 +542,7 @@ static int _decode_dynamic_dict(DecoderContext *context, PyObject *dict)
         if (!key)
             return 0;
 
+
         PyObject *val = _decode(context);
         if (!val) {
             Py_DECREF(key);
@@ -574,16 +563,15 @@ static int _decode_dynamic_dict(DecoderContext *context, PyObject *dict)
  */
 static PyObject* deserialize_array(DecoderContext *context, int collection)
 {
-    PyObject *list_value;
+    int header = _decode_int(context);
 
     // Check for reference
-    list_value = decode_reference(context, context->object_refs, 0);
+    PyObject *list_value = decode_reference(context->object_refs, header);
     if (!list_value)
         return NULL;
 
     if (list_value != Py_None) {
         // Ref found
-
         if (collection) {
             // Map ArrayCollection idx to ref, since
             // it points to the same list.
@@ -593,11 +581,12 @@ static PyObject* deserialize_array(DecoderContext *context, int collection)
             }
         }
         return list_value;
+    } else {
+        Py_DECREF(Py_None);
     }
-    Py_DECREF(Py_None);
 
     // Create list of correct length
-    int array_len = _decode_int(context) >> 1;
+    int array_len = header >> 1;
     list_value = PyList_New(array_len);
     if (!list_value)
         return NULL;
@@ -655,21 +644,16 @@ static int decode_array(DecoderContext *context, PyObject *list_value, int array
 /* Deserialize date. */
 static PyObject* deserialize_date(DecoderContext *context)
 {
-    PyObject *date_value;
+    int header = _decode_int(context);
 
     // Check for reference
-    date_value = decode_reference(context, context->object_refs, 0);
+    PyObject *date_value = decode_reference(context->object_refs, header);
     if (!date_value)
         return NULL;
 
     if (date_value != Py_None)
         return date_value;
     Py_DECREF(Py_None);
-
-    // Skip reference bit
-    // it is only used as a reference,
-    // not as a combined ref or int, like the others.
-    context->pos++;
 
     date_value = decode_date(context);
     if (!date_value)
@@ -707,10 +691,10 @@ static PyObject* decode_date(DecoderContext *context)
 /* Deserialize a byte array. */
 static PyObject* deserialize_byte_array(DecoderContext *context)
 {
-    PyObject *byte_array_value;
+    int header = _decode_int(context);
 
     // Check for reference
-    byte_array_value = decode_reference(context, context->object_refs, 0);
+    PyObject *byte_array_value = decode_reference(context->object_refs, header);
     if (!byte_array_value)
         return NULL;
 
@@ -719,7 +703,7 @@ static PyObject* deserialize_byte_array(DecoderContext *context)
 
     Py_DECREF(Py_None);
 
-    byte_array_value = decode_byte_array(context);
+    byte_array_value = decode_byte_array(context, header >> 1);
     if (!byte_array_value)
         return NULL;
     
@@ -733,11 +717,9 @@ static PyObject* deserialize_byte_array(DecoderContext *context)
 }
 
 /* Decode a byte array. */
-static PyObject* decode_byte_array(DecoderContext *context)
+static PyObject* decode_byte_array(DecoderContext *context, int byte_len)
 {
     PyObject *byte_array_value;
-
-    int byte_len = _decode_int(context) >> 1;
     char char_value[byte_len];
 
     memcpy(char_value, context->buf + context->pos, byte_len);
@@ -760,20 +742,21 @@ static PyObject* decode_byte_array(DecoderContext *context)
 /* Deserialize an XML Doc. */
 static PyObject* deserialize_xml(DecoderContext *context)
 {
-    PyObject *unicode_value;
-    PyObject *xml_value;
+    int header = _decode_int(context);
 
     // Check for reference
-    xml_value = decode_reference(context, context->object_refs, 0);
+    PyObject *xml_value = decode_reference(context->object_refs, header);
     if (!xml_value)
         return NULL;
 
-    if (xml_value != Py_None)
+    if (xml_value != Py_None) {
         return xml_value;
-    Py_DECREF(Py_None);
+    } else {
+        Py_DECREF(Py_None);
+    }
 
     // No reference found
-    unicode_value = decode_string(context);
+    PyObject *unicode_value = decode_string(context, header >> 1);
     if (!unicode_value)
         return NULL;
 
@@ -813,16 +796,15 @@ static PyObject* xml_from_string(PyObject *xml_string)
 /* Deserialize a string. */
 static PyObject* deserialize_string(DecoderContext *context)
 {
-    PyObject *unicode_value;
+    int header = _decode_int(context);
 
     // Check for null string
-    if (context->buf[context->pos] == EMPTY_STRING_TYPE) {
-        context->pos++;
+    if (header == EMPTY_STRING_TYPE) {
         return PyString_FromStringAndSize(NULL, 0);
     }
 
     // Check for reference
-    unicode_value = decode_reference(context, context->string_refs, 0);
+    PyObject *unicode_value = decode_reference(context->string_refs, header);
     if (!unicode_value)
         return NULL;
 
@@ -831,7 +813,7 @@ static PyObject* deserialize_string(DecoderContext *context)
     Py_DECREF(Py_None);
 
     // No reference found
-    unicode_value = decode_string(context);
+    unicode_value = decode_string(context, header >> 1);
     if (!unicode_value)
         return NULL;
 
@@ -845,14 +827,7 @@ static PyObject* deserialize_string(DecoderContext *context)
 }
 
 /* Decode a string. */
-static PyObject* decode_string(DecoderContext *context)
-{
-    int string_size = _decode_int(context) >> 1;
-    return decode_string_size(context, (unsigned int)string_size);
-}
-
-/* Decode a string with a given length. */
-static PyObject* decode_string_size(DecoderContext *context, unsigned int string_size)
+static PyObject* decode_string(DecoderContext *context, unsigned int string_size)
 {
     PyObject *unicode_value = PyUnicode_DecodeUTF8(context->buf + context->pos, string_size, NULL);
     if (!unicode_value)
@@ -863,26 +838,24 @@ static PyObject* decode_string_size(DecoderContext *context, unsigned int string
 }
 
 /*
- * Decode a reference to an object.
- *
- * bit argument specifies which bit to check for the reference (0 = low bit)
+ * Checks a decoded int for the presence of a reference
  *
  * Returns PyObject if object reference was found.
  * returns PyNone if object reference was not found.
  * returns NULL if call failed.
  */
-static PyObject* decode_reference(DecoderContext *context, ObjectContext *object_context, int bit)
+static PyObject* decode_reference(ObjectContext *object_context, int value)
 {
     // Check for index reference
-    if (((context->buf[context->pos] >> bit) & REFERENCE_BIT) == 0) {
-        int idx = _decode_int(context) >> (bit + 1);
+    if ((value & REFERENCE_BIT) == 0) {
+        int idx = value >> 1;
 
-        PyObject *value = get_ref_from_idx(object_context, idx);
-        if (!value)
+        PyObject *ref = get_ref_from_idx(object_context, idx);
+        if (!ref)
             return NULL;
 
-        Py_INCREF(value); // This reference is getting put somewhere, so we need to increase the ref count.
-        return value;
+        Py_INCREF(ref); // This reference is getting put somewhere, so we need to increase the ref count.
+        return ref;
     }
 
     Py_RETURN_NONE;
@@ -1026,14 +999,14 @@ static PyObject* decode_bool_AMF0(DecoderContext *context)
 static PyObject* decode_string_AMF0(DecoderContext *context)
 {
    unsigned short string_size = _decode_ushort(context);
-   return decode_string_size(context, (unsigned int)string_size); 
+   return decode_string(context, (unsigned int)string_size); 
 }
 
 /* Decode a long AMF0 String. */
 static PyObject* decode_long_string_AMF0(DecoderContext *context)
 {
    unsigned int string_size = _decode_ulong(context);
-   return decode_string_size(context, string_size);
+   return decode_string(context, string_size);
 }
 
 /* Decode an AMF0 Reference. */
@@ -1300,12 +1273,12 @@ static int decode_headers_AMF0(DecoderContext *context, PyObject *packet)
         }
 
         PyObject *header_obj;
-        if (context->buf[context->pos] == AMF3_AMF0) {
+        if (new_context->buf[new_context->pos] == AMF3_AMF0) {
             // We could rely on _decode_AMF0
             // to notice the AMF3 byte, but then
             // we create/destroy the new context
             // twice.
-            context->pos++;
+            new_context->pos++;
             header_obj = _decode(new_context);
         } else {
             header_obj = _decode_AMF0(new_context);
@@ -1389,12 +1362,12 @@ static int decode_messages_AMF0(DecoderContext *context, PyObject *packet)
         }
 
         PyObject *message_obj;
-        if (context->buf[context->pos] == AMF3_AMF0) {
+        if (new_context->buf[new_context->pos] == AMF3_AMF0) {
             // We could rely on _decode_AMF0
             // to notice the AMF3 byte, but then
             // we create/destroy the new context
             // twice.
-            context->pos++;
+            new_context->pos++;
             message_obj = _decode(new_context);
         } else {
             message_obj = _decode_AMF0(new_context);
