@@ -1,0 +1,29 @@
+#summary How to serialize/deserialize custom classes.
+= Custom Object Types =
+
+ * !AmFast supports user-defined object types.
+ * Use a amfast.class_def.ClassDef object to define how custom objects are serialized/deserialized.
+ * Use a ClassDefMapper to map amfast.class_def.ClassDef to an object alias.
+
+{{{
+from amfast import class_def
+
+class_mapper = class_def.ClassDefMapper()
+
+# Map a custom class with static attributes
+class_mapper.mapClass(class_def.ClassDef(MyCustomClass, 'class.alias', (tuple, of, static, attributes)))
+
+# Map a custom class with dynamic attributes
+class_mapper.mapClass(class_def.DynamicClassDef(MyCustomClass, 'class.alias', ()))
+
+# Map a custom class implementing IExternizeable
+# ExternizeableClassDef must be sub-classed, and the
+# methods readByteString and writeByteString must be implemented.
+class_mapper.mapClass(class_def.ExternizeableClassDef(MyCustomClass,'class.alias'))
+
+# Map a custom class that is also mapped with SQLAlchemy
+class_mapper.mapClass(class_def.sa_class_def.SaClassDef(MyCustomClass, 'class.alias')
+
+# Map classes with a gateway
+gateway.class_def_mapper = class_mapper
+}}}
