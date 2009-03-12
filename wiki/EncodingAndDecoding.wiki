@@ -21,7 +21,7 @@ encode(...)
      * use_array_collections - bool - True to encode lists and tuples as !ArrayCollections - Default = False
      * use_object_proxies - bool - True to encode dicts as !ObjectProxys - Default = False
      * use_references - bool - True to encode multiply occuring objects as references - Default = True
-     * use_legacy_xml - bool - True to encode XML as old !XMLDocument instead of E4X - Default = False
+     * use_legacy_xml - bool - True to encode XML as old XMLDocument instead of E4X - Default = False
      * include_private - bool - True to encode attributes starting with an underscore - Default = False
      * class_def_mapper - !ClassDefMapper - object that retrieves a !ClassDef object used for customizing serialization of objects - Default = None (all objects are anonymous)
 
