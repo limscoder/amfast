@@ -6,4 +6,5 @@
 
  * TypeMap
  * CustomClasses
+ * Remoting
  * EncodingAndDecoding
