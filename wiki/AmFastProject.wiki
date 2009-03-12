@@ -1,3 +1,4 @@
+#summary About the AmFast project.
 = !AmFast =
 
  * !AmFast is developed and maintained by Dave Thompson.
