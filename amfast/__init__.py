@@ -15,6 +15,17 @@ def epoch_from_date(date):
 def date_from_epoch(epoch_secs):
     return datetime.utcfromtimestamp(epoch_secs)
 
+def format_byte_string(byte_string):
+    """Get a human readable description of a byte string."""
+    bytes = []
+    for i, x in enumerate(byte_string):
+        val = ord(x)
+        char = ''
+        if val > 31 and val < 127:
+            char = "%s" % x
+        bytes.append("%d: %d-%02X-'%s'" % (i, val, val, char))
+    return ' '.join(bytes)
+
 # --- setup module level logging --- #
 
 class NullHandler(logging.Handler):
@@ -26,7 +37,7 @@ class NullHandler(logging.Handler):
     def emit(self, record):
         pass
 
-log_debug = True
+log_debug = False
 logger = logging.getLogger('AmFast')
 logger.addHandler(NullHandler())
 logger.setLevel(logging.DEBUG)

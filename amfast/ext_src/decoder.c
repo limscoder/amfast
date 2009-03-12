@@ -203,7 +203,7 @@ static PyObject* deserialize_object(DecoderContext *context, int proxy)
     if (!obj_value)
         return NULL;
 
-    if (obj_value != Py_None) {
+    if (obj_value != Py_False) {
         // Ref found
         if (proxy) {
             // Map ObjectProxy idx to ref, since
@@ -215,7 +215,7 @@ static PyObject* deserialize_object(DecoderContext *context, int proxy)
         }
         return obj_value;
     } else {
-        Py_DECREF(Py_None);
+        Py_DECREF(Py_False);
     }
 
     // Ref not found
@@ -416,9 +416,11 @@ static PyObject* deserialize_class_def(DecoderContext *context, int header)
     if (!class_def)
         return NULL;
 
-    if (class_def != Py_None)
+    if (class_def != Py_False) {
         return class_def;
-    Py_DECREF(Py_None);
+    } else {
+        Py_DECREF(Py_False);
+    }
 
     class_def = decode_class_def(context, header);
     if (!class_def)
@@ -441,8 +443,11 @@ static PyObject* decode_class_def(DecoderContext *context, int header)
     PyObject *alias = deserialize_string(context);
     if (!alias)
         return NULL;
+
     PyObject *class_def = class_def_from_alias(context, alias);
     Py_DECREF(alias);
+    if (!class_def) 
+        return NULL;
 
     // Check for an externizeable class def.
     if ((header & 0x07FFFFFF) == EXTERNIZEABLE) {
@@ -516,8 +521,9 @@ static PyObject* decode_class_def(DecoderContext *context, int header)
 static PyObject* class_def_from_alias(DecoderContext *context, PyObject *alias)
 {
     // Check for empty string (anonymous object)
-    if (PyUnicode_GET_SIZE(alias) == 0)
+    if (PyUnicode_GET_SIZE(alias) == 0) {
         Py_RETURN_NONE;
+    }
 
     // Get ClassDef object from map.
     // Create method name, if it does not exist already.
@@ -527,7 +533,20 @@ static PyObject* class_def_from_alias(DecoderContext *context, PyObject *alias)
             return NULL;
     }
 
-    return PyObject_CallMethodObjArgs(context->class_def_mapper, context->get_class_def_method_name, alias, NULL);
+    PyObject *return_value = PyObject_CallMethodObjArgs(context->class_def_mapper, context->get_class_def_method_name, alias, NULL);
+
+    // Raise exception if class is not mapped.
+    if (return_value == Py_None) {
+        PyObject *error_title = PyString_FromString("Class alias not mapped: ");
+        PyObject *error_str = PyUnicode_Concat(error_title, alias);
+        PyErr_SetObject(amfast_DecodeError, error_str);
+        Py_DECREF(error_title);
+        Py_DECREF(error_str);
+        Py_DECREF(return_value);
+        return NULL;
+    }
+
+    return return_value;
 }
 
 /* Add the dynamic attributes of an encoded object to a dict. */
@@ -538,10 +557,10 @@ static int _decode_dynamic_dict(DecoderContext *context, PyObject *dict)
             context->pos++;
             return 1;
         }
+
         PyObject *key = deserialize_string(context);
         if (!key)
             return 0;
-
 
         PyObject *val = _decode(context);
         if (!val) {
@@ -570,7 +589,7 @@ static PyObject* deserialize_array(DecoderContext *context, int collection)
     if (!list_value)
         return NULL;
 
-    if (list_value != Py_None) {
+    if (list_value != Py_False) {
         // Ref found
         if (collection) {
             // Map ArrayCollection idx to ref, since
@@ -582,7 +601,7 @@ static PyObject* deserialize_array(DecoderContext *context, int collection)
         }
         return list_value;
     } else {
-        Py_DECREF(Py_None);
+        Py_DECREF(Py_False);
     }
 
     // Create list of correct length
@@ -651,9 +670,11 @@ static PyObject* deserialize_date(DecoderContext *context)
     if (!date_value)
         return NULL;
 
-    if (date_value != Py_None)
+    if (date_value != Py_False) {
         return date_value;
-    Py_DECREF(Py_None);
+    } else {
+        Py_DECREF(Py_False);
+    }
 
     date_value = decode_date(context);
     if (!date_value)
@@ -698,10 +719,11 @@ static PyObject* deserialize_byte_array(DecoderContext *context)
     if (!byte_array_value)
         return NULL;
 
-    if (byte_array_value != Py_None)
+    if (byte_array_value != Py_False) {
         return byte_array_value;
-
-    Py_DECREF(Py_None);
+    } else {
+        Py_DECREF(Py_False);
+    }
 
     byte_array_value = decode_byte_array(context, header >> 1);
     if (!byte_array_value)
@@ -749,10 +771,10 @@ static PyObject* deserialize_xml(DecoderContext *context)
     if (!xml_value)
         return NULL;
 
-    if (xml_value != Py_None) {
+    if (xml_value != Py_False) {
         return xml_value;
     } else {
-        Py_DECREF(Py_None);
+        Py_DECREF(Py_False);
     }
 
     // No reference found
@@ -808,9 +830,11 @@ static PyObject* deserialize_string(DecoderContext *context)
     if (!unicode_value)
         return NULL;
 
-    if (unicode_value != Py_None)
+    if (unicode_value != Py_False) {
         return unicode_value;
-    Py_DECREF(Py_None);
+    } else {
+        Py_DECREF(Py_False);
+    }
 
     // No reference found
     unicode_value = decode_string(context, header >> 1);
@@ -841,7 +865,7 @@ static PyObject* decode_string(DecoderContext *context, unsigned int string_size
  * Checks a decoded int for the presence of a reference
  *
  * Returns PyObject if object reference was found.
- * returns PyNone if object reference was not found.
+ * returns PyFalse if object reference was not found.
  * returns NULL if call failed.
  */
 static PyObject* decode_reference(ObjectContext *object_context, int value)
@@ -858,7 +882,7 @@ static PyObject* decode_reference(ObjectContext *object_context, int value)
         return ref;
     }
 
-    Py_RETURN_NONE;
+    Py_RETURN_FALSE;
 }
 
 /* Decode a double to a native C double. */
@@ -1362,7 +1386,7 @@ static int decode_messages_AMF0(DecoderContext *context, PyObject *packet)
         }
 
         PyObject *message_obj;
-        if (new_context->buf[new_context->pos] == AMF3_AMF0) {
+        if (new_context->buf[new_context->pos + 1] == AMF3_AMF0) {
             // We could rely on _decode_AMF0
             // to notice the AMF3 byte, but then
             // we create/destroy the new context

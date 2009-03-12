@@ -154,11 +154,6 @@ class Message(object):
      * value - object, message value.
     """
 
-    # INVOKABLE_MESSAGE Interface consists of these methods: 
-    # invoke(service_mapper, request_packet, response_packet, request_msg, response_msg)
-    # fail(exc)
-    # acknowledge()
-
     SUCCESS_TARGET = '/onResult'
     FAILED_TARGET = '/onStatus'
     DEBUG_TARGET = '/onDebugEvents'
@@ -169,8 +164,10 @@ class Message(object):
         self.value = value
 
     def _isInvokable(self):
-        """If True, the message's body implements the INVOKABLE_MESSAGE interface."""
-        return hasattr(self.value, 'INVOKABLE_MESSAGE')
+        """If True, the message's body can invoke itself."""
+        if self.target != 'null':
+            return False
+        return True
     is_invokable = property(_isInvokable)
 
     def invoke(self, service_mapper, request_packet, response_packet):
@@ -178,7 +175,7 @@ class Message(object):
         try:
             response_msg = self.acknowledge()
             if self.is_invokable:
-                self.value.invoke(service_mapper, request_packet, response_packet, self, response_msg)
+                self.value[0].invoke(service_mapper, request_packet, response_packet, self, response_msg)
             elif self.target is not None and self.target != '':
                 self._invoke(service_mapper, request_packet, response_packet, response_msg)
             else:
@@ -210,7 +207,7 @@ class Message(object):
         response_message = Message(target=response_target, response='')
         
         if self.is_invokable:
-            error_val = self.value.fail(exc)
+            error_val = self.value[0].fail(exc)
         else:
             error_val = AsError(exc=exc)
 
@@ -223,7 +220,7 @@ class Message(object):
         response_message = Message(target=response_target, response='')
         
         if self.is_invokable:
-            response_message.value = self.value.acknowledge()
+            response_message.value = self.value[0].acknowledge()
 
         return response_message
 
@@ -278,13 +275,13 @@ class Packet(object):
 </Packet>
 """ % (header_msg, message_msg, self.version)
 
-    def process(self, service_mapper):
+    def invoke(self, service_mapper):
         """Process this packet and return a response packet."""
 
         if amfast.log_debug:
             amfast.logger.debug("<requestPacket>%s</requestPacket>" % self)
 
-        response_packet = Packet()
+        response_packet = self.acknowledge()
         try:
             # Invoke any headers
             for header in self.headers:
@@ -310,10 +307,16 @@ class Packet(object):
                 
     def fail(self, exc):
         """Return a response Packet with all messages failed."""
-        response_packet = Packet()
+        response_packet = self.acknowledge()
 
         for message in self.messages:
             response_packet.messages.append(message.fail(exc))
+        return response_packet
+
+    def acknowledge(self):
+        """Create a response to this packet."""
+        response_packet = Packet()
+        response_packet.version = self.version
         return response_packet
 
 class Gateway(object):
@@ -339,17 +342,20 @@ class Gateway(object):
     def process_packet(self, raw_packet):
         """Process an incoming packet."""
         if amfast.log_debug:
-            amfast.logger.debug("Processing incoming packet.")
+            amfast.logger.debug("<gateway>Processing incoming packet.</gateway>")
 
         request_packet = None
         try:
             request_packet = self.decode_packet(raw_packet)
-            response_packet = request_packet.process(self.service_mapper)
-            return self.encode_packet(response_packet)
+            response_packet = request_packet.invoke(self.service_mapper)
+            if response_packet is None:
+                return None
+            else:
+                return self.encode_packet(response_packet)
         except Exception, exc:
             amfast.log_exc()
             if request_packet is not None:
-                return request_packet.fail(exc)
+               return request_packet.fail(exc)
             else:
                 # There isn't much we can do if
                 # the request was not decoded correctly.
@@ -357,10 +363,11 @@ class Gateway(object):
 
     def decode_packet(self, raw_packet):
         if amfast.log_debug:
-            raw = ' '.join(["%02X" % ord( x ) for x in raw_packet]).strip()
-            amfast.logger.debug("<rawRequestPacket>%s</rawRequestPacket>" % raw)
+            amfast.logger.debug("<rawRequestPacket>%s</rawRequestPacket>" %
+                amfast.format_byte_string(raw_packet))
 
-        return decoder.decode(raw_packet, packet=True, class_def_mapper=self.class_def_mapper)
+        return decoder.decode(raw_packet, packet=True,
+            class_def_mapper=self.class_def_mapper)
 
     def encode_packet(self, packet):
         raw_packet = encoder.encode(packet, packet=True, 
@@ -371,8 +378,8 @@ class Gateway(object):
             include_private=self.include_private)
 
         if amfast.log_debug:
-            raw = ' '.join(["%02X" % ord( x ) for x in raw_packet]).strip()
-            amfast.logger.debug("<rawResponsePacket>%s</rawResponsePacket>" % raw)
+            amfast.logger.debug("<rawResponsePacket>%s</rawResponsePacket>" %
+                amfast.format_byte_string(raw_packet))
 
         return raw_packet
 

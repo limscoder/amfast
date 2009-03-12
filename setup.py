@@ -12,14 +12,14 @@ extensions = [
             os.path.join('amfast', 'ext_src', 'amf_common.c'), ])]
 
 setup(name="AmFast",
-    version = "0.1.0",
-    description = "A C extension to encode/decode Python objects with AMF3.",
+    version = "0.2.0",
+    description = "A C extension to encode/decode Python objects with AMF0 and AMF3. Includes support for NetConnection, RemoteObject, IExternizeable, and custom type serialization.",
     url = "http://code.google.com/p/amfast/",
     author = "Dave Thompson",
     author_email = "dthomp325@gmail.com",
     maintainer = "Dave Thompson",
     maintainer_email = "dthomp325@gmail.com",
-    keywords = "amf amf3 flash flex pyamf",
+    keywords = "amf amf0 amf3 flash flex pyamf",
     platforms = ["any"],
     test_suite = "tests.suite",
     packages = ['amfast', 'amfast.class_def', 'amfast.remoting'],
