@@ -2,7 +2,7 @@
 
 = Examples =
 
-The examples below are found in SVN within the [http://code.google.com/p/amfast/source/browse/trunk/examples examples] directory. They implement a simple contact manager, with data persisted by SqlLite.
+The examples below are found in SVN within the [http://code.google.com/p/amfast/source/browse/trunk/examples examples] directory. They implement a simple contact manager with data persisted by !SqlAlchemy and !SqlLite.
 
 == !CherryPy Example ==
 
