@@ -28,8 +28,6 @@ class_def.assign_attrs(FaultError, 'mx.rpc.Fault',
 class AbstractMessage(object):
     """Base class for all flex messages."""
 
-    INVOKABLE_MESSAGE = True
-
     def __init__(self):
         self.body = None
         self.clientId = None
@@ -110,7 +108,7 @@ class AbstractMessage(object):
 """ % (header_str, self.body, attrs_str)
         return str
 
-class_def.assign_attrs(AbstractMessage, 'mx.messaging.messages.AbstractMessage',
+class_def.assign_attrs(AbstractMessage, 'flex.messaging.messages.AbstractMessage',
     ('body', 'clientId', 'destination', 'headers',
         'messageId', 'timestamp', 'timeToLive'), True)
 
@@ -130,7 +128,7 @@ class RemotingMessage(AbstractMessage):
                 remoting.Service.SEPARATOR.join((self.destination, self.operation)))
         response_msg.value.body = target.invoke(request_packet, response_packet, request_msg, response_msg, self.body)
 
-class_def.assign_attrs(RemotingMessage, 'mx.messaging.messages.RemotingMessage',
+class_def.assign_attrs(RemotingMessage, 'flex.messaging.messages.RemotingMessage',
     ('body', 'clientId', 'destination', 'headers',
         'messageId', 'timestamp', 'timeToLive', 'source', 'operation'), True)
 
@@ -144,7 +142,7 @@ class AsyncMessage(AbstractMessage):
         AbstractMessage.invoke(self, service_mapper, request_packet, response_packet, request_msg, response_msg)
         return True
 
-class_def.assign_attrs(AsyncMessage, 'mx.messaging.messages.AsyncMessage',
+class_def.assign_attrs(AsyncMessage, 'flex.messaging.messages.AsyncMessage',
     ('body', 'clientId', 'destination', 'headers',
         'messageId', 'timestamp', 'timeToLive', 'correlationId'), True)
 
@@ -164,7 +162,7 @@ class CommandMessage(AsyncMessage):
             raise FlexMessageError("Command '%s' not found." % self.operation)
         response_msg.value.body = target.invoke(request_packet, response_packet, request_msg, response_msg, self.body)
 
-class_def.assign_attrs(CommandMessage, 'mx.messaging.messages.CommandMessage',
+class_def.assign_attrs(CommandMessage, 'flex.messaging.messages.CommandMessage',
     ('body', 'clientId', 'destination', 'headers',
         'messageId', 'timestamp', 'timeToLive', 'correlationId',
         'operation'), True)
@@ -175,7 +173,7 @@ class AcknowledgeMessage(AsyncMessage):
     def __init__(self):
         AsyncMessage.__init__(self)
 
-class_def.assign_attrs(AcknowledgeMessage, 'mx.messaging.messages.AcknowledgeMessage',
+class_def.assign_attrs(AcknowledgeMessage, 'flex.messaging.messages.AcknowledgeMessage',
     ('body', 'clientId', 'destination', 'headers',
         'messageId', 'timestamp', 'timeToLive', 'correlationId'), True)
 
@@ -202,7 +200,7 @@ class ErrorMessage(AcknowledgeMessage):
             self.rootCause = rootCause
             self.extendedData = extendedData
 
-class_def.assign_attrs(ErrorMessage, 'mx.messaging.messages.ErrorMessage', 
+class_def.assign_attrs(ErrorMessage, 'flex.messaging.messages.ErrorMessage', 
     ('body', 'clientId', 'destination', 'headers',
         'messageId', 'timestamp', 'timeToLive', 'correlationId', 'faultCode',
         'faultString', 'faultDetail', 'rootCause', 'extendedData'), True)

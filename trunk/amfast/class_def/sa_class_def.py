@@ -28,7 +28,7 @@ class SaClassDef(class_def.ClassDef):
     KEY_ATTR = 'sa_key' # sa key
     LAZY_ATTR = 'sa_lazy' # list of lazy attribute names
 
-    def __init__(self, class_, alias=None, static_attrs=None):
+    def __init__(self, class_, alias=None, static_attrs=None, amf3=None):
         """Static attributes are inferred from the class mapper,
         so static_attrs needs to be passed only if there are additional
         un-mapped attributes that need to be considered static."""
@@ -38,19 +38,23 @@ class SaClassDef(class_def.ClassDef):
         except UnmappedInstanceError:
             raise class_def.ClassDefError("Class does not have a SA mapper associated with it.")
 
+        if static_attrs is None:
+            static_attrs = ()
+
         combined_attrs = [self.KEY_ATTR, self.LAZY_ATTR]
         combined_attrs.extend(static_attrs)
         for prop in self.mapper.iterate_properties:
             if not prop.key in combined_attrs:
                 combined_attrs.append(prop.key)
 
-        class_def.ClassDef.__init__(self, class_, alias, tuple(combined_attrs))
+        class_def.ClassDef.__init__(self, class_, alias, tuple(combined_attrs), amf3)
 
     def getStaticAttrVals(self, obj):
         lazy_attrs = []
         vals = [self.mapper.primary_key_from_instance(obj), lazy_attrs]
 
-        for i in range(2..len(self.static_attrs)):
+        attr_count = len(self.static_attrs)
+        for i in range(2, len(self.static_attrs)):
             attr = self.static_attrs[i]
  
             # Look at __dict__ directly,

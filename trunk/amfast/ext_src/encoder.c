@@ -195,6 +195,8 @@ static EncoderContext* _copy_encoder_context(EncoderContext *context)
         return NULL;
 
     new_context->use_references = context->use_references;
+    new_context->use_array_collections = context->use_array_collections;
+    new_context->use_object_proxies = context->use_object_proxies;
 
     new_context->class_def_mapper = context->class_def_mapper;
     if (new_context->class_def_mapper) {
@@ -1748,7 +1750,53 @@ static int write_object_AMF0(EncoderContext *context, PyObject *value)
 static int _encode_packet(EncoderContext *context, PyObject *value)
 {
     // write flash version
-    if (!_encode_ushort(context, 0))
+    PyObject *client_type = PyObject_GetAttrString(value, "version");
+    if (!client_type)
+        return 0;
+
+    PyObject *flash_8 = PyObject_GetAttrString(value, "FLASH_8");
+    if (!flash_8) {
+        Py_DECREF(client_type);
+        return 0;
+    }
+
+    PyObject *flash_com = PyObject_GetAttrString(value, "FLASH_COM");
+    if (!flash_com) {
+        Py_DECREF(client_type);
+        Py_DECREF(flash_8);
+        return 0;
+    }
+
+    PyObject *flash_9 = PyObject_GetAttrString(value, "FLASH_9");
+    if (!flash_9) {
+        Py_DECREF(client_type);
+        Py_DECREF(flash_8);
+        Py_DECREF(flash_com);
+        return 0;
+    }
+
+    // Set client type
+    unsigned short amf_version;
+    if (PyUnicode_Compare(client_type, flash_8) == 0) {
+        amf_version = FLASH_8;
+    } else if (PyUnicode_Compare(client_type, flash_com) == 0) {
+        amf_version = FLASH_COM;
+    } else if (PyUnicode_Compare(client_type, flash_9) == 0) {
+        amf_version = FLASH_9;
+    } else {
+        PyErr_SetString(amfast_EncodeError, "Unknown client type.");
+        Py_DECREF(client_type);
+        Py_DECREF(flash_8);
+        Py_DECREF(flash_com);
+        Py_DECREF(flash_9);
+        return 0;
+    }
+
+    Py_DECREF(client_type);
+    Py_DECREF(flash_8);
+    Py_DECREF(flash_com);
+    Py_DECREF(flash_9);
+    if (!_encode_ushort(context, amf_version))
         return 0;
 
     // write headers
