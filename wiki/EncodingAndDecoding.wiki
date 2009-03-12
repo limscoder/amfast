@@ -1,3 +1,5 @@
+#summary How to use AmFast to encode and decode AMF.
+
 = Encoding =
 
 {{{
