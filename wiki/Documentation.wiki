@@ -5,30 +5,5 @@
 !AmFast can encode and decode Python objects to AMF3 format.
 
  * TypeMap
+ * CustomClasses
  * EncodingAndDecoding
-
-
-
-
-
-= Custom Object Types =
-
-!AmFast supports user-defined object types.
-
-{{{
-from amfast import class_def
-
-# Map a custom class with static attributes
-class_def.map_class(MyCustomClass, class_def.ClassDef, 'class.alias', (tuple, of, static, attributes))
-
-# Map a custom class with dynamic attributes
-class_def.map_class(MyCustomClass, class_def.DynamicClassDef, 'class.alias', ())
-
-# Map a custom class implementing IExternizeable
-# ExternizeableClassDef must be sub-classed, and the
-# methods readByteString and writeByteString must be implemented.
-class_def.map_class(MyCustomClass, class_def.ExternizeableClassDef, 'class.alias')
-
-# Map a custom class that is also mapped with SQLAlchemy
-class_def.map_class(MyCustomClass, class_def.sa_class_def.SaClassDef, 'class.alias')
-}}}
