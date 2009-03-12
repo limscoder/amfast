@@ -1,9 +1,7 @@
-#All about the AmFast project
+= !AmFast =
 
-= AmFast =
-
-AmFast is developed and maintained by Dave Thompson.
-If you're interested in helping out with the project,
+ * !AmFast is developed and maintained by Dave Thompson.
+ * If you're interested in helping out with the project,
 send a message out to the [http://groups.google.com/group/amfast/web/amfast AmFast group]
 
 = Thanks =
