@@ -3,11 +3,12 @@
 
  * !AmFast supports user-defined object types.
  * Use a amfast.class_def.ClassDef object to define how custom objects are serialized/deserialized.
- * Use a ClassDefMapper to map amfast.class_def.ClassDef to an object alias.
+ * Use a !ClassDefMapper to map amfast.class_def.ClassDef to an object alias.
 
 {{{
 from amfast import class_def
 
+# ClassDefMapper objects keep track of ClassDefs
 class_mapper = class_def.ClassDefMapper()
 
 # Map a custom class with static attributes
