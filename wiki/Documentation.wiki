@@ -5,7 +5,7 @@
 !AmFast can encode and decode Python objects to AMF3 format.
 
  * TypeMap
- * Encoding/Decoding
+ * EncodingAndDecoding
 
 
 
