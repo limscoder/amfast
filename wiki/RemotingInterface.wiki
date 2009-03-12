@@ -1,4 +1,4 @@
-#summary How to use !NetConnection and !RemoteObject with !AmFast
+#summary How to use NetConnection and RemoteObject with AmFast
 
 = Remoting =
  * !AmFast supports remoting with Flash !NetConnection and !RemoteObject classes.
@@ -48,14 +48,14 @@ gateway.service_mapper.mapService(service)
 # and gateway.service_mapper.message_header_service objects.
 
 # Map a NetConnection header
-gateway.service_mapper.packet_header_service.setTarget(remoting.CallableTarget(remote_login, 'Credentials')
+gateway.service_mapper.packet_header_service.setTarget(remoting.CallableTarget(remote_login, 'Credentials'))
 
 # Map a RemoteObject header
-gateway.service_mapper.message_header_service.setTarget(remoting.CallableTarget(remote_method, 'message_header_name')
+gateway.service_mapper.message_header_service.setTarget(remoting.CallableTarget(remote_method, 'message_header_name'))
 
 # Flex CommandMessages can be mapped to targets
 # with the gateway.service_mapper.command_service object.
-gateway.service_mapper.command_service.setTarget(remoting.CallableTarget(remote_login, 8)
+gateway.service_mapper.command_service.setTarget(remoting.CallableTarget(remote_login, 8))
 
 # Gateways process an AMF packet
 response_packet_byte_string = gateway.process_packet(amf_packet_byte_string)
