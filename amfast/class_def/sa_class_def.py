@@ -35,6 +35,7 @@ class SaClassDef(class_def.ClassDef):
 
         try:
             self.mapper = class_mapper(class_)
+            self.mapper.compile()
         except UnmappedInstanceError:
             raise class_def.ClassDefError("Class does not have a SA mapper associated with it.")
 
@@ -54,7 +55,7 @@ class SaClassDef(class_def.ClassDef):
         vals = [self.mapper.primary_key_from_instance(obj), lazy_attrs]
 
         attr_count = len(self.static_attrs)
-        for i in range(2, len(self.static_attrs)):
+        for i in xrange(2, attr_count):
             attr = self.static_attrs[i]
  
             # Look at __dict__ directly,
@@ -68,6 +69,9 @@ class SaClassDef(class_def.ClassDef):
                 lazy_attrs.append(attr)
 
         return vals
+
+    def getInstance(self):
+        return self.mapper.class_manager.new_instance()
 
     def applyAttrVals(self, obj, vals):
         # Delete lazy-loaded attrs from vals

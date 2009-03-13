@@ -30,6 +30,7 @@ package models
 		/**
 		 * Primary key of the persistent object.
 		 */
+		[Transient]
 		public var sa_key:ArrayCollection = new ArrayCollection();
 		
 		/**
@@ -40,6 +41,7 @@ package models
 		/**
 		 * Attributes that are in the process of being loaded.
 		 */
+		[Transient]
 		public var sa_loading:ArrayCollection = new ArrayCollection();
 
 		/**
