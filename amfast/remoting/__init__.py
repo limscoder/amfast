@@ -354,8 +354,9 @@ class Gateway(object):
                 return self.encode_packet(response_packet)
         except Exception, exc:
             amfast.log_exc()
+
             if request_packet is not None:
-               return request_packet.fail(exc)
+               return self.encode_packet(request_packet.fail(exc))
             else:
                 # There isn't much we can do if
                 # the request was not decoded correctly.
