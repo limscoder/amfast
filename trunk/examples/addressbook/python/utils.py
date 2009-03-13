@@ -40,6 +40,7 @@ def setup_gateway(gateway):
     service.setTarget(CallableTarget(sa_obj.loadAttr, 'loadAttr'))
     service.setTarget(CallableTarget(sa_obj.loadAll, 'loadAll'))
     service.setTarget(CallableTarget(sa_obj.saveList, 'saveList'))
+    service.setTarget(CallableTarget(sa_obj.save, 'save'))
     service.setTarget(CallableTarget(sa_obj.remove, 'remove'))
     service.setTarget(CallableTarget(sa_obj.removeList, 'removeList'))
     service.setTarget(CallableTarget(sa_obj.insertDefaultData, 'insertDefaultData'))

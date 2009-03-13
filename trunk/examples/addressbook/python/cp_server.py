@@ -14,10 +14,10 @@ def amfhook():
     cherrypy.request.show_tracebacks = False
 
     if cherrypy.request.method != 'POST':
-        raise Exception("AMF request must use 'POST' method.");
+        raise cherrypy.HTTPError(400, "AMF request must use 'POST' method.");
 cherrypy.tools.amfhook = cherrypy.Tool('before_request_body', amfhook, priority=0)
 
-class App:
+class App(object):
     @cherrypy.expose
     def index(self):
         raise cherrypy.HTTPRedirect('/addressbook.html')
@@ -25,9 +25,12 @@ class App:
     @cherrypy.expose
     @cherrypy.tools.amfhook()
     def amfGateway(self):
-        c_len = int(cherrypy.request.headers['Content-Length'])
-        raw_request = cherrypy.request.rfile.read(c_len)
-        return self.gateway.process_packet(raw_request)
+        try:
+            c_len = int(cherrypy.request.headers['Content-Length'])
+            raw_request = cherrypy.request.rfile.read(c_len)
+            return self.gateway.process_packet(raw_request)
+        except Exception, e:
+            raise cherrypy.HTTPError(400, "Bad Request")
 
 if __name__ == '__main__':
     usage = """usage: %s [options]""" % __file__

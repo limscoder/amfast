@@ -63,10 +63,7 @@ class ClassDef(object):
         ==========
          * obj - object, the object to get attribute values from.
         """
-        vals = []
-        for attr in self.static_attrs:
-            vals.append(getattr(obj, attr, None))
-        return vals
+        return [getattr(obj, attr, None) for attr in self.static_attrs]
 
     def getInstance(self):
         """Returns an instance of the mapped class to be used 
@@ -285,17 +282,15 @@ def get_dynamic_attr_vals(obj, ignore_attrs=None, include_private=False):
     """ 
     vals = {}
 
-    if not hasattr(obj, '__dict__'):
-        raise ClassDefError("Only objects with a __dict__ can be encoded dynamically.")
-
-    if ignore_attrs is None:
-        ignore_attrs = ()
+    #if not hasattr(obj, '__dict__'):
+    #    raise ClassDefError("Objects must have a __dict__ can be encoded dynamically.")
 
     for attr, val in obj.__dict__.iteritems():
-        if attr in ignore_attrs:
-            continue
+        if ignore_attrs is not None:
+            if attr in ignore_attrs:
+                continue
 
-        if (not include_private) and (attr.startswith('_')):
+        if (include_private is False) and (attr.startswith('_')):
             continue
 
         vals[attr] = val
