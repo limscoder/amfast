@@ -36,8 +36,8 @@ typedef struct {
     ObjectContext *class_refs; // Keep track of class definitions references
 } DecoderContext;
 
-static DecoderContext* _create_decoder_context(void);
-static DecoderContext* _copy_decoder_context(DecoderContext *context);
+static DecoderContext* _create_decoder_context(int amf3);
+static DecoderContext* _copy_decoder_context(DecoderContext *context, int amf3);
 static int _destroy_decoder_context(DecoderContext *context);
 
 // ---- DECODING
@@ -85,8 +85,8 @@ static PyObject* decode_long_string_AMF0(DecoderContext *context);
 static PyObject* decode_date_AMF0(DecoderContext *context);
 static PyObject* decode_xml_AMF0(DecoderContext *context);
 static PyObject* decode_typed_object_AMF0(DecoderContext *context);
-static int decode_headers_AMF0(DecoderContext *context, PyObject *packet);
-static int decode_messages_AMF0(DecoderContext *context, PyObject *packet);
+static PyObject* decode_headers_AMF0(DecoderContext *context);
+static PyObject* decode_messages_AMF0(DecoderContext *context);
 
 // Entry functions
 static PyObject* decode(PyObject *self, PyObject *args, PyObject *kwargs);
@@ -96,7 +96,7 @@ static PyObject* _decode(DecoderContext *context);
 // ------------------------ DECODING CONTEXT ------------------------ //
 
 /* Create a new DecoderContext. */
-static DecoderContext* _create_decoder_context()
+static DecoderContext* _create_decoder_context(int amf3)
 {
     DecoderContext *context;
     context = (DecoderContext*)malloc(sizeof(DecoderContext));
@@ -109,22 +109,24 @@ static DecoderContext* _create_decoder_context()
     context->buf_len = 0;
     context->pos = 0;
 
-    context->string_refs = create_object_context(64);
-    if (!context->string_refs) {
-        PyErr_SetNone(PyExc_MemoryError);
-        return NULL;
+    if (amf3) {
+        context->string_refs = create_object_context(64);
+        if (!context->string_refs)
+            return NULL;
+    } else {
+        context->string_refs = NULL;
     }
 
     context->object_refs = create_object_context(64);
-    if (!context->object_refs) {
-        PyErr_SetNone(PyExc_MemoryError);
+    if (!context->object_refs)
         return NULL;
-    }
 
-    context->class_refs = create_object_context(64);
-    if (!context->class_refs) {
-        PyErr_SetNone(PyExc_MemoryError);
-        return NULL;
+    if (amf3) {
+        context->class_refs = create_object_context(64);
+        if (!context->class_refs)
+            return NULL;
+    } else {
+        context->class_refs = NULL;
     }
 
     context->class_def_mapper = NULL;
@@ -139,9 +141,9 @@ static DecoderContext* _create_decoder_context()
  *
  * Use this when you need to reset reference counts.
  */
-static DecoderContext* _copy_decoder_context(DecoderContext *context)
+static DecoderContext* _copy_decoder_context(DecoderContext *context, int amf3)
 {
-    DecoderContext *new_context = _create_decoder_context();
+    DecoderContext *new_context = _create_decoder_context(amf3);
     if (!new_context)
         return NULL;
 
@@ -167,9 +169,17 @@ static DecoderContext* _copy_decoder_context(DecoderContext *context)
 /* De-allocate an DecoderContext. */
 static int _destroy_decoder_context(DecoderContext *context)
 {
-    destroy_object_context(context->string_refs);
-    destroy_object_context(context->object_refs);
-    destroy_object_context(context->class_refs);
+    if (context->string_refs) {
+        destroy_object_context(context->string_refs);
+    }
+
+    if (context->object_refs) {
+        destroy_object_context(context->object_refs);
+    }
+
+    if (context->class_refs) {
+        destroy_object_context(context->class_refs);
+    }
 
     if (context->class_def_mapper) {
         Py_DECREF(context->class_def_mapper);
@@ -573,6 +583,9 @@ static int _decode_dynamic_dict(DecoderContext *context, PyObject *dict)
             Py_DECREF(val);
             return 0;
         }
+
+        Py_DECREF(key);
+        Py_DECREF(val);
     }
 }
 
@@ -696,6 +709,13 @@ static PyObject* decode_date(DecoderContext *context)
     PyObject *epoch_float = PyFloat_FromDouble(epoch_millisecs / 1000);
     if (!epoch_float)
         return NULL;
+
+    if (!amfast_mod) {
+        amfast_mod = PyImport_ImportModule("amfast");
+        if(!amfast_mod) {
+            return;
+        }
+    }
 
     PyObject *func = PyObject_GetAttrString(amfast_mod, "date_from_epoch");
     if (!func) {
@@ -1210,11 +1230,9 @@ static PyObject* decode_typed_object_AMF0(DecoderContext *context)
     return obj_value;
 }
 
-/* Decode a AMF0 NetConnection packet. */
+/* Decode an AMF0 NetConnection packet. */
 static PyObject* _decode_packet(DecoderContext *context)
 {
-    PyObject *client_type;
-
     if (!remoting_mod) {
         remoting_mod = PyImport_ImportModule("amfast.remoting");
         if(!remoting_mod)
@@ -1225,109 +1243,108 @@ static PyObject* _decode_packet(DecoderContext *context)
     if (!packet_class)
         return NULL;
 
-    PyObject *packet = PyObject_CallFunctionObjArgs(packet_class, NULL);
-    Py_DECREF(packet_class);
-    if (!packet)
-        return NULL;
-
     // Set client type
+    PyObject *client_type;
     unsigned short amf_version = _decode_ushort(context);
     if (amf_version == FLASH_8) {
-        client_type = PyObject_GetAttrString(packet, "FLASH_8"); 
+        client_type = PyObject_GetAttrString(packet_class, "FLASH_8"); 
     } else if (amf_version == FLASH_COM) {
-        client_type = PyObject_GetAttrString(packet, "FLASH_COM");
+        client_type = PyObject_GetAttrString(packet_class, "FLASH_COM");
     } else if (amf_version == FLASH_9) {
-        client_type = PyObject_GetAttrString(packet, "FLASH_9");
+        client_type = PyObject_GetAttrString(packet_class, "FLASH_9");
     } else {
         PyErr_SetString(amfast_DecodeError, "Unknown client type.");
-        Py_DECREF(packet);
+        Py_DECREF(packet_class);
         return NULL;
     }
 
     if (!client_type) {
-        Py_DECREF(packet);
+        Py_DECREF(packet_class);
         return NULL;
     }
 
-    if (PyObject_SetAttrString(packet, "version", client_type) == -1) {
-        Py_DECREF(packet);
+    PyObject *headers = decode_headers_AMF0(context);
+    if (!headers) {
+        Py_DECREF(packet_class);
+        Py_DECREF(client_type);
         return NULL;
     }
 
-    // Parse headers
-    if (!decode_headers_AMF0(context, packet)) {
-        Py_DECREF(packet);
+    PyObject *messages = decode_messages_AMF0(context);
+    if (!messages) {
+        Py_DECREF(packet_class);
+        Py_DECREF(client_type);
+        Py_DECREF(headers);
         return NULL;
     }
 
-    // Parse messages
-    if (!decode_messages_AMF0(context, packet)) {
-        Py_DECREF(packet);
-        return NULL;
-    }
-
+    PyObject *packet = PyObject_CallFunctionObjArgs(packet_class, client_type, headers, messages, NULL);
+    Py_DECREF(packet_class);
+    Py_DECREF(client_type);
+    Py_DECREF(headers);
+    Py_DECREF(messages);
     return packet;
 }
 
 /* Decode AMF0 packet headers. */
-static int decode_headers_AMF0(DecoderContext *context, PyObject *packet)
+static PyObject* decode_headers_AMF0(DecoderContext *context)
 {
     unsigned short header_count = _decode_ushort(context);
+    PyObject *header_list = PyList_New(header_count);
+    if (!header_list)
+        return NULL;
+
     int i;
     for (i = 0; i < header_count; i++) {
-
         PyObject *header_name = decode_string_AMF0(context);
-        if (!header_name)
-            return 0;
+        if (!header_name) {
+            Py_DECREF(header_list);
+            return NULL;
+        }
 
         PyObject *required = decode_bool_AMF0(context);
         if (!required) {
+            Py_DECREF(header_list);
             Py_DECREF(header_name);
-            return 0;
+            return NULL;
         }
 
         int byte_len = _decode_ulong(context); // Byte length of header.
 
         // We need a new context for each header
-        DecoderContext *new_context = _copy_decoder_context(context);
+        DecoderContext *new_context = _copy_decoder_context(context, 0);
         if (!new_context) {
+            Py_DECREF(header_list);
             Py_DECREF(header_name);
             Py_DECREF(required);
-            return 0;
+            return NULL;
         }
 
-        PyObject *header_obj;
-        if (new_context->buf[new_context->pos] == AMF3_AMF0) {
-            // We could rely on _decode_AMF0
-            // to notice the AMF3 byte, but then
-            // we create/destroy the new context
-            // twice.
-            new_context->pos++;
-            header_obj = _decode(new_context);
-        } else {
-            header_obj = _decode_AMF0(new_context);
-        }
-
+        PyObject *header_obj = _decode_AMF0(new_context);
         context->pos = new_context->pos;
 
         if (!_destroy_decoder_context(new_context)) {
+            Py_DECREF(header_list);
             Py_DECREF(header_name);
             Py_DECREF(required);
-            return 0;
+            Py_XDECREF(header_obj);
+            return NULL;
         }
 
         if (!header_obj) {
+            Py_DECREF(header_list);
             Py_DECREF(header_name);
             Py_DECREF(required);
-            return 0;
+            return NULL;
         }
 
         // Create header object
         PyObject *header_class = PyObject_GetAttrString(remoting_mod, "Header");
         if (!header_class) {
+            Py_DECREF(header_list);
             Py_DECREF(header_name);
             Py_DECREF(required);
-            return 0;
+            return NULL;
         }
 
         PyObject *header = PyObject_CallFunctionObjArgs(header_class, header_name, required, header_obj, NULL);
@@ -1336,88 +1353,77 @@ static int decode_headers_AMF0(DecoderContext *context, PyObject *packet)
         Py_DECREF(required);
         Py_DECREF(header_obj);
         if (!header) {
-            Py_DECREF(header_name);
-            return 0;
+            Py_DECREF(header_list);
+            return NULL;
         }
 
-        // Set header into packet
-        PyObject *header_list = PyObject_GetAttrString(packet, "headers");
-        if (!header_list) {
-            Py_DECREF(header_name);
-            Py_DECREF(header);
-            return 0;
-        }
-
-        int return_value = PyList_Append(header_list, header);
-        Py_DECREF(header);
-        Py_DECREF(header_list);
-        if (return_value == -1) {
-            return 0;
-        }
+        // Steals reference to header
+        PyList_SET_ITEM(header_list, i, header);
     }
 
-    return 1;
+    return header_list;
 }
 
 /* Decode AMF0 packet messages. */
-static int decode_messages_AMF0(DecoderContext *context, PyObject *packet)
+static PyObject* decode_messages_AMF0(DecoderContext *context)
 {
     unsigned short message_count = _decode_ushort(context);
+    PyObject *message_list = PyList_New(message_count);
+    if (!message_list)
+        return NULL;
+
     int i;
     for (i = 0; i < message_count; i++) {
         PyObject *target = decode_string_AMF0(context);
-        if (!target)
-            return 0;
+        if (!target) {
+            Py_DECREF(message_list);
+            return NULL;
+        }
 
         PyObject *response = decode_string_AMF0(context);
         if (!response) {
+            Py_DECREF(message_list);
             Py_DECREF(target);
-            return 0;
+            return NULL;
         }
 
         int byte_len = _decode_ulong(context); // Message byte length
 
         // We need a new context for each message
-        DecoderContext *new_context = _copy_decoder_context(context);
+        DecoderContext *new_context = _copy_decoder_context(context, 0);
         if (!new_context) {
+            Py_DECREF(message_list);
             Py_DECREF(target);
             Py_DECREF(response);
-            return 0;
+            return NULL;
         }
 
-        PyObject *message_obj;
-        if (new_context->buf[new_context->pos + 1] == AMF3_AMF0) {
-            // We could rely on _decode_AMF0
-            // to notice the AMF3 byte, but then
-            // we create/destroy the new context
-            // twice.
-            new_context->pos++;
-            message_obj = _decode(new_context);
-        } else {
-            message_obj = _decode_AMF0(new_context);
-        }
-
+        PyObject *message_obj = message_obj = _decode_AMF0(new_context);
         context->pos = new_context->pos;
 
         if (!_destroy_decoder_context(new_context)) {
+            Py_DECREF(message_list);
             Py_DECREF(target);
             Py_DECREF(response);
-            return 0;
+            Py_XDECREF(message_obj);
+            return NULL;
         }
 
         if (!message_obj) {
+            Py_DECREF(message_list);
             Py_DECREF(target);
             Py_DECREF(response);
-            return 0;
+            return NULL;
         }
 
         // Create message object
         PyObject *message_class = PyObject_GetAttrString(remoting_mod, "Message");
         if (!message_class) {
+            Py_DECREF(message_list);
             Py_DECREF(target);
             Py_DECREF(response);
             Py_DECREF(message_obj);
-            return 0;
+            return NULL;
         }
 
         PyObject *message = PyObject_CallFunctionObjArgs(message_class, target, response, message_obj, NULL);
@@ -1425,25 +1431,16 @@ static int decode_messages_AMF0(DecoderContext *context, PyObject *packet)
         Py_DECREF(target);
         Py_DECREF(response);
         Py_DECREF(message_obj);
-        if (!message)
-            return 0;
-
-        // Set message into packet
-        PyObject *message_list = PyObject_GetAttrString(packet, "messages");
-        if (!message_list) {
-            Py_DECREF(message);
-            return 0;
+        if (!message) {
+            Py_DECREF(message_list);
+            return NULL;
         }
 
-        int return_value = PyList_Append(message_list, message);
-        Py_DECREF(message_list);
-        Py_DECREF(message);
-        if (return_value == -1) {
-            return 0;
-        }
+        // Steals reference
+        PyList_SET_ITEM(message_list, i, message);
     }
 
-    return 1;
+    return message_list;
 }
 
 /* Decode individual AMF0 objects from buffer. */
@@ -1453,7 +1450,7 @@ static PyObject* _decode_AMF0(DecoderContext *context)
 
     if (byte == AMF3_AMF0) {
         // AMF3 item requires new reference counts.
-        DecoderContext *new_context = _copy_decoder_context(context);
+        DecoderContext *new_context = _copy_decoder_context(context, 1);
         new_context->pos++;
         PyObject *return_value = _decode(new_context);
         context->pos = new_context->pos;
@@ -1507,7 +1504,7 @@ static PyObject* _decode_AMF0(DecoderContext *context)
     return NULL;
 }
 
-/* Decode individual objects from buffer. */
+/* Decode individual AMF3 objects from buffer. */
 static PyObject* _decode(DecoderContext *context)
 {
     char byte = context->buf[context->pos];
@@ -1567,7 +1564,7 @@ static PyObject* decode(PyObject *self, PyObject *args, PyObject *kwargs)
         &value, &packet, &amf3, &class_def_mapper))
         return NULL;
 
-    DecoderContext *context = _create_decoder_context();
+    DecoderContext *context = _create_decoder_context(amf3);
     if (!context)
         return NULL;
 
