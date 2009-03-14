@@ -43,8 +43,8 @@ typedef struct {
     ObjectContext *class_refs; // Keep track of class definitions references
 } EncoderContext;
 
-static EncoderContext* _create_encoder_context(size_t size);
-static EncoderContext* _copy_encoder_context(EncoderContext *context);
+static EncoderContext* _create_encoder_context(size_t size, int amf3);
+static EncoderContext* _copy_encoder_context(EncoderContext *context, int amf3);
 static int _destroy_encoder_context(EncoderContext *context);
 static int _increase_buffer_size(EncoderContext *context, size_t size);
 static int _amf_write_string_size(EncoderContext *context, char *value, size_t size);
@@ -73,7 +73,6 @@ static int encode_unicode(EncoderContext *context, PyObject *value);
 static int serialize_string(EncoderContext *context, PyObject *value);
 static int encode_string(EncoderContext *context, PyObject *value);
 static int serialize_string_or_unicode(EncoderContext *context, PyObject *value);
-static int _serialize_string(EncoderContext *context, char *value);
 static int write_tuple(EncoderContext *context, PyObject *value);
 static int serialize_tuple(EncoderContext *context, PyObject *value);
 static int encode_tuple(EncoderContext *context, PyObject *value);
@@ -137,7 +136,7 @@ static int _encode_object(EncoderContext *context, PyObject *value);
 // ------------------------ ENCODING CONTEXT ------------------------ //
 
 /* Create a new EncoderContext. */
-static EncoderContext* _create_encoder_context(size_t size)
+static EncoderContext* _create_encoder_context(size_t size, int amf3)
 {
     EncoderContext *context;
     context = (EncoderContext*)malloc(sizeof(EncoderContext));
@@ -154,22 +153,24 @@ static EncoderContext* _create_encoder_context(size_t size)
         return NULL;
     }
 
-    context->string_refs = create_object_context(64);
-    if (!context->string_refs) {
-        PyErr_SetNone(PyExc_MemoryError);
-        return NULL;
+    if (amf3) {
+        context->string_refs = create_object_context(64);
+        if (!context->string_refs)
+            return NULL;
+    } else {
+        context->string_refs = NULL;
     }
 
     context->object_refs = create_object_context(64);
-    if (!context->object_refs) {
-        PyErr_SetNone(PyExc_MemoryError);
+    if (!context->object_refs)
         return NULL;
-    }
 
-    context->class_refs = create_object_context(64);
-    if (!context->class_refs) {
-        PyErr_SetNone(PyExc_MemoryError);
-        return NULL;
+    if (amf3) {
+        context->class_refs = create_object_context(64);
+        if (!context->class_refs)
+            return NULL;
+    } else {
+        context->class_refs = NULL;
     }
 
     context->include_private = NULL;
@@ -188,9 +189,9 @@ static EncoderContext* _create_encoder_context(size_t size)
  *
  * Use this when you need to reset reference counts.
  */
-static EncoderContext* _copy_encoder_context(EncoderContext *context)
+static EncoderContext* _copy_encoder_context(EncoderContext *context, int amf3)
 {
-    EncoderContext *new_context = _create_encoder_context(context->buf_size);
+    EncoderContext *new_context = _create_encoder_context(context->buf_size, amf3);
     if (!new_context)
         return NULL;
 
@@ -229,9 +230,17 @@ static EncoderContext* _copy_encoder_context(EncoderContext *context)
 /* De-allocate an EncoderContext. */
 static int _destroy_encoder_context(EncoderContext *context)
 {
-    destroy_object_context(context->string_refs);
-    destroy_object_context(context->object_refs);
-    destroy_object_context(context->class_refs);
+    if (context->string_refs) {
+        destroy_object_context(context->string_refs);
+    }
+
+    if (context->object_refs) {
+        destroy_object_context(context->object_refs);
+    }
+
+    if (context->class_refs) {
+        destroy_object_context(context->class_refs);
+    }
 
     if (context->class_def_mapper) {
         Py_DECREF(context->class_def_mapper);
@@ -439,9 +448,8 @@ static int serialize_unicode(EncoderContext *context, PyObject *value)
 {
     // Check for empty string
     if (PyUnicode_GET_SIZE(value) == 0) {
-        // References are never used for empty stddrings.
+        // TODO: References are never used for empty strings.
         // does the index needs to be incremented ??
-        // context->string_refs->current_idx += 1;
         return _amf_write_byte(context, EMPTY_STRING_TYPE);
     }
 
@@ -457,19 +465,7 @@ static int serialize_unicode(EncoderContext *context, PyObject *value)
 static int encode_unicode(EncoderContext *context, PyObject *value)
 {
     PyObject *PyString_value = PyUnicode_AsUTF8String(value);
-    if (!PyString_value)
-        return 0;
-    char *char_value = PyString_AS_STRING(PyString_value);
-    int string_len = PyString_GET_SIZE(PyString_value);
-    Py_DECREF(PyString_value);
-    if (!char_value)
-        return 0;
-    
-    // Add size of string to header
-    if (!_encode_int(context, string_len << 1 | REFERENCE_BIT))
-        return 0;
-
-    return _amf_write_string_size(context, char_value, string_len);
+    return encode_string(context, PyString_value);
 }
 
 /* Serialize a PyString. */
@@ -489,16 +485,27 @@ static int serialize_string(EncoderContext *context, PyObject *value)
     return encode_string(context, value);
 }
 
-/* Encode a PyString. */
+/* Encode a PyString as UTF8. */
 static int encode_string(EncoderContext *context, PyObject *value)
 {
-    PyObject *unicode_value = PyUnicode_FromObject(value);
-    if (!unicode_value)
+    /*
+     *  TODO: The following code assumes all strings
+     *  are already UTF8 or ASCII.
+     *
+     *  Should we check to make sure,
+     *  or just let the client pick it up?
+     */
+    char *char_value = PyString_AS_STRING(value);
+    int string_len = PyString_GET_SIZE(value);
+    if (!char_value)
         return 0;
 
-    int return_value = encode_unicode(context, unicode_value);
-    Py_DECREF(unicode_value);
-    return return_value;
+    // Add size of string to header
+    if (!_encode_int(context, string_len << 1 | REFERENCE_BIT))
+        return 0;
+
+    // Write string.
+    return _amf_write_string_size(context, char_value, string_len);
 }
 
 /* Encode a PyString or a PyUnicode. */
@@ -506,12 +513,11 @@ static int serialize_string_or_unicode(EncoderContext *context, PyObject *value)
 {
     if (PyUnicode_Check(value)) {
         return serialize_unicode(context, value);
-    }
-    else if (PyString_Check(value)) {
+    } else if (PyString_Check(value)) {
         return serialize_string(context, value);
     }
  
-    PyErr_SetString(amfast_EncodeError, "Attempting to encode non string/unicode as string.");
+    PyErr_SetString(amfast_EncodeError, "Attempting to serialize non string/unicode as string.");
     return 0;
 }
 
@@ -520,26 +526,12 @@ static int encode_string_or_unicode_AMF0(EncoderContext *context, PyObject *valu
 {
     if (PyUnicode_Check(value)) {
         return encode_unicode_AMF0(context, value, allow_long);
-    }
-    else if (PyString_Check(value)) {
+    } else if (PyString_Check(value)) {
         return encode_string_AMF0(context, value, allow_long);
     }
 
     PyErr_SetString(amfast_EncodeError, "Attempting to encode non string/unicode as string.");
     return 0;
-}
-
-
-/* Serialize a native C string. */
-static int _serialize_string(EncoderContext *context, char *value)
-{
-    PyObject *string_value = PyString_FromString(value);
-    if (!string_value)
-        return 0;
-
-    int return_value = serialize_string(context, string_value);
-    Py_DECREF(string_value);
-    return return_value;
 }
 
 /* Encode an ArrayCollection header. */
@@ -806,6 +798,13 @@ static int encode_date(EncoderContext *context, PyObject *value)
         return 0;
 
     // Call python function to get datetime
+    if (!amfast_mod) {
+        amfast_mod = PyImport_ImportModule("amfast");
+        if(!amfast_mod) {
+            return;
+        }
+    }
+
     PyObject *epoch_func = PyObject_GetAttrString(amfast_mod, "epoch_from_date");
     if (!epoch_func)
         return 0;
@@ -1300,18 +1299,6 @@ static int write_unicode_AMF0(EncoderContext *context, PyObject *value)
     return encode_unicode_AMF0(context, value, 0);
 }
 
-/* Write a PyString in AMF0. */
-static int encode_string_AMF0(EncoderContext *context, PyObject *value, int allow_long)
-{
-    PyObject *unicode_value = PyUnicode_FromObject(value);
-    if (!unicode_value)
-        return 0;
-
-    int return_value = encode_unicode_AMF0(context, unicode_value, allow_long);
-    Py_DECREF(unicode_value);
-    return return_value;
-}
-
 /*
  * Encode a PyUnicode in AMF0.
  *
@@ -1325,9 +1312,24 @@ static int encode_unicode_AMF0(EncoderContext *context, PyObject *value, int all
     PyObject *PyString_value = PyUnicode_AsUTF8String(value);
     if (!PyString_value)
         return 0;
-    char *char_value = PyString_AS_STRING(PyString_value);
-    int string_len = PyString_GET_SIZE(PyString_value);
+
+    int return_value = encode_string_AMF0(context, PyString_value, allow_long);
     Py_DECREF(PyString_value);
+    return return_value;
+}
+
+/*
+ * Encode a PyString in AMF0.
+ *
+ * allow_long
+ * 1 = allow long values
+ * 0 = don't allow long values
+ * -1 = force long value
+ */
+static int encode_string_AMF0(EncoderContext *context, PyObject *value, int allow_long)
+{
+    char *char_value = PyString_AS_STRING(value);
+    int string_len = PyString_GET_SIZE(value);
     if (!char_value)
         return 0;
 
@@ -1335,12 +1337,10 @@ static int encode_unicode_AMF0(EncoderContext *context, PyObject *value, int all
         PyErr_SetString(amfast_EncodeError, "Long string not allowed.");
         return 0;
     } else if (string_len > 65536 || allow_long == -1) {
-        unsigned long string_len_long = 0 + string_len;
-        if (!_encode_ulong(context, string_len_long))
+        if (!_encode_ulong(context, string_len))
             return 0;
     } else {
-        unsigned short string_len_short = 0 + string_len;
-        if (!_encode_ushort(context, string_len_short))
+        if (!_encode_ushort(context, string_len))
             return 0;
     }
 
@@ -1442,6 +1442,13 @@ static int _encode_dynamic_dict_AMF0(EncoderContext *context, PyObject *value)
 static int encode_date_AMF0(EncoderContext *context, PyObject *value)
 {
     // Call python function to get datetime
+    if (!amfast_mod) {
+        amfast_mod = PyImport_ImportModule("amfast");
+        if(!amfast_mod) {
+            return;
+        }
+    }
+
     PyObject *epoch_func = PyObject_GetAttrString(amfast_mod, "epoch_from_date");
     if (!epoch_func)
         return 0;
@@ -1533,6 +1540,13 @@ static int write_anonymous_object_AMF0(EncoderContext *context, PyObject *value)
 /* Get attributes from an anonymous object as a dict. */
 static PyObject* attributes_from_object(EncoderContext *context, PyObject *value)
 {
+    if (!class_def_mod) {
+        class_def_mod = PyImport_ImportModule("amfast");
+        if(!class_def_mod) {
+            return;
+        }
+    }
+
     PyObject *attr_func = PyObject_GetAttrString(class_def_mod, "get_dynamic_attr_vals");
     if (!attr_func)
         return NULL;
@@ -1626,7 +1640,7 @@ static int write_object_AMF0(EncoderContext *context, PyObject *value)
             return 0;
 
         // Create new context for AMF3 encoder
-        EncoderContext *new_context = _copy_encoder_context(context);
+        EncoderContext *new_context = _copy_encoder_context(context, 1);
         int return_value = _encode(new_context, value);
         if (!return_value) {
             // AMF3 encode failed
@@ -1883,7 +1897,7 @@ static int encode_packet_header_AMF0(EncoderContext *context, PyObject *value)
         return 0;
 
     // Encode header value with a new context, so references are reset
-    EncoderContext *new_context = _copy_encoder_context(context);
+    EncoderContext *new_context = _copy_encoder_context(context, 0);
     return_value = _encode_AMF0(new_context, body);
     Py_DECREF(body);
     if (!return_value) {
@@ -1927,7 +1941,7 @@ static int encode_packet_message_AMF0(EncoderContext *context, PyObject *value)
         return 0;
 
     // Encode message value with a new context, so references are reset
-    EncoderContext *new_context = _copy_encoder_context(context);
+    EncoderContext *new_context = _copy_encoder_context(context, 0);
     return_value = _encode_AMF0(new_context, body);
     Py_DECREF(body);
     if (!return_value) {
@@ -2081,7 +2095,7 @@ static PyObject* encode(PyObject *self, PyObject *args, PyObject *kwargs)
         &use_legacy_xml, &amf3, &packet, &include_private, &class_def_mapper))
         return NULL;
 
-    EncoderContext *context = _create_encoder_context(1024);
+    EncoderContext *context = _create_encoder_context(1024, amf3);
     if (!context)
         return NULL;
 
