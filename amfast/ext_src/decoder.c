@@ -331,7 +331,7 @@ static int decode_typed_object(DecoderContext *context, PyObject *obj_value, PyO
             return 0;
         }
 
-        PyObject *attr_name = PyTuple_GetItem(static_attrs, i);
+        PyObject *attr_name = PyTuple_GET_ITEM(static_attrs, i);
         if (!attr_name) {
             Py_DECREF(decoded_attrs);
             Py_DECREF(static_attrs);

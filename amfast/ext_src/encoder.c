@@ -448,8 +448,7 @@ static int serialize_unicode(EncoderContext *context, PyObject *value)
 {
     // Check for empty string
     if (PyUnicode_GET_SIZE(value) == 0) {
-        // TODO: References are never used for empty strings.
-        // does the index needs to be incremented ??
+        // References are never used for empty strings.
         return _amf_write_byte(context, EMPTY_STRING_TYPE);
     }
 
@@ -672,7 +671,13 @@ static int encode_list(EncoderContext *context, PyObject *value)
     // Encode each value in the list
     Py_ssize_t i;
     for (i = 0; i < value_len; i++) {
-        if (!_encode(context, PyList_GET_ITEM(value, i)))
+        // Increment ref count in case 
+        // list is modified by someone else.
+        PyObject *list_item = PyList_GET_ITEM(value, i);
+        Py_INCREF(list_item);
+        int return_value = _encode(context, list_item);
+        Py_DECREF(list_item);
+        if (!return_value)
             return 0;
     }
 
@@ -1064,10 +1069,25 @@ static int encode_object(EncoderContext *context, PyObject *value)
         return 0;
     }
     
-    int static_attr_len = PyList_GET_SIZE(static_attrs);
+    int static_attr_len = PySequence_Size(static_attrs);
+    if (static_attr_len == -1) {
+        Py_DECREF(class_def);
+        Py_DECREF(static_attrs);
+        return 0;
+    }
+
     int i;
     for (i = 0; i < static_attr_len; i++) {
-        if (!_encode(context, PyList_GET_ITEM(static_attrs, i))) {
+        PyObject *static_attr = PySequence_GetItem(static_attrs, i);
+        if (!static_attr) {
+            Py_DECREF(static_attrs);
+            Py_DECREF(class_def);
+            return 0;
+        }
+
+        int return_value = _encode(context, static_attr);
+        Py_DECREF(static_attr);
+        if (!return_value) {
             Py_DECREF(static_attrs);
             Py_DECREF(class_def);
             return 0;
@@ -1149,15 +1169,16 @@ static int encode_class_def(EncoderContext *context, PyObject *value)
        return 0;
     }
 
-    if (!PyTuple_Check(static_attrs)) {
+    int static_attr_len = PySequence_Size(static_attrs);
+    if (static_attr_len == -1) {
        Py_DECREF(class_alias);
        Py_DECREF(static_attrs);
-       PyErr_SetString(amfast_EncodeError, "ClassDef.static_attrs must be a tuple.");
        return 0;
     }
 
-    int static_attr_len = PyTuple_GET_SIZE(static_attrs);
     if (static_attr_len > (MAX_INT >> 4)) {
+       Py_DECREF(class_alias);
+       Py_DECREF(static_attrs);
        PyErr_SetString(amfast_EncodeError, "ClassDef has too many attributes.");
        return 0;
     }
@@ -1179,10 +1200,15 @@ static int encode_class_def(EncoderContext *context, PyObject *value)
     // Encode static attr names
     int i;
     for (i = 0; i < static_attr_len; i++) {
-        PyObject *attr_name = PyTuple_GET_ITEM(static_attrs, i);
-        if (!attr_name)
-            return 0; 
-        if (!serialize_string_or_unicode(context, attr_name))
+        PyObject *attr_name = PySequence_GetItem(static_attrs, i);
+        if (!attr_name) {
+            Py_DECREF(static_attrs);
+            return 0;
+        }
+        
+        int return_value = serialize_string_or_unicode(context, attr_name);
+        Py_DECREF(attr_name);
+        if (!return_value)
             return 0;
     }
 
@@ -1365,7 +1391,13 @@ static int write_list_AMF0(EncoderContext *context, PyObject *value)
 
     int i;
     for (i = 0; i < array_len; i++) {
-        if (!_encode_AMF0(context, PyList_GET_ITEM(value, i)))
+        // Increment ref count in case 
+        // list is modified by someone else.
+        PyObject *list_item = PyList_GET_ITEM(value, i);
+        Py_INCREF(list_item);
+        int return_value = _encode_AMF0(context, list_item);
+        Py_DECREF(list_item);
+        if (!return_value)
             return 0;
     }
 
@@ -1695,19 +1727,17 @@ static int write_object_AMF0(EncoderContext *context, PyObject *value)
         return 0;
     }
 
-    if (!PyTuple_Check(static_attr_names)) {
+    int static_attr_len = PySequence_Size(static_attrs);
+    if (static_attr_len == -1) {
         Py_DECREF(class_def);
         Py_DECREF(attrs);
         Py_DECREF(static_attrs);
-        Py_DECREF(static_attr_names);
-        PyErr_SetString(amfast_EncodeError, "ClassDef.static_attrs must be a tuple.");
         return 0;
     }
-    
-    int static_attr_len = PyList_GET_SIZE(static_attrs);
+
     int i;
     for (i = 0; i < static_attr_len; i++) {
-        PyObject *static_attr_name = PyTuple_GetItem(static_attr_names, i);
+        PyObject *static_attr_name = PySequence_GetItem(static_attr_names, i);
         if (!static_attr_name) {
             Py_DECREF(class_def);
             Py_DECREF(attrs);
@@ -1715,7 +1745,7 @@ static int write_object_AMF0(EncoderContext *context, PyObject *value)
             return 0;
         }
 
-        PyObject *static_attr = PyList_GET_ITEM(static_attrs, i);
+        PyObject *static_attr = PySequence_GetItem(static_attrs, i);
         if (!static_attr) {
             Py_DECREF(class_def);
             Py_DECREF(attrs);
@@ -1735,6 +1765,7 @@ static int write_object_AMF0(EncoderContext *context, PyObject *value)
         }
     }
     Py_DECREF(static_attrs);
+    Py_DECREF(static_attr_names);
 
     // Get dynamic attrs
     if (PyObject_HasAttrString(class_def, "DYNAMIC_CLASS_DEF")) {
@@ -1818,7 +1849,11 @@ static int _encode_packet(EncoderContext *context, PyObject *value)
     if (!headers)
         return 0;
 
-    int header_count = PyList_Size(headers);
+    int header_count = PySequence_Size(headers);
+    if (header_count == -1) {
+        Py_DECREF(headers);
+        return 0;
+    }
     if (!_encode_ushort(context, header_count)) {
         Py_DECREF(headers);
         return 0;
@@ -1826,7 +1861,7 @@ static int _encode_packet(EncoderContext *context, PyObject *value)
 
     int i;
     for (i = 0; i < header_count; i++) {
-        PyObject *header = PyList_GetItem(headers, i);
+        PyObject *header = PySequence_GetItem(headers, i);
         if (!header) {
             Py_DECREF(headers);
             return 0;
@@ -1846,14 +1881,18 @@ static int _encode_packet(EncoderContext *context, PyObject *value)
     if (!messages)
         return 0;
 
-    int message_count = PyList_Size(messages);
+    int message_count = PySequence_Size(messages);
+    if (message_count == -1) {
+        Py_DECREF(messages);
+        return 0;
+    }
     if (!_encode_ushort(context, message_count)) {
         Py_DECREF(messages);
         return 0;
     }
 
     for (i = 0; i < message_count; i++) {
-        PyObject *message = PyList_GetItem(messages, i);
+        PyObject *message = PySequence_GetItem(messages, i);
         if (!message) {
             Py_DECREF(messages);
             return 0;
