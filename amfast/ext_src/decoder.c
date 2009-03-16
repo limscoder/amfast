@@ -454,21 +454,30 @@ static PyObject* decode_class_def(DecoderContext *context, int header)
     if (!alias)
         return NULL;
 
+    // Get alias as C-String for error handling
+    PyObject *alias_str = PyUnicode_AsASCIIString(alias);
+    if (!alias_str) {
+        Py_DECREF(alias);
+        return NULL;
+    }
+    char *alias_char = PyString_AsString(alias_str);
+
     PyObject *class_def = class_def_from_alias(context, alias);
     Py_DECREF(alias);
     if (!class_def) 
         return NULL;
 
     // Check for an externizeable class def.
+    if(PyObject_HasAttrString(class_def, "EXTERNIZEABLE_CLASS_DEF")) {
+        return(class_def);
+    }
+ 
     if ((header & 0x07FFFFFF) == EXTERNIZEABLE) {
-        if(PyObject_HasAttrString(class_def, "EXTERNIZEABLE_CLASS_DEF")) {
-            // Externizeable
-            return(class_def);
-        } else {
-            Py_DECREF(class_def);
-            PyErr_SetString(amfast_DecodeError, "Encoded class is externizeable, but ClassDef is not.");
-            return NULL;
-        }
+        Py_DECREF(class_def);
+        char error_str[512];
+        sprintf(error_str, "Encoded class '%s' is externizeable, but ClassDef is not.", alias_char);
+        PyErr_SetString(amfast_DecodeError, error_str);
+        return NULL;
     }
 
     // Check for anonymous object
@@ -479,11 +488,15 @@ static PyObject* decode_class_def(DecoderContext *context, int header)
     // but encoding is static
     if (PyObject_HasAttrString(class_def, "DYNAMIC_CLASS_DEF") && (!((header & DYNAMIC) == DYNAMIC))) {
         Py_DECREF(class_def);
-        PyErr_SetString(amfast_DecodeError, "Encoded class is static, but ClassDef is dynamic.");
+        char error_str[512];
+        sprintf(error_str, "Encoded class '%s' is static, but ClassDef is dynamic.", alias_char);
+        PyErr_SetString(amfast_DecodeError, error_str);
         return NULL;
     } else if ((header & DYNAMIC) == DYNAMIC && (!PyObject_HasAttrString(class_def, "DYNAMIC_CLASS_DEF"))) {
         Py_DECREF(class_def);
-        PyErr_SetString(amfast_DecodeError, "Encoded class is dynamic, but ClassDef is static.");
+        char error_str[512];
+        sprintf(error_str, "Encoded class '%s' is dynamic, but ClassDef is static.", alias_char);
+        PyErr_SetString(amfast_DecodeError, error_str);
         return NULL;
     }
 
@@ -713,7 +726,7 @@ static PyObject* decode_date(DecoderContext *context)
     if (!amfast_mod) {
         amfast_mod = PyImport_ImportModule("amfast");
         if(!amfast_mod) {
-            return;
+            return NULL;
         }
     }
 
@@ -842,7 +855,10 @@ static PyObject* deserialize_string(DecoderContext *context)
 
     // Check for null string
     if (header == EMPTY_STRING_TYPE) {
-        return PyString_FromStringAndSize(NULL, 0);
+        PyObject *empty_string = PyString_FromStringAndSize(NULL, 0);
+        PyObject *return_value = PyUnicode_FromObject(empty_string);
+        Py_DECREF(empty_string);
+        return return_value;
     }
 
     // Check for reference
