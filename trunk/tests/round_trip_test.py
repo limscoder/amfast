@@ -109,6 +109,12 @@ class RoundTripTestCase(unittest.TestCase):
         decoded = decoder.decode(encoded, class_def_mapper=self.class_mapper, amf3=True)
         self.resultTest(decoded['objects'])
 
+    def testComplexDict(self):
+        complex = {'element': 'ignore', 'objects': self.buildComplex()}
+        encoded = encoder.encode(complex, use_array_collections=False, use_object_proxies=False, class_def_mapper=self.class_mapper, amf3=True)
+        decoded = decoder.decode(encoded, class_def_mapper=self.class_mapper, amf3=True)
+        self.resultTest(decoded['objects'])
+
     def testPyamfComplexDict(self):
         return
         complex = {'element': 'ignore', 'objects': self.buildComplex()}
@@ -134,7 +140,6 @@ class RoundTripTestCase(unittest.TestCase):
         for i in range(10000):
             print "%s ..." % i
             self.testPyamfComplexDict()
-
 
 def suite():
     return unittest.TestLoader().loadTestsFromTestCase(RoundTripTestCase)
