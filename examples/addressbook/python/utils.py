@@ -4,6 +4,7 @@ import logging
 
 import amfast
 from amfast.class_def.sa_class_def import SaClassDef
+from amfast.class_def.code_generator import CodeGenerator
 from amfast.remoting import Service, CallableTarget
 
 import persistent
@@ -46,3 +47,9 @@ def setup_gateway(gateway):
     service.setTarget(CallableTarget(sa_obj.insertDefaultData, 'insertDefaultData'))
     service.setTarget(CallableTarget(sa_obj.raiseException, 'raiseException'))
     gateway.service_mapper.mapService(service)
+
+    # Generate source code
+    #coder = CodeGenerator()
+    #coder.generateFilesFromMapper(gateway.class_def_mapper, use_accessors=False,
+    #    packaged=True, constructor=False, bindable=True, extends='SAObject')
+

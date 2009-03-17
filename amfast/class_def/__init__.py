@@ -20,7 +20,8 @@ class ClassDef(object):
 
     CLASS_DEF = True
 
-    def __init__(self, class_, alias=None, static_attrs=None, amf3=None):
+    def __init__(self, class_, alias=None, static_attrs=None,
+        amf3=None, _builtIn=False):
         """arguments
         =========
          * class_ - class, the class being mapped.
@@ -29,6 +30,7 @@ class ClassDef(object):
          * amf3 - bool, if True, this object will be encoded in AMF3. Default = True
         """
         self.class_ = class_
+        self._builtIn = _builtIn
 
         if alias is None:
             if hasattr(class_, ALIAS):
@@ -87,8 +89,8 @@ class DynamicClassDef(ClassDef):
 
     DYNAMIC_CLASS_DEF = True
 
-    def __init__(self, class_, alias=None, static_attrs=None, amf3=True):
-        ClassDef.__init__(self, class_, alias, static_attrs, amf3)
+    def __init__(self, class_, alias=None, static_attrs=None, amf3=True, _builtIn=False):
+        ClassDef.__init__(self, class_, alias, static_attrs, amf3, _builtIn)
 
     def getDynamicAttrVals(self, obj, include_private=False):
         """Returns a dict where keys are attribute names and values are attribute values.
@@ -106,8 +108,8 @@ class ExternizeableClassDef(ClassDef):
     
     EXTERNIZEABLE_CLASS_DEF = True
     
-    def __init__(self, class_, alias=None, static_attrs=None):
-        ClassDef.__init__(self, class_, alias, static_attrs, amf3=True)
+    def __init__(self, class_, alias=None, static_attrs=None, _builtIn=False):
+        ClassDef.__init__(self, class_, alias, static_attrs, amf3=True, _builtIn=_builtIn)
  
     def writeByteString(self, obj):
         """Returns a byte string representation of the object.
@@ -144,7 +146,8 @@ class _ProxyClassDef(ExternizeableClassDef):
         pass
 
     def __init__(self):
-        ExternizeableClassDef.__init__(self, self._ProxyObject, self.PROXY_ALIAS, None)
+        ExternizeableClassDef.__init__(self, self._ProxyObject, self.PROXY_ALIAS,
+            None, _builtIn=True)
 
 class _ArrayCollectionClassDef(_ProxyClassDef):
     """A special ClassDef used internally to encode/decode an ArrayCollection."""
@@ -187,16 +190,16 @@ class ClassDefMapper(object):
         self.mapClass(_ObjectProxyClassDef())
 
         # Exceptions
-        self.mapClass(ClassDef(remoting.AsError))
-        self.mapClass(ClassDef(messaging.FaultError))
+        self.mapClass(ClassDef(remoting.AsError, _builtIn=True))
+        self.mapClass(ClassDef(messaging.FaultError, _builtIn=True))
 
         # Remoting messages
-        self.mapClass(ClassDef(messaging.AbstractMessage))
-        self.mapClass(ClassDef(messaging.RemotingMessage))
-        self.mapClass(ClassDef(messaging.AsyncMessage))
-        self.mapClass(ClassDef(messaging.CommandMessage))
-        self.mapClass(ClassDef(messaging.AcknowledgeMessage))
-        self.mapClass(ClassDef(messaging.ErrorMessage))
+        self.mapClass(ClassDef(messaging.AbstractMessage, _builtIn=True))
+        self.mapClass(ClassDef(messaging.RemotingMessage, _builtIn=True))
+        self.mapClass(ClassDef(messaging.AsyncMessage, _builtIn=True))
+        self.mapClass(ClassDef(messaging.CommandMessage, _builtIn=True))
+        self.mapClass(ClassDef(messaging.AcknowledgeMessage, _builtIn=True))
+        self.mapClass(ClassDef(messaging.ErrorMessage, _builtIn=True))
 
     def mapClass(self, class_def):
         """Map a class_def implementation, so that it can be retrieved based on class attributes.
