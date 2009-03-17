@@ -9,3 +9,4 @@
  * RemotingInterface
  * EncodingAndDecoding
  * ExampleImplementations
+ * ActionScriptCodeGeneration
