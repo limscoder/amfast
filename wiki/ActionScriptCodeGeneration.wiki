@@ -4,7 +4,6 @@
 
  * Use the class_def.code_generator.CodeGenerator class to generate Actionscript source code.
 
-{{{
 class_def.code_generator.CodeGenerator.generateFilesFromMapper(self, class_mapper, dir='.', use_accessors=False, packaged=False, constructor=False, bindable=False, extends=None, imp
 lements=None) unbound amfast.class_def.code_generator.CodeGenerator method
     Generates an Actionscript class source string.
@@ -19,10 +18,11 @@ lements=None) unbound amfast.class_def.code_generator.CodeGenerator method
      * bindable - bool, If True, add the 'Bindable' metadata tag. Default = False
      * extends - string, name of the class that this class inherits from. Default = None
      * implements - list or tuple, a list of interface names that this class implments. Default = None
-}}}
 
 {{{
-    coder = CodeGenerator()
-    coder.generateFilesFromMapper(class_def_mapper, use_accessors=False,
-        packaged=True, constructor=False, bindable=True, extends='Parent')
+from amfast.class_def.code_generator import CodeGenerator   
+
+coder = CodeGenerator()
+coder.generateFilesFromMapper(class_def_mapper, use_accessors=False,
+    packaged=True, constructor=False, bindable=True, extends='Parent')
 }}}
