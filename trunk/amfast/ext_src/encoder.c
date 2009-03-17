@@ -743,18 +743,9 @@ static int serialize_dict(EncoderContext *context, PyObject *value)
 /* Encode a dict. */
 static int encode_dict(EncoderContext *context, PyObject *value)
 {
-    // Encode as anonymous object
-    if (!_amf_write_byte(context, DYNAMIC))
+    if (!serialize_class_def(context, Py_None)) {
         return 0;
-
-    // Anonymous object alias is an empty string
-    if (!_amf_write_byte(context, EMPTY_STRING_TYPE))
-        return 0;
-
-    // Even though this is an anonymous class,
-    // The class definition reference count needs to be incremented
-    if (!map_next_object_ref(context->class_refs, Py_None))
-        return 0;
+    }
     
     return _encode_dynamic_dict(context, value);
 }
@@ -1129,7 +1120,16 @@ static int serialize_class_def(EncoderContext *context, PyObject *value)
 /* Encode a class definition. */
 static int encode_class_def(EncoderContext *context, PyObject *value)
 {
-    int header;
+    if (value == Py_None) {
+        // Encode as anonymous object
+        if (!_amf_write_byte(context, DYNAMIC))
+            return 0;
+
+        // Anonymous object alias is an empty string
+        if (!_amf_write_byte(context, EMPTY_STRING_TYPE))
+            return 0;
+        return 1;
+    }
 
     // Encode class type
     if (!PyObject_HasAttrString(value, "CLASS_DEF")) {
@@ -1138,6 +1138,7 @@ static int encode_class_def(EncoderContext *context, PyObject *value)
     }
 
     // Determine header type
+    int header;
     if (PyObject_HasAttrString(value, "EXTERNIZEABLE_CLASS_DEF")) {
         header = EXTERNIZEABLE;
     } else if (PyObject_HasAttrString(value, "DYNAMIC_CLASS_DEF")) {
