@@ -1,0 +1,28 @@
+#summary Generate actionscript source code for ClassDefs.
+
+= Code Generation =
+
+ * Use the class_def.code_generator.CodeGenerator class to generate Actionscript source code.
+
+{{{
+class_def.code_generator.CodeGenerator.generateFilesFromMapper(self, class_mapper, dir='.', use_accessors=False, packaged=False, constructor=False, bindable=False, extends=None, imp
+lements=None) unbound amfast.class_def.code_generator.CodeGenerator method
+    Generates an Actionscript class source string.
+    
+    arguments:
+    ===========
+     * class_mapper - amfast.class_def.ClassDefMapper, ClassDefMapper being used to generate the action script classed.
+     * dir - string, directory to store generated files in. Default = '.'
+     * use_accessors - bool, If True create getter and setter methods for attributes. Default = False
+     * packaged - bool, If True wrap created class in a package (for AS3). Default = False
+     * constructor - bool, If True create a constructor method. Default = False
+     * bindable - bool, If True, add the 'Bindable' metadata tag. Default = False
+     * extends - string, name of the class that this class inherits from. Default = None
+     * implements - list or tuple, a list of interface names that this class implments. Default = None
+}}}
+
+{{{
+    coder = CodeGenerator()
+    coder.generateFilesFromMapper(class_def_mapper, use_accessors=False,
+        packaged=True, constructor=False, bindable=True, extends='Parent')
+}}}
