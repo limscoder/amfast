@@ -2,9 +2,9 @@
 
 = Code Generation =
 
- * Use the !class_def.code_generator.CodeGenerator class to generate Actionscript source code.
+ * Use the class_def.code_generator.!CodeGenerator class to generate Actionscript source code.
 
-!class_def.code_generator.CodeGenerator.generateFilesFromMapper(self, class_mapper, dir='.', use_accessors=False, packaged=False, constructor=False, bindable=False, extends=None, implements=None)
+class_def.code_generator.!CodeGenerator.generateFilesFromMapper(self, class_mapper, dir='.', use_accessors=False, packaged=False, constructor=False, bindable=False, extends=None, implements=None)
     Generates an Actionscript class source string.
     
     arguments:
