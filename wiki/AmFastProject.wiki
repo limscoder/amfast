@@ -1,7 +1,7 @@
 #summary About the AmFast project.
 = !AmFast =
 
- * !AmFast is developed and maintained by Dave Thompson.
+ * !AmFast is developed and maintained by [http://bcf.arl.arizona.edu/dave-thompson/index.php Dave Thompson].
  * If you're interested in helping out with the project, send a message out to the [http://groups.google.com/group/amfast/web/amfast AmFast group]
 
 = Thanks =
