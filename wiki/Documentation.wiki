@@ -2,7 +2,7 @@
 
 = Documentation =
 
-!AmFast can encode and decode Python objects to AMF3 format.
+!AmFast can encode and decode Python objects to/from AMF format.
 
  * TypeMap
  * CustomClasses
