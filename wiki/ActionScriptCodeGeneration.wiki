@@ -9,7 +9,7 @@ class_def.code_generator.!CodeGenerator.generateFilesFromMapper(self, class_mapp
     
     arguments:
     ===========
-     * class_mapper - amfast.class_def.ClassDefMapper, ClassDefMapper being used to generate the action script classed.
+     * class_mapper - amfast.class_def.!ClassDefMapper, !ClassDefMapper being used to generate the action script classed.
      * dir - string, directory to store generated files in. Default = '.'
      * use_accessors - bool, If True create getter and setter methods for attributes. Default = False
      * packaged - bool, If True wrap created class in a package (for AS3). Default = False
