@@ -1594,7 +1594,7 @@ static int write_anonymous_object_AMF0(EncoderContext *context, PyObject *value)
 static PyObject* attributes_from_object(EncoderContext *context, PyObject *value)
 {
     if (!class_def_mod) {
-        class_def_mod = PyImport_ImportModule("amfast");
+        class_def_mod = PyImport_ImportModule("amfast.class_def");
         if(!class_def_mod) {
             return NULL;
         }
