@@ -15,11 +15,11 @@ class CodeGenerator(object):
     def generateFilesFromMapper(self, class_mapper, dir='.', use_accessors=False,
         packaged=False, constructor=False, bindable=False,
         extends=None, implements=None):
-        """Generates an Actionscript class source string.
+        """Generates an Actionscript class files.
 
         arguments:
         ===========
-         * class_mapper - amfast.class_def.ClassDefMapper, ClassDefMapper being used to generate the action script classed.
+         * class_mapper - amfast.class_def.ClassDefMapper, ClassDefMapper being used to generate the action script classes.
          * dir - string, directory to store generated files in. Default = '.'
          * use_accessors - bool, If True create getter and setter methods for attributes. Default = False
          * packaged - bool, If True wrap created class in a package (for AS3). Default = False
@@ -37,7 +37,7 @@ class CodeGenerator(object):
     def generateClassFile(self, class_def, dir='.', use_accessors=False,
         packaged=False, constructor=False, bindable=False,
         extends=None, implements=None):
-        """Generates an Actionscript class source string.
+        """Generates an Actionscript class source file.
 
         arguments:
         ===========
@@ -103,6 +103,12 @@ class CodeGenerator(object):
         
         if hasattr(class_def, "DYNAMIC_CLASS_DEF") is True:
             class_def_str += 'dynamic '
+
+        if hasattr(class_def, "EXTERNIZEABLE_CLASS_DEF") is True:
+            imp = ['IExternalizable']
+            if implements is not None:
+                imp.extend(implements)
+            implements = imp
 
         class_def_str += 'class %s' % class_
         if extends is not None:
