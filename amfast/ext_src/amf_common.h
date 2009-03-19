@@ -57,6 +57,13 @@
 #define TYPED_OBJ_AMF0 0x10
 #define AMF3_AMF0 0x11
 
+// For 2.4 support
+#if PY_VERSION_HEX < 0x02050000
+typedef int Py_ssize_t;
+#define PY_SSIZE_T_MAX INT_MAX
+#define PY_SSIZE_T_MIN INT_MIN
+#endif
+
 /* A dynamic array of ObjectRefs. */
 typedef struct {
     PyObject **data;
