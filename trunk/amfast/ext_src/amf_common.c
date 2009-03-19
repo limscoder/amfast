@@ -18,13 +18,17 @@ ObjectContext* create_object_context(size_t size)
     context->data_len = 0; // Nothing is in the array yet
     context->data = (PyObject**)malloc(sizeof(PyObject*) * context->data_size); // Create array
     if (!context->data) {
+        free(context);
         PyErr_SetNone(PyExc_MemoryError);
         return NULL;
     }
 
     context->references = PyDict_New();
-    if (!context->references)
+    if (!context->references) {
+        free(context->data);
+        free(context);
         return NULL;
+    }
 
     return context;
 }
@@ -34,7 +38,7 @@ int destroy_object_context(ObjectContext *context)
 {
     // De-Allocate all ObjectRefs
     int i;
-    for (i = 0; i < context->data_len; i++) {
+    for (i = 0; i < (int)context->data_len; i++) {
         PyObject *ref = context->data[i];
         Py_DECREF(ref); // Don't need obj anymore
     }
@@ -65,9 +69,9 @@ int map_next_object_ref(ObjectContext *context, PyObject *ref)
     if (!key)
         return 0;
 
-    PyObject *idx = PyInt_FromLong(idx_int);
+    PyObject *idx = PyInt_FromLong((long)idx_int);
     if (!idx) {
-        Py_DECREF(idx);
+        Py_DECREF(key);
         return 0;
     }
 
@@ -103,14 +107,14 @@ int get_idx_from_ref(ObjectContext *context, PyObject *ref)
     if (!idx)
         return -1;
 
-    int idx_int = PyInt_AsLong(idx);
-    return idx_int;
+    long idx_int = PyInt_AsLong(idx);
+    return (int)idx_int;
 }
 
 /* Returns mapped ref if it exists, otherwise returns NULL. */
 PyObject* get_ref_from_idx(ObjectContext *context, int idx)
 {
-    if (idx >= context->data_len) {
+    if (idx >= (int)context->data_len) {
         PyErr_SetString(PyExc_IndexError, "AMF index out of range.");
         return NULL;
     }
@@ -127,7 +131,8 @@ static int map_object_ref(ObjectContext *context, PyObject *ref)
 
     while (new_len > current_size) {
         // array is not large enough.
-        // Double its memory, so that we don't need to realloc everytime.
+        // Double its memory, so that we
+        // don't need to realloc everytime.
         current_size *= 2;
     }
 

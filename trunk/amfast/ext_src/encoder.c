@@ -26,13 +26,6 @@ static int big_endian; // Flag == 1 if architecture is big_endian, == 0 if not
 
 /* Context for encoding. */
 typedef struct {
-    char *buf; // Output buffer
-    size_t buf_len; // Current length of string in output buffer
-    size_t buf_size; // Current size of output buffer
-    int use_array_collections; // Flag == 1 to encode lists and tuples to ArrayCollection
-    int use_object_proxies; // Flag == 1 to encode dicts to ObjectProxy
-    int use_references; // Flag == 1 to encode multiply occuring objects as references
-    int use_legacy_xml; // Flag == 1 to encode XML as legacy XMLDocument instead of E4X
     PyObject *include_private; // PyBool, if True encode attributes starting with '_'.
     PyObject *class_def_mapper; // Object for getting a ClassDef for an object.
     PyObject *get_class_def_method_name; // Name of the method to call to retrieve a class def.
@@ -41,6 +34,14 @@ typedef struct {
     ObjectContext *string_refs; // Keep track of string references
     ObjectContext *object_refs; // Keep track of object references
     ObjectContext *class_refs; // Keep track of class definitions references
+    char *buf; // Output buffer
+    size_t buf_len; // Current length of string in output buffer
+    size_t buf_size; // Current size of output buffer
+    int use_array_collections; // Flag == 1 to encode lists and tuples to ArrayCollection
+    int use_object_proxies; // Flag == 1 to encode dicts to ObjectProxy
+    int use_references; // Flag == 1 to encode multiply occuring objects as references
+    int use_legacy_xml; // Flag == 1 to encode XML as legacy XMLDocument instead of E4X
+ 
 } EncoderContext;
 
 static EncoderContext* _create_encoder_context(size_t size, int amf3);
@@ -145,42 +146,62 @@ static EncoderContext* _create_encoder_context(size_t size, int amf3)
         return NULL;
     }
 
-    context->buf_size = size; // initial buffer size.
-    context->buf_len = 0; // Nothing is in the buffer yet
-    context->buf = (char*)malloc(sizeof(char*) * context->buf_size); // Create buffer
-    if (!context->buf) {
-        PyErr_SetNone(PyExc_MemoryError);
-        return NULL;
-    }
-
-    if (amf3) {
-        context->string_refs = create_object_context(64);
-        if (!context->string_refs)
-            return NULL;
-    } else {
-        context->string_refs = NULL;
-    }
-
-    context->object_refs = create_object_context(64);
-    if (!context->object_refs)
-        return NULL;
-
-    if (amf3) {
-        context->class_refs = create_object_context(64);
-        if (!context->class_refs)
-            return NULL;
-    } else {
-        context->class_refs = NULL;
-    }
-
+    // Set python object pointers to NULL
     context->include_private = NULL;
     context->class_def_mapper = NULL;
     context->get_class_def_method_name = NULL;
     context->array_collection_def = NULL;
     context->object_proxy_def = NULL;
 
-    context->use_references = 1;
+    // Setup buffer
+    context->buf_size = size; // initial buffer size.
+    context->buf_len = 0; // Nothing is in the buffer yet
+    context->buf = (char*)malloc(sizeof(char*) * context->buf_size); // Create buffer
+    if (!context->buf) {
+        PyErr_SetNone(PyExc_MemoryError);
+        free(context);
+        return NULL;
+    }
 
+    if (amf3) {
+        context->string_refs = create_object_context(64);
+        if (!context->string_refs) {
+            free(context->buf);
+            free(context);
+            return NULL;
+        }
+    } else {
+        context->string_refs = NULL;
+    }
+
+    context->object_refs = create_object_context(64);
+    if (!context->object_refs) {
+        if (context->string_refs) {
+            destroy_object_context(context->string_refs);
+        }
+        free(context->buf);
+        free(context);
+        return NULL;
+    }
+
+    if (amf3) {
+        context->class_refs = create_object_context(64);
+        if (!context->class_refs) {
+            if (context->string_refs) {
+                destroy_object_context(context->string_refs);
+            }
+            if (context->object_refs) {
+                destroy_object_context(context->object_refs);
+            }
+            free(context->buf);
+            free(context);
+            return NULL;
+        }
+    } else {
+        context->class_refs = NULL;
+    }
+
+    context->use_references = 1;
     return context;
 }
 
@@ -418,7 +439,7 @@ static int write_int(EncoderContext *context, PyObject *value)
         // Int is in valid AMF3 int range.
         if (_amf_write_byte(context, INT_TYPE) != 1)
             return 0;
-        return _encode_int(context, n);
+        return _encode_int((int)context, n);
     } else {
         // Int is too big, it must be encoded as a double
         if (_amf_write_byte(context, DOUBLE_TYPE) != 1)
@@ -495,16 +516,16 @@ static int encode_string(EncoderContext *context, PyObject *value)
      *  or just let the client pick it up?
      */
     char *char_value = PyString_AS_STRING(value);
-    int string_len = PyString_GET_SIZE(value);
+    Py_ssize_t string_len = PyString_GET_SIZE(value);
     if (!char_value)
         return 0;
 
     // Add size of string to header
-    if (!_encode_int(context, string_len << 1 | REFERENCE_BIT))
+    if (!_encode_int(context, ((int)string_len) << 1 | REFERENCE_BIT))
         return 0;
 
     // Write string.
-    return _amf_write_string_size(context, char_value, string_len);
+    return _amf_write_string_size(context, char_value, (int)string_len);
 }
 
 /* Encode a PyString or a PyUnicode. */
@@ -607,7 +628,7 @@ static int encode_tuple(EncoderContext *context, PyObject *value)
 {
     // Add size of tuple to header
     Py_ssize_t value_len = PyTuple_GET_SIZE(value);
-    if (!_encode_int(context, value_len << 1 | NULL_TYPE))
+    if (!_encode_int(context, ((int)value_len) << 1 | NULL_TYPE))
         return 0;
 
     // We're never writing associative array items
@@ -615,7 +636,7 @@ static int encode_tuple(EncoderContext *context, PyObject *value)
         return 0;
 
     // Encode each value in the tuple
-    Py_ssize_t i;
+    int i;
     for (i = 0; i < value_len; i++) {
         if (!_encode(context, PyTuple_GET_ITEM(value, i)))
             return 0;
@@ -661,7 +682,7 @@ static int encode_list(EncoderContext *context, PyObject *value)
 {
     // Add size of list to header
     Py_ssize_t value_len = PyList_GET_SIZE(value);
-    if (!_encode_int(context, value_len << 1 | NULL_TYPE))
+    if (!_encode_int(context, ((int)value_len) << 1 | NULL_TYPE))
         return 0;
 
     // We're never writing associative array items
@@ -669,7 +690,7 @@ static int encode_list(EncoderContext *context, PyObject *value)
         return 0;
 
     // Encode each value in the list
-    Py_ssize_t i;
+    int i;
     for (i = 0; i < value_len; i++) {
         // Increment ref count in case 
         // list is modified by someone else.
@@ -797,7 +818,7 @@ static int encode_date(EncoderContext *context, PyObject *value)
     if (!amfast_mod) {
         amfast_mod = PyImport_ImportModule("amfast");
         if(!amfast_mod) {
-            return;
+            return 0;
         }
     }
 
@@ -866,7 +887,7 @@ static int write_reference_AMF0(EncoderContext *context, PyObject *value)
         if (!_amf_write_byte(context, REF_AMF0))
             return 0;
 
-        if (!_encode_ulong(context, idx))
+        if (!_encode_ulong(context, (unsigned int)idx))
             return 0;
 
         return 1;
@@ -889,7 +910,6 @@ static int serialize_byte_array(EncoderContext *context, PyObject *value)
 
     // Length prefix
     Py_ssize_t value_len;
-
     if (PyString_CheckExact(value)) {
         value_len = PyString_GET_SIZE(value);
     }
@@ -904,7 +924,7 @@ static int serialize_byte_array(EncoderContext *context, PyObject *value)
         return 0;
     }
 
-    if (!_encode_int(context, value_len << 1 | REFERENCE_BIT))
+    if (!_encode_int(context, ((int)value_len) << 1 | REFERENCE_BIT))
         return 0;
 
     return encode_byte_array(context, value);
@@ -1060,7 +1080,7 @@ static int encode_object(EncoderContext *context, PyObject *value)
         return 0;
     }
     
-    int static_attr_len = PySequence_Size(static_attrs);
+    Py_ssize_t static_attr_len = PySequence_Size(static_attrs);
     if (static_attr_len == -1) {
         Py_DECREF(class_def);
         Py_DECREF(static_attrs);
@@ -1170,7 +1190,7 @@ static int encode_class_def(EncoderContext *context, PyObject *value)
        return 0;
     }
 
-    int static_attr_len = PySequence_Size(static_attrs);
+    Py_ssize_t static_attr_len = PySequence_Size(static_attrs);
     if (static_attr_len == -1) {
        Py_DECREF(class_alias);
        Py_DECREF(static_attrs);
@@ -1183,7 +1203,7 @@ static int encode_class_def(EncoderContext *context, PyObject *value)
        PyErr_SetString(amfast_EncodeError, "ClassDef has too many attributes.");
        return 0;
     }
-    header |= static_attr_len << 4;
+    header |= ((int)static_attr_len) << 4;
 
     if (!_encode_int(context, header)) {
        Py_DECREF(class_alias);
@@ -1233,7 +1253,7 @@ static int encode_bool_AMF0(EncoderContext *context, PyObject *value)
 /* Encode a PyInt in AMF0. */
 static int encode_int_AMF0(EncoderContext *context, PyObject *value)
 {
-    int long_val = PyInt_AsLong(value);
+    long long_val = PyInt_AsLong(value);
     PyObject *py_long_val = PyLong_FromLong(long_val);
     if (!py_long_val)
         return 0;
@@ -1312,7 +1332,7 @@ static int write_string_AMF0(EncoderContext *context, PyObject *value)
 /* Write a PyUnicode in AMF0. */
 static int write_unicode_AMF0(EncoderContext *context, PyObject *value)
 {
-    int string_len = PyUnicode_GET_SIZE(value);
+    Py_ssize_t string_len = PyUnicode_GET_SIZE(value);
 
     if (string_len > 65536) {
         if (!_amf_write_byte(context, LONG_STRING_AMF0))
@@ -1356,7 +1376,7 @@ static int encode_unicode_AMF0(EncoderContext *context, PyObject *value, int all
 static int encode_string_AMF0(EncoderContext *context, PyObject *value, int allow_long)
 {
     char *char_value = PyString_AS_STRING(value);
-    int string_len = PyString_GET_SIZE(value);
+    Py_ssize_t string_len = PyString_GET_SIZE(value);
     if (!char_value)
         return 0;
 
@@ -1364,14 +1384,14 @@ static int encode_string_AMF0(EncoderContext *context, PyObject *value, int allo
         PyErr_SetString(amfast_EncodeError, "Long string not allowed.");
         return 0;
     } else if (string_len > 65536 || allow_long == -1) {
-        if (!_encode_ulong(context, string_len))
+        if (!_encode_ulong(context, (unsigned int)string_len))
             return 0;
     } else {
-        if (!_encode_ushort(context, string_len))
+        if (!_encode_ushort(context, (unsigned short)string_len))
             return 0;
     }
 
-    return _amf_write_string_size(context, char_value, string_len);
+    return _amf_write_string_size(context, char_value, (size_t)string_len);
 }
 
 /* Write a PyList to AMF0. */
@@ -1386,8 +1406,8 @@ static int write_list_AMF0(EncoderContext *context, PyObject *value)
     if (!_amf_write_byte(context, ARRAY_AMF0))
         return 0;
 
-    int array_len = PyList_GET_SIZE(value);
-    if (!_encode_ulong(context, array_len))
+    Py_ssize_t array_len = PyList_GET_SIZE(value);
+    if (!_encode_ulong(context, (unsigned int)array_len))
         return 0;
 
     int i;
@@ -1417,8 +1437,8 @@ static int write_tuple_AMF0(EncoderContext *context, PyObject *value)
     if (!_amf_write_byte(context, ARRAY_AMF0))
         return 0;
 
-    int array_len = PyTuple_GET_SIZE(value);
-    if (!_encode_ulong(context, array_len))
+    Py_ssize_t array_len = PyTuple_GET_SIZE(value);
+    if (!_encode_ulong(context, (unsigned int)array_len))
         return 0;
 
     int i;
@@ -1478,7 +1498,7 @@ static int encode_date_AMF0(EncoderContext *context, PyObject *value)
     if (!amfast_mod) {
         amfast_mod = PyImport_ImportModule("amfast");
         if(!amfast_mod) {
-            return;
+            return 0;
         }
     }
 
@@ -1576,7 +1596,7 @@ static PyObject* attributes_from_object(EncoderContext *context, PyObject *value
     if (!class_def_mod) {
         class_def_mod = PyImport_ImportModule("amfast");
         if(!class_def_mod) {
-            return;
+            return NULL;
         }
     }
 
@@ -1728,7 +1748,7 @@ static int write_object_AMF0(EncoderContext *context, PyObject *value)
         return 0;
     }
 
-    int static_attr_len = PySequence_Size(static_attrs);
+    Py_ssize_t static_attr_len = PySequence_Size(static_attrs);
     if (static_attr_len == -1) {
         Py_DECREF(class_def);
         Py_DECREF(attrs);
@@ -1850,12 +1870,12 @@ static int _encode_packet(EncoderContext *context, PyObject *value)
     if (!headers)
         return 0;
 
-    int header_count = PySequence_Size(headers);
+    Py_ssize_t header_count = PySequence_Size(headers);
     if (header_count == -1) {
         Py_DECREF(headers);
         return 0;
     }
-    if (!_encode_ushort(context, header_count)) {
+    if (!_encode_ushort(context, (unsigned short)header_count)) {
         Py_DECREF(headers);
         return 0;
     }
@@ -1882,12 +1902,12 @@ static int _encode_packet(EncoderContext *context, PyObject *value)
     if (!messages)
         return 0;
 
-    int message_count = PySequence_Size(messages);
+    Py_ssize_t message_count = PySequence_Size(messages);
     if (message_count == -1) {
         Py_DECREF(messages);
         return 0;
     }
-    if (!_encode_ushort(context, message_count)) {
+    if (!_encode_ushort(context, (unsigned short)message_count)) {
         Py_DECREF(messages);
         return 0;
     }
@@ -1945,7 +1965,7 @@ static int encode_packet_header_AMF0(EncoderContext *context, PyObject *value)
         return 0;
     }
 
-    if (!_encode_ulong(context, new_context->buf_len)) {
+    if (!_encode_ulong(context, (unsigned int)new_context->buf_len)) {
         _destroy_encoder_context(new_context);
         return 0;
     }
@@ -1989,7 +2009,7 @@ static int encode_packet_message_AMF0(EncoderContext *context, PyObject *value)
         return 0;
     }
 
-    if (!_encode_ulong(context, new_context->buf_len)) {
+    if (!_encode_ulong(context, (unsigned int)new_context->buf_len)) {
         _destroy_encoder_context(new_context);
         return 0;
     }
@@ -2136,14 +2156,23 @@ static PyObject* encode(PyObject *self, PyObject *args, PyObject *kwargs)
         return NULL;
 
     EncoderContext *context = _create_encoder_context(1024, amf3);
-    if (!context)
+    if (!context) {
+        Py_DECREF(class_def_mapper);
+        Py_DECREF(include_private);
         return NULL;
+    }
 
     // Set defaults
     context->use_array_collections = use_array_collections;
     context->use_object_proxies = use_object_proxies;
     context->use_references = use_references;
     context->use_legacy_xml = use_legacy_xml;
+
+    if (include_private != Py_None) {
+        context->include_private = include_private;
+        Py_INCREF(context->include_private);
+        Py_DECREF(Py_False);
+    }
 
     if (class_def_mapper != Py_None) {
         // Use user supplied ClassDefMapper.
@@ -2152,27 +2181,27 @@ static PyObject* encode(PyObject *self, PyObject *args, PyObject *kwargs)
         Py_DECREF(Py_None);
     } else {
         // Create anonymous ClassDefMapper
+        Py_DECREF(Py_None);
         if (!class_def_mod) {
             class_def_mod = PyImport_ImportModule("amfast.class_def");
-            if(!class_def_mod)
+            if(!class_def_mod) {
+                _destroy_encoder_context(context);
                 return NULL;
+            }
         }
 
         PyObject *class_def = PyObject_GetAttrString(class_def_mod, "ClassDefMapper");
-        if (!class_def)
+        if (!class_def) {
+            _destroy_encoder_context(context);
             return NULL;
+        }
 
         context->class_def_mapper = PyObject_CallFunctionObjArgs(class_def, NULL);
         Py_DECREF(class_def);
-        if (!context->class_def_mapper)
+        if (!context->class_def_mapper) {
+            _destroy_encoder_context(context);
             return NULL;
-        Py_DECREF(Py_None);
-    }
-
-    if (include_private != Py_None) {
-        context->include_private = include_private;
-        Py_INCREF(context->include_private);
-        Py_DECREF(Py_False);
+        }
     }
 
     int return_value;
@@ -2189,15 +2218,8 @@ static PyObject* encode(PyObject *self, PyObject *args, PyObject *kwargs)
         return NULL;
     }
 
-    PyObject *return_obj = PyString_FromStringAndSize(context->buf, context->buf_len);
-    if (!return_obj) {
-        _destroy_encoder_context(context);
-        return NULL;
-    }
-
-    if (!_destroy_encoder_context(context))
-        return NULL;
-
+    PyObject *return_obj = PyString_FromStringAndSize(context->buf, (Py_ssize_t)context->buf_len);
+    _destroy_encoder_context(context);
     return return_obj;
 }
 
@@ -2254,14 +2276,6 @@ initencoder(void)
     Py_INCREF(amfast_EncodeError);
     if (PyModule_AddObject(module, "EncodeError", amfast_EncodeError) == -1) {
         return;
-    }
-
-    // Include class def module
-    if (!class_def_mod) {
-        class_def_mod = PyImport_ImportModule("amfast.class_def");
-        if(!class_def_mod) {
-            return;
-        }
     }
 
     // Determine endianness of architecture
