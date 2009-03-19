@@ -1,9 +1,5 @@
 import unittest
 
-import pyamf
-from pyamf import amf3
-from pyamf.util import BufferedByteStream
-
 import amfast.encoder as encoder
 import amfast.decoder as decoder
 import amfast.class_def as class_def
@@ -26,15 +22,9 @@ class RoundTripTestCase(unittest.TestCase):
         self.class_mapper.mapClass(class_def.DynamicClassDef(self.TestObject, 'test_complex.test', ()))
         self.class_mapper.mapClass(class_def.DynamicClassDef(self.TestSubObject, 'test_complex.sub', ()))
 
-        pyamf.register_class(self.TestObject, 'test_complex.test')
-        pyamf.register_class(self.TestSubObject, 'test_complex.sub')
-
     def tearDown(self):
         self.class_mapper.unmapClass(self.TestObject)
         self.class_mapper.unmapClass(self.TestSubObject)
-
-        pyamf.unregister_class(self.TestObject)
-        pyamf.unregister_class(self.TestSubObject)
 
     def buildComplex(self, max=5):
         test_objects = []
@@ -114,32 +104,6 @@ class RoundTripTestCase(unittest.TestCase):
         encoded = encoder.encode(complex, use_array_collections=False, use_object_proxies=False, class_def_mapper=self.class_mapper, amf3=True)
         decoded = decoder.decode(encoded, class_def_mapper=self.class_mapper, amf3=True)
         self.resultTest(decoded['objects'])
-
-    def testPyamfComplexDict(self):
-        return
-        complex = {'element': 'ignore', 'objects': self.buildComplex()}
-        self.context = pyamf.get_context(pyamf.AMF3)
-        self.stream = BufferedByteStream()
-        self.pyamf_encoder = pyamf.get_encoder(pyamf.AMF3, data=self.stream, context=self.context)
-
-        self.pyamf_encoder.writeElement(complex)
-        encoded = self.pyamf_encoder.stream.getvalue()
-        context = amf3.Context()
-        decoded = amf3.Decoder(encoded, context).readElement()
-
-        self.resultTest(decoded['objects'])
-
-    def testSpeed(self):
-        return
-        for i in range(10000):
-            print "%s ..." % i
-            self.testComplexDict()
-
-    def testPyamfSpeed(self):
-        return
-        for i in range(10000):
-            print "%s ..." % i
-            self.testPyamfComplexDict()
 
 def suite():
     return unittest.TestLoader().loadTestsFromTestCase(RoundTripTestCase)

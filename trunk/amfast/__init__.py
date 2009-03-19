@@ -7,7 +7,12 @@ import logging
 
 class AmFastError(Exception):
     """Base exception for this package."""
-    pass
+    # To get around 2.6 deprecation warning
+    def _get_message(self):
+        return self._message
+    def _set_message(self, message):
+        self._message = message
+    message = property(_get_message, _set_message)
 
 def epoch_from_date(date):
     return long(calendar.timegm(date.timetuple()) * 1000)

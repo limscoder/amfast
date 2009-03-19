@@ -1476,6 +1476,11 @@ static PyObject* decode_messages_AMF0(DecoderContext *context)
 /* Decode individual AMF0 objects from buffer. */
 static PyObject* _decode_AMF0(DecoderContext *context)
 {
+    if (context->pos > context->buf_len) {
+        PyErr_SetString(amfast_DecodeError, "Parsed past end of buffer.");
+        return NULL;
+    }
+
     char byte = context->buf[context->pos];
 
     if (byte == AMF3_AMF0) {
@@ -1528,7 +1533,7 @@ static PyObject* _decode_AMF0(DecoderContext *context)
         return decode_typed_object_AMF0(context);
     }
 
-    char error_str[40];
+    char error_str[100];
     sprintf(error_str, "Unknown AMF0 type marker byte: '%X' at position: %d", byte, context->pos);
     PyErr_SetString(amfast_DecodeError, error_str);
     return NULL;
@@ -1537,6 +1542,11 @@ static PyObject* _decode_AMF0(DecoderContext *context)
 /* Decode individual AMF3 objects from buffer. */
 static PyObject* _decode(DecoderContext *context)
 {
+    if (context->pos > context->buf_len) {
+        PyErr_SetString(amfast_DecodeError, "Parsed past end of buffer.");
+        return NULL;
+    }
+
     char byte = context->buf[context->pos];
 
     if (byte == NULL_TYPE) {
@@ -1574,7 +1584,7 @@ static PyObject* _decode(DecoderContext *context)
         return deserialize_date(context);
     }
 
-    char error_str[40];
+    char error_str[100];
     sprintf(error_str, "Unknown AMF3 type marker byte: '%X' at position: %d", byte, context->pos);
     PyErr_SetString(amfast_DecodeError, error_str);
     return NULL;
