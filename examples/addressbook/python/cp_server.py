@@ -14,10 +14,11 @@ def amfhook():
     cherrypy.request.show_tracebacks = False
 
     if cherrypy.request.method != 'POST':
-        raise cherrypy.HTTPError(400, "AMF request must use 'POST' method.");
+        raise cherrypy.HTTPError(405, "AMF request must use 'POST' method.");
 cherrypy.tools.amfhook = cherrypy.Tool('before_request_body', amfhook, priority=0)
 
 class App(object):
+    """Controller class that directs requests to the Gateway."""
     @cherrypy.expose
     def index(self):
         raise cherrypy.HTTPRedirect('/addressbook.html')
@@ -25,12 +26,9 @@ class App(object):
     @cherrypy.expose
     @cherrypy.tools.amfhook()
     def amfGateway(self):
-        try:
-            c_len = int(cherrypy.request.headers['Content-Length'])
-            raw_request = cherrypy.request.rfile.read(c_len)
-            return self.gateway.process_packet(raw_request)
-        except Exception, e:
-            raise cherrypy.HTTPError(400, "Bad Request")
+        c_len = int(cherrypy.request.headers['Content-Length'])
+        raw_request = cherrypy.request.rfile.read(c_len)
+        return self.gateway.process_packet(raw_request)
 
 if __name__ == '__main__':
     usage = """usage: %s [options]""" % __file__
@@ -45,8 +43,7 @@ if __name__ == '__main__':
 
     amfast.log_debug = options.log_debug
 
-    gateway = amfast.remoting.Gateway(use_array_collections=True,
-        use_object_proxies=True)
+    gateway = amfast.remoting.Gateway()
     utils.setup_gateway(gateway)
 
     # Start server
@@ -67,5 +64,5 @@ if __name__ == '__main__':
     app.gateway = gateway
     cherrypy.quickstart(app, '/', config=cp_options)
 
-    print "Serving on port: %s" % options.port
+    print "Serving on %s:%s" % (options.domain, options.port)
     print "Press ctrl-c to halt."

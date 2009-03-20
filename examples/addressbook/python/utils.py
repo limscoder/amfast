@@ -24,6 +24,10 @@ def setup_gateway(gateway):
     handler.setLevel(logging.DEBUG)
     amfast.logger.addHandler(handler)
 
+    # Set Gateway options
+    gateway.use_array_collections = True
+    gateway.use_object_proxies = True
+
     # Map class aliases
     # These same aliases must be
     # registered in the client
@@ -48,7 +52,7 @@ def setup_gateway(gateway):
     service.setTarget(CallableTarget(sa_obj.raiseException, 'raiseException'))
     gateway.service_mapper.mapService(service)
 
-    # Generate source code
+    # Generate source code for mapped models
     #coder = CodeGenerator()
     #coder.generateFilesFromMapper(gateway.class_def_mapper, use_accessors=False,
     #    packaged=True, constructor=False, bindable=True, extends='SAObject')
