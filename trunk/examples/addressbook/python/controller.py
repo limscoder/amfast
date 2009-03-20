@@ -1,5 +1,3 @@
-import pyamf
-
 import models
 from persistent import Schema
 
