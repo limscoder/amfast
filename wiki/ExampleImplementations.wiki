@@ -6,7 +6,13 @@ The examples below are found in SVN within the [http://code.google.com/p/amfast/
 
 == !CherryPy Example ==
 
-Use !CherryPy to serve the example address book over http with the following command:
+Use [http://www.cherrypy.org/ CherryPy] web framework to serve the example address book over http with the following command:
 {{{
 python addressbook/python/cp_server.py
+}}}
+
+== Twisted Example ==
+Use [http://twistedmatrix.com/trac/ Twisted] web framework to serve the example address book over http with the following command:
+{{{
+twistd -noy addressbook/python/cp_server.py
 }}}
