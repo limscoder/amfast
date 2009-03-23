@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Application xmlns:mx="http://www.adobe.com/2006/mxml">
+	<mx:Panel width="100%" height="100%"
+		title="Flex -- AmFast -- SQLAlchemy Address Book Example">
+		<mx:Form>
+			<mx:FormItem label="server:">
+				<mx:TextInput
+					id="server"
+					text="localhost" />
+			</mx:FormItem>
+			
+			<mx:FormItem label="port:">
+				<mx:TextInput
+					id="port"
+					text="8000" />
+			</mx:FormItem>
+		</mx:Form>
+		
+		<mx:DataGrid
+			id="userGrid"
+			width="100%"
+			height="100%"
+			doubleClickEnabled="true"
+			doubleClick="editUser()"
+			dataProvider="{users}"
+			toolTip="Double click on a user to edit their details."
+			allowMultipleSelection="true">
+			<mx:columns>
+				<mx:DataGridColumn headerText="Key" dataField="sa_key" />
+				<mx:DataGridColumn headerText="First Name" dataField="first_name" />
+				<mx:DataGridColumn headerText="Last Name" dataField="last_name" />
+			</mx:columns>
+		</mx:DataGrid>
+		
+		<mx:HBox width="100%" horizontalAlign="center">
+			<mx:Button
+				label="Add"
+				click="addUser()"
+				toolTip="Add a new user." />
+			<mx:Button
+				label="Reload"
+				click="loadUsers()"
+				toolTip="Reload users from server." />
+			<mx:Button
+				label="Insert Default"
+				click="insertDefaultData()"
+				toolTip="Insert default data." />
+			<mx:Button
+				label="Remove"
+				click="removeUser()"
+				toolTip="Remove selected users." />
+			<mx:Button
+				label="Raise Exception"
+				click="raiseException()"
+				toolTip="Raise an exception on the server side." />
+			
+		</mx:HBox>
+	</mx:Panel>
+	
+	<mx:Script>
+		<![CDATA[
+			import flash.net.registerClassAlias;
+		
+			import mx.collections.ArrayCollection;
+			import mx.managers.PopUpManager;
+			import mx.messaging.ChannelSet;
+			import mx.messaging.channels.AMFChannel;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			import mx.rpc.AbstractOperation;
+			import mx.rpc.events.*;
+			
+			import components.*;
+			import models.*;
+
+			protected var service:RemoteObject;
+			protected var serviceUrl:String;
+		
+			[Bindable]
+			protected var users:ArrayCollection;
+
+			/**
+			 * Create a RemoteObject with url from user input.
+			 */
+			public function getService():RemoteObject
+			{
+				var url:String = 'http://' + server.text +
+					':' + port.text + '/amfGateway';
+				if (url == serviceUrl && service != null) {
+					// Use existing service
+					return service;
+				}
+				
+				// Create the AMF Channel
+				serviceUrl = url;
+				var channel:AMFChannel = new AMFChannel("amfast-channel", serviceUrl);
+
+				// Create a channel set and add your channel(s) to it
+				var channels:ChannelSet = new ChannelSet();
+				channels.addChannel(channel);
+
+				// Create a new remote object and set channels
+				var remoteObject:RemoteObject = new RemoteObject("ExampleService");
+				remoteObject.showBusyCursor = true;
+				remoteObject.channelSet = channels;
+				return remoteObject;
+			}
+
+			/**
+			 * Insert default data
+			 */
+			public function insertDefaultData():void
+			{
+				var remoteObj:RemoteObject = getService();
+				var operation:AbstractOperation = remoteObj.getOperation('insertDefaultData');
+                operation.addEventListener(ResultEvent.RESULT, insertDefaultData_resultHandler);
+                operation.send();
+			}
+			
+			protected function insertDefaultData_resultHandler(event:Event):void
+			{
+				event.target.removeEventListener(ResultEvent.RESULT, insertDefaultData_resultHandler);
+				loadUsers();
+			}
+			
+			/**
+			 * Raise an exception on the server side.
+			 */
+			public function raiseException():void
+			{
+				var remoteObj:RemoteObject = getService();
+				var operation:AbstractOperation = remoteObj.getOperation('raiseException');
+                operation.send();
+			}
+			
+			/**
+			 * Load list of persistent users from server.
+			 */
+			public function loadUsers():void
+			{
+				var remoteObj:RemoteObject = getService();
+				var operation:AbstractOperation = remoteObj.getOperation('loadAll');
+                operation.addEventListener(ResultEvent.RESULT, loadAll_resultHandler);
+                operation.send(SAObject.getRemoteAlias(models.User));
+			}
+			
+			protected function loadAll_resultHandler(event:Event):void
+			{
+				event.target.removeEventListener(ResultEvent.RESULT, loadAll_resultHandler);
+				users = ArrayCollection(ResultEvent(event).result);
+			}
+
+			protected function editUser():void
+			{
+				if (userGrid.selectedItem == null) {
+					return;
+				}
+				
+				var dlg:EditUserDlg = new EditUserDlg();
+				dlg.user = User(userGrid.selectedItem);
+				PopUpManager.addPopUp(dlg, DisplayObject(this));
+			}
+			
+			protected function addUser():void
+			{
+				var user:User = new User();
+				var dlg:EditUserDlg = new EditUserDlg();
+				dlg.user = user;
+				PopUpManager.addPopUp(dlg, DisplayObject(this));
+			}
+			
+			protected function removeUser():void
+			{
+				if (userGrid.selectedItems == null || userGrid.selectedItems.length < 1) {
+					return;
+				}
+				
+				var removeKeys:Array = [];
+				for each (var item:Object in userGrid.selectedItems) {
+					removeKeys.push(item.sa_key);
+				}
+				
+				var remoteObj:RemoteObject = getService();
+				var operation:AbstractOperation = remoteObj.getOperation('removeList');
+                operation.addEventListener(ResultEvent.RESULT, remove_resultHandler);
+                
+                operation.send(SAObject.getRemoteAlias(models.User), removeKeys);
+			}
+			
+			protected function remove_resultHandler(event:Event):void
+			{
+				event.target.removeEventListener(ResultEvent.RESULT, remove_resultHandler);
+				loadUsers();
+			}
+		]]>
+	</mx:Script>
+</mx:Application>
