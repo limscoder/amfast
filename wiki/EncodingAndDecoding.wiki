@@ -45,6 +45,6 @@ decode(...)
     
     Optional keyword arguments:
     ============================
-     * packet - bool - True to decode as an AMF NetConnection packet (decode a remoting call). - Default = False
+     * packet - bool - True to decode as an AMF !NetConnection packet (decode a remoting call). - Default = False
      * amf3 - bool - True to decode as AMF3 format. - Default = False
      * class_def_mapper - !ClassDefMapper - object that retrieves a !ClassDef object used for customizing de-serialization of objects - Default = None (all objects are anonymous)
