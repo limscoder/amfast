@@ -15,9 +15,11 @@ class AmFastError(Exception):
     message = property(_get_message, _set_message)
 
 def epoch_from_date(date):
+    """Returns epoch milliseconds."""
     return long(calendar.timegm(date.timetuple()) * 1000)
 
 def date_from_epoch(epoch_secs):
+    """Returns datetime."""
     return datetime.utcfromtimestamp(epoch_secs)
 
 def format_byte_string(byte_string):

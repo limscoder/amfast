@@ -12,7 +12,7 @@ extensions = [
             os.path.join('amfast', 'ext_src', 'amf_common.c'), ])]
 
 setup(name="AmFast",
-    version = "0.2.1",
+    version = "0.2.2",
     description = "A C extension to encode/decode Python objects with AMF0 and AMF3. Includes support for NetConnection, RemoteObject, IExternizeable, and custom type serialization.",
     url = "http://code.google.com/p/amfast/",
     author = "Dave Thompson",

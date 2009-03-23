@@ -12,7 +12,7 @@ import controller
 import models
 
 def setup_gateway(gateway):
-    """configures a amfast.remoting.Gateway object."""
+    """Configures an amfast.remoting.Gateway object."""
 
     # Setup database
     schema = persistent.Schema()

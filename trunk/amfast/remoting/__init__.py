@@ -36,7 +36,7 @@ class Service(object):
      * name - string, service name.
     """
 
-    # Name of special service that handles packets header targets
+    # Name of special service that handles packet header targets
     PACKET_HEADER_SERVICE = 'PACKET_HEADER_SERVICE'
 
     # Name of special service that handles message header targets
@@ -65,8 +65,7 @@ class Service(object):
             del self._targets[target.name]
 
 class Target(object):
-    """A remoting target is a single exposed method that
-    can be invoked by Headers and Messages.
+    """A remoting target can be invoked by a message.
 
     attributes:
     ============
@@ -74,6 +73,10 @@ class Target(object):
     """
     def __init__(self, name):
         self.name = name
+
+    def _invoke_str(self, args):
+        return "<targetInvocation target=\"%s\">%s</targetInvocation>" % \
+            (self.name, args)
 
     def invoke(self, request_packet, response_packet, request_msg, response_msg, args):
         """Invoke a target.
@@ -105,7 +108,7 @@ class CallableTarget(Target):
     def invoke(self, request_packet, response_packet, request_msg, response_msg, args):
         """Calls self.callable and passes *args."""
         if amfast.log_debug:
-            amfast.logger.debug("<targetInvocation target=\"%s\">%s</targetInvocation>" % (self.name, args))
+            amfast.logger.debug(self._invoke_str(args))
         return self.callable(*args)
 
 class ExtCallableTarget(CallableTarget):
@@ -118,7 +121,7 @@ class ExtCallableTarget(CallableTarget):
     """
     def invoke(self, request_packet, response_packet, request_msg, response_msg, args):
         if amfast.log_debug:
-            amfast.logger.debug("<targetInvocation target=\"%s\">%s</targetInvocation>" % (self.name, args))
+            amfast.logger.debug(self._invoke_str(args))
         return self.callable(request_packet, response_packet, request_msg, response_msg, *args)
 
 class Header(object):
@@ -143,6 +146,7 @@ class Header(object):
         target = service_mapper.packet_header_service.getTarget(self.name)
         if target is not None:
             return target.invoke(request_packet, response_packet, None, None, (self.value,))
+        return False
 
 class Message(object):
     """A remoting message body.
@@ -277,7 +281,6 @@ class Packet(object):
 
     def invoke(self, service_mapper):
         """Process this packet and return a response packet."""
-
         if amfast.log_debug:
             amfast.logger.debug("<requestPacket>%s</requestPacket>" % self)
 
@@ -391,6 +394,7 @@ class ServiceMapper(object):
     ===========
     packet_header_service - Service, a special service for AMF packet headers.
     message_header_service - Service, a special service for AMF message headers.
+    command_service - Service, a special service for Flex CommandMessages.
     
     When an AMF packet or message is processed, the object checks
     the header_service Service for a target where target.name == header.name

@@ -5,7 +5,7 @@ class CodeGenerator(object):
     """Generates Actionscript source code from class defs.
 
     attributes:
-    ===========
+    ============
      * indent - string, indention string to use. Default = '\t'
     """
 
@@ -29,8 +29,9 @@ class CodeGenerator(object):
          * implements - list or tuple, a list of interface names that this class implments. Default = None
         """
         for class_def in class_mapper._mapped_classes.values():
-            if class_def._builtIn is True:
+            if class_def._built_in is True:
                 continue
+
             self.generateClassFile(class_def, dir, use_accessors,
                 packaged, constructor, bindable, extends, implements)
 
@@ -95,7 +96,7 @@ class CodeGenerator(object):
         if bindable is True:
             class_str.append(indent + '[Bindable]')
 
-        class_str.append(indent + "[RemoteClass('%s')]" % class_def.alias)
+        class_str.append(indent + "[RemoteClass(alias='%s')]" % class_def.alias)
 
         class_def_str = indent
         if packaged is True:
