@@ -23,9 +23,9 @@ class SaClassDef(class_def.ClassDef):
     Mapped attributes are considered static.
     Dynamic attributes are ignored.
 
-    The class must be mapped with SQLAlchemy BEFORE calling class_def.map_class.
+    The class must be mapped with SQLAlchemy BEFORE calling ClassDefMapper.map_class().
     """
-    KEY_ATTR = 'sa_key' # sa key
+    KEY_ATTR = 'sa_key' # sa instance key
     LAZY_ATTR = 'sa_lazy' # list of lazy attribute names
 
     def __init__(self, class_, alias=None, static_attrs=None, amf3=None):
@@ -48,7 +48,7 @@ class SaClassDef(class_def.ClassDef):
             if not prop.key in combined_attrs:
                 combined_attrs.append(prop.key)
 
-        class_def.ClassDef.__init__(self, class_, alias, tuple(combined_attrs), amf3)
+        class_def.ClassDef.__init__(self, class_, alias, combined_attrs, amf3)
 
     def getStaticAttrVals(self, obj):
         lazy_attrs = []
@@ -64,7 +64,7 @@ class SaClassDef(class_def.ClassDef):
             if attr in obj.__dict__:
                 vals.append(getattr(obj, attr))
             else:
-                # This object is lazy
+                # This attr is lazy
                 vals.append(None)
                 lazy_attrs.append(attr)
 

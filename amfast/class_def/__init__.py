@@ -14,23 +14,24 @@ class ClassDef(object):
     ===========
      * class_ - class, the class object mapped to this definition
      * alias - string, the amf alias name of the mapped class
-     * static_attrs - tuple, a tuple of static attribute names, all values must be strings or unicode
+     * static_attrs - tuple or list, a tuple of static attribute names,
+          all values must be strings or unicode
      * amf3 - bool, if True, this object will be encoded in AMF3. 
     """
 
     CLASS_DEF = True
 
     def __init__(self, class_, alias=None, static_attrs=None,
-        amf3=None, _builtIn=False):
+        amf3=None, _built_in=False):
         """arguments
-        =========
+        =============
          * class_ - class, the class being mapped.
          * alias - string, specifies the amf class alias. Default = module.class
-         * static_attrs - tuple, a tuple of static attribute strings. Default = empty tuple
+         * static_attrs - tuple or list, a tuple of static attribute strings. Default = empty tuple
          * amf3 - bool, if True, this object will be encoded in AMF3. Default = True
         """
         self.class_ = class_
-        self._builtIn = _builtIn
+        self._built_in = _built_in
 
         if alias is None:
             if hasattr(class_, ALIAS):
@@ -81,16 +82,15 @@ class ClassDef(object):
          * obj - object, the object to set the attribute values on.
          * vals - dict, keys == attribute name, values == attribute values.
         """
-        for key, val in vals.iteritems():
-            setattr(obj, key, val)
+        [setattr(obj, key, val) for key, val in vals.iteritems()]
 
 class DynamicClassDef(ClassDef):
     """A ClassDef with dynamic attributes."""
 
     DYNAMIC_CLASS_DEF = True
 
-    def __init__(self, class_, alias=None, static_attrs=None, amf3=True, _builtIn=False):
-        ClassDef.__init__(self, class_, alias, static_attrs, amf3, _builtIn)
+    def __init__(self, class_, alias=None, static_attrs=None, amf3=True, _built_in=False):
+        ClassDef.__init__(self, class_, alias, static_attrs, amf3, _built_in)
 
     def getDynamicAttrVals(self, obj, include_private=False):
         """Returns a dict where keys are attribute names and values are attribute values.
@@ -108,8 +108,8 @@ class ExternizeableClassDef(ClassDef):
     
     EXTERNIZEABLE_CLASS_DEF = True
     
-    def __init__(self, class_, alias=None, static_attrs=None, _builtIn=False):
-        ClassDef.__init__(self, class_, alias, static_attrs, amf3=True, _builtIn=_builtIn)
+    def __init__(self, class_, alias=None, static_attrs=None, _built_in=False):
+        ClassDef.__init__(self, class_, alias, static_attrs, amf3=True, _built_in=_built_in)
  
     def writeByteString(self, obj):
         """Returns a byte string representation of the object.
@@ -130,7 +130,7 @@ class ExternizeableClassDef(ClassDef):
         arguments
         ==========
          * obj - object, The object that the byte string is being applied to.
-         * buf - string in 2.5-, ByteArray in 2.6+, The bytes to be read.
+         * buf - string in 2.4 and 2.5, ByteArray in 2.6+, The bytes to be read.
         """
         
         raise ClassDefError("This method must be implemented by a sub-class.")
@@ -147,7 +147,7 @@ class _ProxyClassDef(ExternizeableClassDef):
 
     def __init__(self):
         ExternizeableClassDef.__init__(self, self._ProxyObject, self.PROXY_ALIAS,
-            None, _builtIn=True)
+            None, _built_in=True)
 
 class _ArrayCollectionClassDef(_ProxyClassDef):
     """A special ClassDef used internally to encode/decode an ArrayCollection."""
@@ -169,15 +169,15 @@ class _ObjectProxyClassDef(_ProxyClassDef):
 
 class ClassDefMapper(object):
     """Map classes to ClassDefs, retrieve class_defs by class or alias name."""
-    def __init__(self, alias_attr='_amf_alias'):
+    def __init__(self, class_def_attr='_amf_alias'):
         """
         arguments
         ==========
-        * alias_attr - string, an attribute with this name will be added
+        * class_def_attr - string, an attribute with this name will be added
             mapped classes. Default = '_amf_alias'
         """
         self._mapped_classes = {}
-        self.alias_attr = alias_attr
+        self.class_def_attr = class_def_attr
         self._mapBuiltIns()
 
     def _mapBuiltIns(self):
@@ -190,16 +190,16 @@ class ClassDefMapper(object):
         self.mapClass(_ObjectProxyClassDef())
 
         # Exceptions
-        self.mapClass(ClassDef(remoting.AsError, _builtIn=True))
-        self.mapClass(ClassDef(messaging.FaultError, _builtIn=True))
+        self.mapClass(ClassDef(remoting.AsError, _built_in=True))
+        self.mapClass(ClassDef(messaging.FaultError, _built_in=True))
 
-        # Remoting messages
-        self.mapClass(ClassDef(messaging.AbstractMessage, _builtIn=True))
-        self.mapClass(ClassDef(messaging.RemotingMessage, _builtIn=True))
-        self.mapClass(ClassDef(messaging.AsyncMessage, _builtIn=True))
-        self.mapClass(ClassDef(messaging.CommandMessage, _builtIn=True))
-        self.mapClass(ClassDef(messaging.AcknowledgeMessage, _builtIn=True))
-        self.mapClass(ClassDef(messaging.ErrorMessage, _builtIn=True))
+        # Flex remoting messages
+        self.mapClass(ClassDef(messaging.AbstractMessage, _built_in=True))
+        self.mapClass(ClassDef(messaging.RemotingMessage, _built_in=True))
+        self.mapClass(ClassDef(messaging.AsyncMessage, _built_in=True))
+        self.mapClass(ClassDef(messaging.CommandMessage, _built_in=True))
+        self.mapClass(ClassDef(messaging.AcknowledgeMessage, _built_in=True))
+        self.mapClass(ClassDef(messaging.ErrorMessage, _built_in=True))
 
     def mapClass(self, class_def):
         """Map a class_def implementation, so that it can be retrieved based on class attributes.
@@ -211,27 +211,19 @@ class ClassDefMapper(object):
         if not hasattr(class_def, 'CLASS_DEF'):
             raise ClassDefError("class_def argument must be a ClassDef object.")
 
-        setattr(class_def.class_, self.alias_attr, class_def.alias)
+        setattr(class_def.class_, self.class_def_attr, class_def)
         self._mapped_classes[class_def.alias] = class_def
 
     def getClassDefByClass(self, class_):
         """Get a ClassDef.
 
-        Returns None in not ClassDef is found.
+        Returns None if ClassDef is not found.
 
         arguments
         ==========
          * class_ - class, the class to find a ClassDef for.
         """
-        if not hasattr(class_, self.alias_attr):
-            return None
-
-        alias = getattr(class_, self.alias_attr)
-
-        if not (alias in self._mapped_classes):
-            raise ClassDefError("ClassDef for alias '%s' could not be found." % alias)
-
-        return self._mapped_classes[alias]
+        return getattr(class_, self.class_def_attr, None)
 
     def getClassDefByAlias(self, alias):
         """Get a ClassDef.
@@ -242,11 +234,7 @@ class ClassDefMapper(object):
         ==========
          * alias - string, the alias to find a ClassDef for.
         """
-
-        if not (alias in self._mapped_classes):
-            return None
-
-        return self._mapped_classes[alias]
+        return self._mapped_classes.get(alias, None)
 
     def unmapClass(self, class_):
         """Unmap a class definition.
@@ -259,9 +247,9 @@ class ClassDefMapper(object):
         if class_def is None:
             raise ClassDefError("ClassDef not found.")
 
-        alias = getattr(class_, self.alias_attr)
-        delattr(class_, self.alias_attr)
-        del self._mapped_classes[alias]
+        class_def = getattr(class_, self.class_def_attr)
+        delattr(class_, self.class_def_attr)
+        del self._mapped_classes[class_def.alias]
 
 # ---- module attributes ---- #
 
@@ -279,14 +267,11 @@ def get_dynamic_attr_vals(obj, ignore_attrs=None, include_private=False):
     argmuents
     ==========
      * obj - object, object to get dynamic attribute values from.
-     * ignore_attrs - list or tuple of attributes to ignore. Default = empty list.
+     * ignore_attrs - list or tuple of attributes to ignore. Default = empty tuple.
      * include_private - bool, if False do not include attributes that start with '_'.
           Default = False.
     """ 
     vals = {}
-
-    #if not hasattr(obj, '__dict__'):
-    #    raise ClassDefError("Objects must have a __dict__ can be encoded dynamically.")
 
     for attr, val in obj.__dict__.iteritems():
         if ignore_attrs is not None:

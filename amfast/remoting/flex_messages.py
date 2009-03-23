@@ -147,6 +147,9 @@ class_def.assign_attrs(AsyncMessage, 'flex.messaging.messages.AsyncMessage',
         'messageId', 'timestamp', 'timeToLive', 'correlationId'), True)
 
 class CommandMessage(AsyncMessage):
+    """A Flex CommandMessage. Operations are integers instead of strings.
+    See Flex API docs for list of possible commands.
+    """
 
     CLIENT_PING_OPERATION = 5
 
