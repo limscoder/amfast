@@ -262,6 +262,12 @@ class Packet(object):
             messages = []
         self.messages = messages
 
+    def _getAmf3(self):
+        if self.version == self.FLASH_9:
+            return True
+        return False
+    is_amf3 = property(_getAmf3)
+
     def __str__(self):
         header_msg = "\n  ".join(["%s" % header for header in self.headers])
 
@@ -358,12 +364,12 @@ class Gateway(object):
             if response_packet is None:
                 return None
             else:
-                return self.encode_packet(response_packet)
+                return self.encode_packet(response_packet, request_packet.is_amf3)
         except Exception, exc:
             amfast.log_exc()
 
             if request_packet is not None:
-               return self.encode_packet(request_packet.fail(exc))
+               return self.encode_packet(request_packet.fail(exc), request_packet.is_amf3)
             else:
                 # There isn't much we can do if
                 # the request was not decoded correctly.
@@ -377,13 +383,13 @@ class Gateway(object):
         return decoder.decode(raw_packet, packet=True,
             class_def_mapper=self.class_def_mapper)
 
-    def encode_packet(self, packet):
+    def encode_packet(self, packet, amf3=False):
         raw_packet = encoder.encode(packet, packet=True, 
             class_def_mapper=self.class_def_mapper,
             use_array_collections=self.use_array_collections,
             use_object_proxies=self.use_object_proxies,
             use_references=self.use_references, use_legacy_xml=self.use_legacy_xml,
-            include_private=self.include_private)
+            include_private=self.include_private, amf3=amf3)
 
         if amfast.log_debug:
             amfast.logger.debug("<rawResponsePacket>%s</rawResponsePacket>" %
