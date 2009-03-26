@@ -3,7 +3,7 @@ import sys
 import logging
 
 import amfast
-from amfast.class_def import DynamicClassDef
+from amfast.class_def import DynamicClassDef, ExternizeableClassDef
 from amfast.class_def.sa_class_def import SaClassDef
 from amfast.class_def.code_generator import CodeGenerator
 from amfast.remoting import Service, CallableTarget
@@ -39,6 +39,8 @@ def setup_gateway(gateway):
     gateway.class_def_mapper.mapClass(SaClassDef(models.PhoneNumber, 'models.PhoneNumber'))
     gateway.class_def_mapper.mapClass(DynamicClassDef(models.RemoteClass,
         'org.red5.server.webapp.echo.RemoteClass', amf3=False))
+    gateway.class_def_mapper.mapClass(ExternizeableClassDef(models.ExternClass,
+        'org.red5.server.webapp.echo.ExternalizableClass'))
 
     # Map controller methods to service targets
     sa_obj = controller.SAObject()

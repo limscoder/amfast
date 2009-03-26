@@ -704,7 +704,13 @@ static PyObject* deserialize_array(DecoderContext *context, int collection)
 
     // Create list of correct length
     int array_len = header >> 1;
-    list_value = PyList_New(array_len);
+    if (context->buf[context->pos] == EMPTY_STRING_TYPE) {
+        // Regular array
+        list_value = PyList_New(array_len);
+    } else {
+        // Associative array
+        list_value = PyDict_New();
+    }
     if (!list_value)
         return NULL;
 
@@ -738,21 +744,44 @@ static PyObject* deserialize_array(DecoderContext *context, int collection)
 /* Populate an array with values from the buffer. */
 static int decode_array(DecoderContext *context, PyObject *list_value, int array_len)
 {
-    // Skip associative part of array (terminated with empty string).
-    int go = 1;
-    while (go) {
-        if (context->buf[context->pos] == EMPTY_STRING_TYPE)
-            go = 0;
+    int assoc = 0;
+    if (context->buf[context->pos] == EMPTY_STRING_TYPE) {
+        // Regular array.
+        assoc = 0;
         context->pos++;
+    } else {
+        if (!_decode_dynamic_dict(context, list_value))
+            return 0;
+        assoc = 1;
     }
 
     // Add each item to the list
     int i;
-    for (i = 0; i < array_len; i++) {
-        PyObject *value = _decode(context);
-        if (!value)
-            return 0;
-        PyList_SET_ITEM(list_value, i, value);
+    if (assoc) {
+        for (i = 0; i < array_len; i++) {
+            PyObject *value = _decode(context);
+            if (!value)
+                return 0;
+
+            PyObject *key = PyInt_FromLong((long)i);
+            if (!key) {
+               Py_DECREF(value);
+               return 0;
+            }
+
+            int return_value = PyDict_SetItem(list_value, key, value);
+            Py_DECREF(value);
+            Py_DECREF(key);
+            if (return_value == -1)
+                return 0;
+        }
+    } else {
+        for (i = 0; i < array_len; i++) {
+            PyObject *value = _decode(context);
+            if (!value)
+                return 0;
+            PyList_SET_ITEM(list_value, i, value);
+        }
     }
 
     return 1;

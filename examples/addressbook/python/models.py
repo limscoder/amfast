@@ -19,3 +19,7 @@ class Email(object):
 
 class RemoteClass(object):
     pass
+
+class ExternClass(object):
+    pass
+

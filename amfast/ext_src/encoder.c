@@ -73,7 +73,7 @@ static int serialize_unicode(EncoderContext *context, PyObject *value);
 static int encode_unicode(EncoderContext *context, PyObject *value);
 static int serialize_string(EncoderContext *context, PyObject *value);
 static int encode_string(EncoderContext *context, PyObject *value);
-static int serialize_string_or_unicode(EncoderContext *context, PyObject *value);
+static int serialize_object_as_string(EncoderContext *context, PyObject *value);
 static int write_list(EncoderContext *context, PyObject *value);
 static int serialize_list(EncoderContext *context, PyObject *value);
 static int encode_list(EncoderContext *context, PyObject *value);
@@ -111,7 +111,7 @@ static int write_reference_AMF0(EncoderContext *context, PyObject *value);
 static int write_list_AMF0(EncoderContext *context, PyObject *value, int write_reference);
 static int write_dict_AMF0(EncoderContext *context, PyObject *value);
 static int _encode_dynamic_dict_AMF0(EncoderContext *context, PyObject *value);
-static int encode_string_or_unicode_AMF0(EncoderContext *context, PyObject *value, int allow_long);
+static int encode_object_as_string_AMF0(EncoderContext *context, PyObject *value, int allow_long);
 static int write_date_AMF0(EncoderContext *context, PyObject *value);
 static int encode_class_def_AMF0(EncoderContext *context, PyObject *value);
 static int _encode_object_AMF0(EncoderContext *context, PyObject *value);
@@ -525,20 +525,25 @@ static int encode_string(EncoderContext *context, PyObject *value)
 }
 
 /* Encode a PyString or a PyUnicode. */
-static int serialize_string_or_unicode(EncoderContext *context, PyObject *value)
+static int serialize_object_as_string(EncoderContext *context, PyObject *value)
 {
-    if (PyUnicode_Check(value)) {
-        return serialize_unicode(context, value);
-    } else if (PyString_Check(value)) {
+    if (PyString_Check(value)) {
         return serialize_string(context, value);
+    } else if (PyUnicode_Check(value)) {
+        return serialize_unicode(context, value);
     }
- 
-    PyErr_SetString(amfast_EncodeError, "Attempting to serialize non string/unicode as string.");
-    return 0;
+
+    PyObject *str_rep = PyObject_Str(value);
+    if (!str_rep)
+        return 0;
+
+    int return_value = serialize_string(context, str_rep);
+    Py_DECREF(str_rep);
+    return return_value;
 }
 
 /* Encode a PyString or a PyUnicode to AMF0. */
-static int encode_string_or_unicode_AMF0(EncoderContext *context, PyObject *value, int allow_long)
+static int encode_object_as_string_AMF0(EncoderContext *context, PyObject *value, int allow_long)
 {
     if (PyUnicode_Check(value)) {
         return encode_unicode_AMF0(context, value, allow_long);
@@ -546,8 +551,13 @@ static int encode_string_or_unicode_AMF0(EncoderContext *context, PyObject *valu
         return encode_string_AMF0(context, value, allow_long);
     }
 
-    PyErr_SetString(amfast_EncodeError, "Attempting to encode non string/unicode as string.");
-    return 0;
+    PyObject *str_rep = PyObject_Str(value);
+    if (!str_rep)
+        return 0;
+
+    int return_value = encode_string_AMF0(context, str_rep, allow_long);
+    Py_DECREF(str_rep);
+    return return_value;
 }
 
 /* Encode an ArrayCollection header. */
@@ -726,10 +736,8 @@ static int _encode_dynamic_dict(EncoderContext *context, PyObject *value)
     Py_ssize_t idx = 0;
 
     while (PyDict_Next(value, &idx, &key, &val)) {
-        if (!serialize_string_or_unicode(context, key)) {
-            PyErr_SetString(amfast_EncodeError, "Non string/dict key. Only string and unicode dict keys can be encoded.");
+        if (!serialize_object_as_string(context, key))
             return 0;
-        }
 
         if (!_encode(context, val)) {
             return 0;
@@ -1127,7 +1135,7 @@ static int encode_class_def(EncoderContext *context, PyObject *value)
            return 0;
        }
        
-       int return_value = serialize_string_or_unicode(context, class_alias);
+       int return_value = serialize_object_as_string(context, class_alias);
        Py_DECREF(class_alias);
        return return_value;
     }
@@ -1160,7 +1168,7 @@ static int encode_class_def(EncoderContext *context, PyObject *value)
        return 0;
     }
 
-    int return_value = serialize_string_or_unicode(context, class_alias);
+    int return_value = serialize_object_as_string(context, class_alias);
     Py_DECREF(class_alias);
     if (!return_value) {
        Py_DECREF(static_attrs);
@@ -1176,7 +1184,7 @@ static int encode_class_def(EncoderContext *context, PyObject *value)
             return 0;
         }
         
-        int return_value = serialize_string_or_unicode(context, attr_name);
+        int return_value = serialize_object_as_string(context, attr_name);
         Py_DECREF(attr_name);
         if (!return_value)
             return 0;
@@ -1404,10 +1412,8 @@ static int _encode_dynamic_dict_AMF0(EncoderContext *context, PyObject *value)
     Py_ssize_t idx = 0;
 
     while (PyDict_Next(value, &idx, &key, &val)) {
-        if (!encode_string_or_unicode_AMF0(context, key, 0)) {
-            PyErr_SetString(amfast_EncodeError, "Non string/dict key. Only string and unicode dict keys can be encoded.");
+        if (!encode_object_as_string_AMF0(context, key, 0))
             return 0;
-        }
 
         if (!_encode_AMF0(context, val)) {
             return 0;
@@ -1558,7 +1564,7 @@ static int encode_class_def_AMF0(EncoderContext *context, PyObject *value)
     if (!alias)
         return 0;
 
-    int return_value = encode_string_or_unicode_AMF0(context, alias, 0);
+    int return_value = encode_object_as_string_AMF0(context, alias, 0);
     Py_DECREF(alias);
     return return_value;
 }
@@ -1877,7 +1883,7 @@ static int encode_packet_header_AMF0(EncoderContext *context, PyObject *value)
     if (!header_name)
         return 0;
 
-    int return_value = encode_string_or_unicode_AMF0(context, header_name, 0);
+    int return_value = encode_object_as_string_AMF0(context, header_name, 0);
     Py_DECREF(header_name);
     if (!return_value)
         return 0;
@@ -1921,7 +1927,7 @@ static int encode_packet_message_AMF0(EncoderContext *context, PyObject *value)
     if (!target)
         return 0;
 
-    int return_value = encode_string_or_unicode_AMF0(context, target, 0);
+    int return_value = encode_object_as_string_AMF0(context, target, 0);
     Py_DECREF(target);
     if (!return_value)
         return 0;
@@ -1930,7 +1936,7 @@ static int encode_packet_message_AMF0(EncoderContext *context, PyObject *value)
     if (!response)
         return 0;
 
-    return_value = encode_string_or_unicode_AMF0(context, response, 0);
+    return_value = encode_object_as_string_AMF0(context, response, 0);
     if (!return_value) {
         Py_DECREF(response);
         return 0;

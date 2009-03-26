@@ -251,9 +251,6 @@ class Amf3EncoderTestCase(unittest.TestCase):
         buf = encoder.encode(test, use_object_proxies=True, amf3=True)
         self.assertEquals(result, buf)
 
-    def testDictBadKeyRaisesError(self):
-        self.assertRaises(encoder.EncodeError, encoder.encode, {1: 'fail'}, amf3=True)
-
     def testDate(self):
         import datetime
 
