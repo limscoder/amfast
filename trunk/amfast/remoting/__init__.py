@@ -45,6 +45,9 @@ class Service(object):
     # Name of special service that handles command messages
     COMMAND_SERVICE = 'COMMAND_SERVICE'
 
+    # Name of special service that handles targets without a service prefix
+    DEFAULT_SERVICE = 'DEFAULT_SERVICE'
+
     SEPARATOR = '.' # Character used to separate service names and target names
 
     def __init__(self, name):
@@ -194,10 +197,11 @@ class Message(object):
         """Invoke an action on an AMF0 style message."""
         qualified_name = self.target.split(Service.SEPARATOR)
         if len(qualified_name) < 2:
-            raise RemotingError("Target name: '%s' is invalid. Target name must be in the form: 'service%starget'." % \
-                (self.target, Service.SEPARATOR))
-        target_name = qualified_name.pop()
-        service_name = Service.SEPARATOR.join(qualified_name)
+            target_name = self.target
+            service_name = Service.DEFAULT_SERVICE
+        else:
+            target_name = qualified_name.pop()
+            service_name = Service.SEPARATOR.join(qualified_name)
 
         target = service_mapper.getTargetByName(service_name, target_name)
         if target is None:
@@ -395,6 +399,7 @@ class ServiceMapper(object):
     packet_header_service - Service, a special service for AMF packet headers.
     message_header_service - Service, a special service for AMF message headers.
     command_service - Service, a special service for Flex CommandMessages.
+    default_service - Service, a special service for targets that don't have service specifiers.
     
     When an AMF packet or message is processed, the object checks
     the header_service Service for a target where target.name == header.name
@@ -421,6 +426,8 @@ class ServiceMapper(object):
         self.mapService(self.message_header_service)
         self.command_service = Service(Service.COMMAND_SERVICE)
         self.mapService(self.command_service)
+        self.default_service = Service(Service.DEFAULT_SERVICE)
+        self.mapService(self.default_service)
 
         self.command_service.setTarget(ExtCallableTarget(targets.ro_ping,
             messaging.CommandMessage.CLIENT_PING_OPERATION))
@@ -432,11 +439,6 @@ class ServiceMapper(object):
         ==========
          * service - Service, the service to map.
         """
-        if service.name in (Service.PACKET_HEADER_SERVICE,
-            Service.MESSAGE_HEADER_SERVICE, service.COMMAND_SERVICE):
-            if service.name in self._mapped_services:
-                raise RemotingError("'%s' name is reserved for internal use." % service.name)
-
         self._mapped_services[service.name] = service
 
     def unMapService(self, service):
@@ -446,10 +448,6 @@ class ServiceMapper(object):
         ==========
          * service - Service, the service to un-map.
         """
-        if service.name in (Service.PACKET_HEADER_SERVICE,
-            Service.MESSAGE_HEADER_SERVICE, Service.COMMAND_SERVICE):
-            raise RemotingError("'%s' name is reserved for internal use." % service.name)
-
         if service.name in self._mapped_services:
             del self._mapped_services[service.name]
 
