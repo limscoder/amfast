@@ -1,9 +1,12 @@
 /* Things used by both the encoder and the decoder. */
 #include <Python.h>
 
-// Valid integer range
+// Valid AMF3 integer range
 #define MIN_INT -268435457
 #define MAX_INT 268435456
+
+// Valid AMF0 integer types
+#define MAX_USHORT 65535
 
 // Reference bit
 #define REFERENCE_BIT 0x01
