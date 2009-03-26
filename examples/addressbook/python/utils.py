@@ -40,6 +40,10 @@ def setup_gateway(gateway):
     # Map controller methods to service targets
     sa_obj = controller.SAObject()
     sa_obj.gateway = gateway
+    sa_obj.gateway.service_mapper.default_service.setTarget(CallableTarget(sa_obj.echo, 'echo'))
+    service = Service('Red5Echo')
+    service.setTarget(CallableTarget(sa_obj.echo, 'echo'))
+    gateway.service_mapper.mapService(service)
     service = Service('ExampleService')
     service.setTarget(CallableTarget(sa_obj.load, 'load'))
     service.setTarget(CallableTarget(sa_obj.loadAttr, 'loadAttr'))

@@ -62,3 +62,7 @@ class SAObject(object):
 
     def raiseException(self):
         raise Exception("Example Exception")
+
+    def echo(self, val):
+        """Return what was sent to the client."""
+        return val
