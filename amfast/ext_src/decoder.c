@@ -17,6 +17,7 @@ static PyObject *xml_dom_mod;
 static PyObject *amfast_mod;
 static PyObject *class_def_mod;
 static PyObject *remoting_mod;
+static PyObject *as_types_mod;
 static PyObject *amfast_Error;
 static PyObject *amfast_DecodeError;
 static int big_endian; // Flag == 1 if architecture is big_endian, == 0 if not
@@ -59,6 +60,7 @@ static int decode_array(DecoderContext *context, PyObject *list_value, int array
 static PyObject* decode_reference(ObjectContext *object_context, int value);
 static PyObject* deserialize_xml(DecoderContext *context);
 static PyObject* xml_from_string(PyObject *xml_string);
+static PyObject* as_byte_array_from_string(PyObject *byte_string);
 static PyObject* deserialize_byte_array(DecoderContext *context);
 static PyObject* decode_byte_array(DecoderContext *context, int byte_len);
 static PyObject* decode_date(DecoderContext *context);
@@ -884,7 +886,9 @@ static PyObject* decode_byte_array(DecoderContext *context, int byte_len)
     // ByteArray decoding is only available in 2.6+
     byte_array_value = PyByteArray_FromStringAndSize(char_value, (Py_ssize_t)byte_len);
     #else
-    byte_array_value = PyString_FromStringAndSize(char_value, (Py_ssize_t)byte_len);
+    PyObject *byte_string = PyString_FromStringAndSize(char_value, (Py_ssize_t)byte_len);
+    byte_array_value = as_byte_array_from_string(byte_string);
+    Py_DECREF(byte_string);
     #endif
 
     if (!byte_array_value)
@@ -947,6 +951,25 @@ static PyObject* xml_from_string(PyObject *xml_string)
     PyObject *xml_obj = PyObject_CallFunctionObjArgs(func, xml_string, NULL);
     Py_DECREF(func);
     return xml_obj;
+}
+
+/* Create an AsByteArray from a string. */
+static PyObject* as_byte_array_from_string(PyObject *byte_string)
+{
+    if (!as_types_mod) {
+        // Import amfast.class_def.as_types
+        as_types_mod = PyImport_ImportModule("amfast.class_def.as_types");
+        if (!as_types_mod)
+            return NULL;
+    }
+
+    PyObject *class_ = PyObject_GetAttrString(as_types_mod, "AsByteArray");
+    if (!class_)
+        return NULL;
+
+    PyObject *obj = PyObject_CallFunctionObjArgs(class_, byte_string, NULL);
+    Py_DECREF(class_);
+    return obj;
 }
 
 /* Deserialize a string. */
