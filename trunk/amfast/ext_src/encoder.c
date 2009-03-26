@@ -112,7 +112,7 @@ static int write_list_AMF0(EncoderContext *context, PyObject *value, int write_r
 static int write_dict_AMF0(EncoderContext *context, PyObject *value);
 static int _encode_dynamic_dict_AMF0(EncoderContext *context, PyObject *value);
 static int encode_string_or_unicode_AMF0(EncoderContext *context, PyObject *value, int allow_long);
-static int encode_date_AMF0(EncoderContext *context, PyObject *value);
+static int write_date_AMF0(EncoderContext *context, PyObject *value);
 static int encode_class_def_AMF0(EncoderContext *context, PyObject *value);
 static int _encode_object_AMF0(EncoderContext *context, PyObject *value);
 static int write_object_AMF0(EncoderContext *context, PyObject *value);
@@ -1423,8 +1423,17 @@ static int _encode_dynamic_dict_AMF0(EncoderContext *context, PyObject *value)
 }
 
 /* Encode a Date object to AMF0 .*/
-static int encode_date_AMF0(EncoderContext *context, PyObject *value)
+static int write_date_AMF0(EncoderContext *context, PyObject *value)
 {
+    // Dates can use references
+    /*int wrote_ref = write_reference_AMF0(context, value);
+    if (wrote_ref == 0 || wrote_ref == 1) {
+        return wrote_ref;
+    }*/
+
+    if (!_amf_write_byte(context, DATE_AMF0))
+        return 0;
+ 
     // Call python function to get datetime
     if (!amfast_mod) {
         amfast_mod = PyImport_ImportModule("amfast");
@@ -2010,9 +2019,7 @@ static int _encode_AMF0(EncoderContext *context, PyObject *value)
     } else if (PyDict_Check(value)) {
         return write_dict_AMF0(context, value);
     } else if (PyDateTime_Check(value) || PyDate_Check(value)) {
-        if (!_amf_write_byte(context, DATE_AMF0))
-            return 0;
-        return encode_date_AMF0(context, value);
+       return write_date_AMF0(context, value);
     } else {
         return _encode_object_AMF0(context, value);
     }
