@@ -54,8 +54,6 @@ class ClassDef(object):
                 amf3 = True
         self.amf3 = amf3
 
-        self._decoded_attrs = None # This value gets set by the decoder, don't mess with it.
-
     def getStaticAttrVals(self, obj):
         """Returns a list of values of attributes defined in self.static_attrs
 
