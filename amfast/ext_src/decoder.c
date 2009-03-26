@@ -80,7 +80,7 @@ static PyObject* decode_dict_AMF0(DecoderContext *context);
 static int _decode_dynamic_dict_AMF0(DecoderContext *context, PyObject *dict);
 static unsigned short _decode_ushort(DecoderContext *context);
 static unsigned int _decode_ulong(DecoderContext *context);
-static PyObject* decode_array_AMF0(DecoderContext *context);
+static PyObject* decode_array_AMF0(DecoderContext *context, int map_reference);
 static PyObject* decode_long_string_AMF0(DecoderContext *context);
 static PyObject* decode_date_AMF0(DecoderContext *context);
 static PyObject* decode_xml_AMF0(DecoderContext *context);
@@ -1138,8 +1138,15 @@ static int _decode_dynamic_dict_AMF0(DecoderContext *context, PyObject *dict)
     }
 }
 
-/* Decode an AMF0 array. */
-static PyObject* decode_array_AMF0(DecoderContext *context)
+/*
+ * Decode an AMF0 array.
+ *
+ * If the map_reference property is not 0, a reference for this list
+ * is added to the context. If the array being decoded is the body
+ * of a NetConnection message, map_reference should be 0.
+ *
+ */
+static PyObject* decode_array_AMF0(DecoderContext *context, int map_reference)
 {
     int array_len = _decode_ulong(context);
 
@@ -1147,10 +1154,12 @@ static PyObject* decode_array_AMF0(DecoderContext *context)
     if (!list_value)
         return NULL;
 
-    // Reference must be added before children (to allow for recursion).
-    if (!map_next_object_idx(context->object_refs, list_value)) {
-        Py_DECREF(list_value);
-        return NULL;
+    if (map_reference) {
+        // Reference must be added before children (to allow for recursion).
+        if (!map_next_object_idx(context->object_refs, list_value)) {
+            Py_DECREF(list_value);
+            return NULL;
+        }
     }
 
     // Add each item to the list
@@ -1428,9 +1437,18 @@ static PyObject* decode_messages_AMF0(DecoderContext *context)
             return NULL;
         }
 
-        PyObject *message_obj = message_obj = _decode_AMF0(new_context);
-        context->pos = new_context->pos;
+        PyObject *message_obj;
+        if (PyUnicode_GET_SIZE(response) > 0 && new_context->buf[new_context->pos] == ARRAY_AMF0) {
+            // If this is a list of arguments for a RPC,
+            // then the list of arguments should not be
+            // added to the reference count!
+            new_context->pos++;
+            message_obj = decode_array_AMF0(new_context, 0);
+        } else {
+            message_obj = _decode_AMF0(new_context);
+        }
 
+        context->pos = new_context->pos;
         if (!_destroy_decoder_context(new_context)) {
             Py_DECREF(message_list);
             Py_DECREF(target);
@@ -1518,7 +1536,7 @@ static PyObject* _decode_AMF0(DecoderContext *context)
         return decode_dict_AMF0(context);
     } else if (byte == ARRAY_AMF0) {
         context->pos++;
-        return decode_array_AMF0(context);
+        return decode_array_AMF0(context, 1);
     } else if (byte == LONG_STRING_AMF0) {
         context->pos++;
         return decode_long_string_AMF0(context);

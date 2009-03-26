@@ -74,9 +74,6 @@ static int encode_unicode(EncoderContext *context, PyObject *value);
 static int serialize_string(EncoderContext *context, PyObject *value);
 static int encode_string(EncoderContext *context, PyObject *value);
 static int serialize_string_or_unicode(EncoderContext *context, PyObject *value);
-static int write_tuple(EncoderContext *context, PyObject *value);
-static int serialize_tuple(EncoderContext *context, PyObject *value);
-static int encode_tuple(EncoderContext *context, PyObject *value);
 static int write_list(EncoderContext *context, PyObject *value);
 static int serialize_list(EncoderContext *context, PyObject *value);
 static int encode_list(EncoderContext *context, PyObject *value);
@@ -111,8 +108,7 @@ static int encode_string_AMF0(EncoderContext *context, PyObject *value, int allo
 static int write_unicode_AMF0(EncoderContext *context, PyObject *value);
 static int encode_unicode_AMF0(EncoderContext *context, PyObject *value, int allow_long);
 static int write_reference_AMF0(EncoderContext *context, PyObject *value);
-static int write_tuple_AMF0(EncoderContext *context, PyObject *value);
-static int write_list_AMF0(EncoderContext *context, PyObject *value);
+static int write_list_AMF0(EncoderContext *context, PyObject *value, int write_reference);
 static int write_dict_AMF0(EncoderContext *context, PyObject *value);
 static int _encode_dynamic_dict_AMF0(EncoderContext *context, PyObject *value);
 static int encode_string_or_unicode_AMF0(EncoderContext *context, PyObject *value, int allow_long);
@@ -439,7 +435,7 @@ static int write_int(EncoderContext *context, PyObject *value)
         // Int is in valid AMF3 int range.
         if (_amf_write_byte(context, INT_TYPE) != 1)
             return 0;
-        return _encode_int((int)context, n);
+        return _encode_int(context, n);
     } else {
         // Int is too big, it must be encoded as a double
         if (_amf_write_byte(context, DOUBLE_TYPE) != 1)
@@ -591,61 +587,7 @@ static int _encode_array_collection_header(EncoderContext *context)
     return _amf_write_byte(context, ARRAY_TYPE);
 }
 
-/* Write a PyTuple. */
-static int write_tuple(EncoderContext *context, PyObject *value)
-{
-    // Write type marker
-    if (context->use_array_collections == 1) {
-        if (!_amf_write_byte(context, OBJECT_TYPE))
-            return 0;
-    } else {
-        if (_amf_write_byte(context, ARRAY_TYPE) != 1)
-            return 0;
-    }
-
-    return serialize_tuple(context, value);
-}
-
-/* Serialize a PyTuple. */
-static int serialize_tuple(EncoderContext *context, PyObject *value)
-{
-    // Check for idx
-    int return_value = encode_reference(context, context->object_refs, value, 0);
-    if (return_value > -1)
-        return return_value;
-
-    // Write ArrayCollection header
-    if (context->use_array_collections == 1) {
-        if (!_encode_array_collection_header(context))
-            return 0;
-    }
-
-    return encode_tuple(context, value);
-}
-
-/* Encode a PyTuple. */
-static int encode_tuple(EncoderContext *context, PyObject *value)
-{
-    // Add size of tuple to header
-    Py_ssize_t value_len = PyTuple_GET_SIZE(value);
-    if (!_encode_int(context, ((int)value_len) << 1 | NULL_TYPE))
-        return 0;
-
-    // We're never writing associative array items
-    if (!_amf_write_byte(context, NULL_TYPE))
-        return 0;
-
-    // Encode each value in the tuple
-    int i;
-    for (i = 0; i < value_len; i++) {
-        if (!_encode(context, PyTuple_GET_ITEM(value, i)))
-            return 0;
-    }
-
-    return 1;
-}
-
-/* Writes a PyList. */
+/* Writes a PyList or PyTuple. */
 static int write_list(EncoderContext *context, PyObject *value)
 {
     // Write type marker
@@ -660,7 +602,7 @@ static int write_list(EncoderContext *context, PyObject *value)
     return serialize_list(context, value);
 }
 
-/* Serializes a PyList. */
+/* Serializes a PyList or PyTuple. */
 static int serialize_list(EncoderContext *context, PyObject *value)
 {
     // Check for idx
@@ -677,11 +619,14 @@ static int serialize_list(EncoderContext *context, PyObject *value)
     return encode_list(context, value);
 }
 
-/* Encode a PyList. */
+/* Encode a PyList or PyTuple. */
 static int encode_list(EncoderContext *context, PyObject *value)
 {
     // Add size of list to header
-    Py_ssize_t value_len = PyList_GET_SIZE(value);
+    Py_ssize_t value_len = PySequence_Size(value);
+    if (value_len < 0)
+        return 0;
+
     if (!_encode_int(context, ((int)value_len) << 1 | NULL_TYPE))
         return 0;
 
@@ -694,8 +639,10 @@ static int encode_list(EncoderContext *context, PyObject *value)
     for (i = 0; i < value_len; i++) {
         // Increment ref count in case 
         // list is modified by someone else.
-        PyObject *list_item = PyList_GET_ITEM(value, i);
-        Py_INCREF(list_item);
+        PyObject *list_item = PySequence_GetItem(value, i);
+        if (!list_item)
+            return 0;
+
         int return_value = _encode(context, list_item);
         Py_DECREF(list_item);
         if (!return_value)
@@ -855,7 +802,7 @@ static int encode_reference(EncoderContext *context, ObjectContext *object_conte
 
     int idx = get_idx_from_ref(object_context, value);
     if (idx > -1) {
-       if (idx < MAX_INT) {// Max idx size (that's a lot of refs.)
+       if (idx < MAX_INT) {// Max reference count
            if (!_encode_int(context, (idx << (bit + 1)) | (0x00 + bit)))
                return 0;
            return 1;
@@ -884,13 +831,15 @@ static int write_reference_AMF0(EncoderContext *context, PyObject *value)
 
     int idx = get_idx_from_ref(context->object_refs, value);
     if (idx > -1) {
-        if (!_amf_write_byte(context, REF_AMF0))
-            return 0;
+        if (idx < MAX_USHORT) {
+            if (!_amf_write_byte(context, REF_AMF0))
+                return 0;
 
-        if (!_encode_ulong(context, (unsigned int)idx))
-            return 0;
+            if (!_encode_ushort(context, (unsigned short)idx))
+                return 0;
 
-        return 1;
+            return 1;
+        }
     }
 
     // Object is not indexed, add index
@@ -1395,18 +1344,23 @@ static int encode_string_AMF0(EncoderContext *context, PyObject *value, int allo
 }
 
 /* Write a PyList to AMF0. */
-static int write_list_AMF0(EncoderContext *context, PyObject *value)
+static int write_list_AMF0(EncoderContext *context, PyObject *value, int write_reference)
 {
-    int return_value = write_reference_AMF0(context, value);
-    if (return_value == 0 || return_value == 1) {
-        return return_value;
+    if (write_reference) {
+        int return_value = write_reference_AMF0(context, value);
+        if (return_value == 0 || return_value == 1) {
+            return return_value;
+        }
     }
 
     // No reference
     if (!_amf_write_byte(context, ARRAY_AMF0))
         return 0;
 
-    Py_ssize_t array_len = PyList_GET_SIZE(value);
+    Py_ssize_t array_len = PySequence_Size(value);
+    if (array_len < 0)
+        return 0;
+
     if (!_encode_ulong(context, (unsigned int)array_len))
         return 0;
 
@@ -1414,36 +1368,13 @@ static int write_list_AMF0(EncoderContext *context, PyObject *value)
     for (i = 0; i < array_len; i++) {
         // Increment ref count in case 
         // list is modified by someone else.
-        PyObject *list_item = PyList_GET_ITEM(value, i);
-        Py_INCREF(list_item);
+        PyObject *list_item = PySequence_GetItem(value, (Py_ssize_t)i);
+        if (!list_item)
+            return 0;
+
         int return_value = _encode_AMF0(context, list_item);
         Py_DECREF(list_item);
         if (!return_value)
-            return 0;
-    }
-
-    return 1;
-}
-
-/* Write a PyTuple to AMF0. */
-static int write_tuple_AMF0(EncoderContext *context, PyObject *value)
-{
-    int return_value = write_reference_AMF0(context, value);
-    if (return_value == 0 || return_value == 1) {
-        return return_value;
-    }
-
-    // No reference
-    if (!_amf_write_byte(context, ARRAY_AMF0))
-        return 0;
-
-    Py_ssize_t array_len = PyTuple_GET_SIZE(value);
-    if (!_encode_ulong(context, (unsigned int)array_len))
-        return 0;
-
-    int i;
-    for (i = 0; i < array_len; i++) {
-        if (!_encode_AMF0(context, PyTuple_GET_ITEM(value, i)))
             return 0;
     }
 
@@ -1992,17 +1923,29 @@ static int encode_packet_message_AMF0(EncoderContext *context, PyObject *value)
         return 0;
 
     return_value = encode_string_or_unicode_AMF0(context, response, 0);
-    Py_DECREF(response);
-    if (!return_value)
+    if (!return_value) {
+        Py_DECREF(response);
         return 0;
+    }
 
     PyObject *body = PyObject_GetAttrString(value, "value");
-    if (!body)
+    if (!body) {
+        Py_DECREF(response);
         return 0;
+    }
 
-    // Encode message value with a new context, so references are reset
+    // Encode message body with a new context, so references are reset
     EncoderContext *new_context = _copy_encoder_context(context, 0);
-    return_value = _encode_AMF0(new_context, body);
+
+    if (PySequence_Size(response) > 0 && (PyList_Check(body) || PyTuple_Check(body))) {
+        // We're encoding a request,
+        // Don't count argument list 
+        // in reference count.
+        return_value = write_list_AMF0(new_context, body, 0);
+    } else {
+        return_value = _encode_AMF0(new_context, body);
+    }
+    Py_DECREF(response);
     Py_DECREF(body);
     if (!return_value) {
         _destroy_encoder_context(new_context);
@@ -2063,10 +2006,8 @@ static int _encode_AMF0(EncoderContext *context, PyObject *value)
         return write_string_AMF0(context, value);
     } else if (PyUnicode_Check(value)) {
         return write_unicode_AMF0(context, value);
-    } else if (PyList_Check(value)) {
-        return write_list_AMF0(context, value);
-    } else if (PyTuple_Check(value)) {
-        return write_tuple_AMF0(context, value);
+    } else if (PyList_Check(value) || PyTuple_Check(value)) {
+        return write_list_AMF0(context, value, 1);
     } else if (PyDict_Check(value)) {
         return write_dict_AMF0(context, value);
     } else if (PyDateTime_Check(value) || PyDate_Check(value)) {
@@ -2104,10 +2045,8 @@ static int _encode(EncoderContext *context, PyObject *value)
         if (!_amf_write_byte(context, DOUBLE_TYPE))
             return 0;
         return encode_long(context, value);
-    } else if (PyList_Check(value)) {
+    } else if (PyList_Check(value) || PyTuple_Check(value)) {
         return write_list(context, value);
-    } else if (PyTuple_Check(value)) {
-        return write_tuple(context, value);
     } else if (PyDict_Check(value)) {
         if (!_amf_write_byte(context, OBJECT_TYPE))
             return 0;
