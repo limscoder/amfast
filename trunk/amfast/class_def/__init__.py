@@ -116,8 +116,7 @@ class ExternizeableClassDef(ClassDef):
 
         The return value can be a string or a ByteArray.
         """
-
-        raise ClassDefError("This method must be implemented by a sub-class.")
+        return obj.extern_byte_string
 
     def readByteString(self, obj, buf):
         """Returns an integer specifying the
@@ -130,8 +129,7 @@ class ExternizeableClassDef(ClassDef):
          * obj - object, The object that the byte string is being applied to.
          * buf - string in 2.4 and 2.5, ByteArray in 2.6+, The bytes to be read.
         """
-        
-        raise ClassDefError("This method must be implemented by a sub-class.")
+        obj.extern_byte_string = buf
 
 class _ProxyClassDef(ExternizeableClassDef):
     """A special class used internally to encode/decode Proxied objects."""
