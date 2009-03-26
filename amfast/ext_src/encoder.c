@@ -41,7 +41,7 @@ typedef struct {
     int use_object_proxies; // Flag == 1 to encode dicts to ObjectProxy
     int use_references; // Flag == 1 to encode multiply occuring objects as references
     int use_legacy_xml; // Flag == 1 to encode XML as legacy XMLDocument instead of E4X
- 
+    int use_amf3; // Flag == 1 to encode packet messages in AMF3
 } EncoderContext;
 
 static EncoderContext* _create_encoder_context(size_t size, int amf3);
@@ -198,6 +198,7 @@ static EncoderContext* _create_encoder_context(size_t size, int amf3)
     }
 
     context->use_references = 1;
+    context->use_amf3 = 0;
     return context;
 }
 
@@ -213,6 +214,7 @@ static EncoderContext* _copy_encoder_context(EncoderContext *context, int amf3)
         return NULL;
 
     new_context->use_references = context->use_references;
+    new_context->use_amf3 = context->use_amf3;
     new_context->use_array_collections = context->use_array_collections;
     new_context->use_object_proxies = context->use_object_proxies;
 
@@ -920,10 +922,13 @@ static int write_xml(EncoderContext *context, PyObject *value)
 {
     int byte_marker;
 
-    if (context->use_legacy_xml == 1)
+    if (context->use_legacy_xml == 1) {
+        printf("LEGACY XML   !!\n");
         byte_marker = XML_DOC_TYPE;
-    else
+    } else {
+        printf("NEW XML !!\n");
         byte_marker = XML_TYPE;
+    }
 
     if (!_amf_write_byte(context, byte_marker))
         return 0;
@@ -1949,7 +1954,7 @@ static int encode_packet_message_AMF0(EncoderContext *context, PyObject *value)
     }
 
     // Encode message body with a new context, so references are reset
-    EncoderContext *new_context = _copy_encoder_context(context, 0);
+    EncoderContext *new_context = _copy_encoder_context(context, context->use_amf3);
 
     if (PySequence_Size(response) > 0 && (PyList_Check(body) || PyTuple_Check(body))) {
         // We're encoding a request,
@@ -1957,7 +1962,13 @@ static int encode_packet_message_AMF0(EncoderContext *context, PyObject *value)
         // in reference count.
         return_value = write_list_AMF0(new_context, body, 0);
     } else {
-        return_value = _encode_AMF0(new_context, body);
+        if (context->use_amf3) {
+            if (!_amf_write_byte(new_context, AMF3_AMF0))
+                return 0;
+            return_value = _encode(new_context, body);
+        } else {
+            return_value = _encode_AMF0(new_context, body);
+        }
     }
     Py_DECREF(response);
     Py_DECREF(body);
@@ -2106,7 +2117,7 @@ static PyObject* encode(PyObject *self, PyObject *args, PyObject *kwargs)
         &use_legacy_xml, &amf3, &packet, &include_private, &class_def_mapper))
         return NULL;
 
-    EncoderContext *context = _create_encoder_context(1024, amf3);
+    EncoderContext *context = _create_encoder_context(1024, ((!packet) && amf3));
     if (!context) {
         Py_DECREF(class_def_mapper);
         Py_DECREF(include_private);
@@ -2118,6 +2129,7 @@ static PyObject* encode(PyObject *self, PyObject *args, PyObject *kwargs)
     context->use_object_proxies = use_object_proxies;
     context->use_references = use_references;
     context->use_legacy_xml = use_legacy_xml;
+    context->use_amf3 = amf3;
 
     if (include_private != Py_None) {
         context->include_private = include_private;
@@ -2158,7 +2170,7 @@ static PyObject* encode(PyObject *self, PyObject *args, PyObject *kwargs)
     int return_value;
     if (packet) {
         return_value = _encode_packet(context, value);
-    } else if (amf3) {
+    } else if (context->use_amf3) {
         return_value = _encode(context, value); 
     } else {
         return_value = _encode_AMF0(context, value);
