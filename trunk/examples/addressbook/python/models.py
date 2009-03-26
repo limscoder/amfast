@@ -16,3 +16,6 @@ class Email(object):
     def __init__(self):
         self.label = None
         self.email = None
+
+class RemoteClass(object):
+    pass

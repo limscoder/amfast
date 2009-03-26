@@ -1470,7 +1470,6 @@ static int write_xml_AMF0(EncoderContext *context, PyObject *value)
 /* Encode a Python object that doesn't have a C API in AMF0. */
 static int _encode_object_AMF0(EncoderContext *context, PyObject *value)
 {
-
     // Check for special object types
     int xml_value = check_xml(value);
     if (xml_value == -1) {
