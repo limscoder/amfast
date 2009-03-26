@@ -60,7 +60,6 @@ static PyObject* decode_reference(ObjectContext *object_context, int value);
 static PyObject* deserialize_xml(DecoderContext *context);
 static PyObject* xml_from_string(PyObject *xml_string);
 static PyObject* deserialize_byte_array(DecoderContext *context);
-static PyObject* deserialize_byte_array(DecoderContext *context);
 static PyObject* decode_byte_array(DecoderContext *context, int byte_len);
 static PyObject* decode_date(DecoderContext *context);
 static PyObject* deserialize_object(DecoderContext *context, int proxy);
@@ -1182,6 +1181,13 @@ static PyObject* decode_date_AMF0(DecoderContext *context)
     // TODO: use timezone value to adjust datetime
     PyObject *date_value = decode_date(context);
     int tz = _decode_ushort(context); // timezone value.
+
+    // Add date to reference count
+    if (!map_next_object_idx(context->object_refs, date_value)) {
+        Py_DECREF(date_value);
+        return NULL;
+    }
+
     return date_value;
 }
 

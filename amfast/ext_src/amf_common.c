@@ -115,7 +115,9 @@ int get_idx_from_ref(ObjectContext *context, PyObject *ref)
 PyObject* get_ref_from_idx(ObjectContext *context, int idx)
 {
     if (idx >= (int)context->data_len) {
-        PyErr_SetString(PyExc_IndexError, "AMF index out of range.");
+        char error_str[50];
+        sprintf(error_str, "AMF index %i out of range.", idx);
+        PyErr_SetString(PyExc_IndexError, error_str);
         return NULL;
     }
 
