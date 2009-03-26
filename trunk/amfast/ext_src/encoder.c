@@ -18,6 +18,7 @@ const int endian_test = 1;
 static PyObject *xml_dom_mod;
 static PyObject *amfast_mod;
 static PyObject *class_def_mod;
+static PyObject *as_types_mod;
 static PyObject *amfast_Error;
 static PyObject *amfast_EncodeError;
 static int big_endian; // Flag == 1 if architecture is big_endian, == 0 if not
@@ -93,8 +94,8 @@ static int serialize_class_def(EncoderContext *context, PyObject *value);
 static int encode_class_def(EncoderContext *context, PyObject *value);
 static int serialize_byte_array(EncoderContext *context, PyObject *value);
 static int encode_byte_array(EncoderContext *context, PyObject *value);
-
 static int check_xml(PyObject *value);
+static int check_byte_array(PyObject *value);
 
 // AMF0
 static int encode_bool_AMF0(EncoderContext *context, PyObject *value);
@@ -923,10 +924,8 @@ static int write_xml(EncoderContext *context, PyObject *value)
     int byte_marker;
 
     if (context->use_legacy_xml == 1) {
-        printf("LEGACY XML   !!\n");
         byte_marker = XML_DOC_TYPE;
     } else {
-        printf("NEW XML !!\n");
         byte_marker = XML_TYPE;
     }
 
@@ -969,6 +968,25 @@ static int check_xml(PyObject *value)
     
     int return_value = PyObject_IsInstance(value, doc_class);
     Py_DECREF(doc_class);
+    return return_value;
+}
+
+/* Returns 1 if a PyObject is a amfast.class_def.as_types.AsByteArray object. */
+static int check_byte_array(PyObject *value)
+{
+    if (!as_types_mod) {
+        // Import amfast.class_def.as_types
+        as_types_mod = PyImport_ImportModule("amfast.class_def.as_types");
+        if (!as_types_mod)
+            return -1;
+    }
+
+    PyObject *class_ = PyObject_GetAttrString(as_types_mod, "AsByteArray");
+    if (!class_)
+        return -1;
+
+    int return_value = PyObject_IsInstance(value, class_);
+    Py_DECREF(class_);
     return return_value;
 }
 
@@ -1997,6 +2015,22 @@ static int _encode_object(EncoderContext *context, PyObject *value)
     } else if (xml_value == 1) {
         return write_xml(context, value);
     }
+
+    #ifndef Py_BYTEARRAYOBJECT_H
+    int byte_array_value = check_byte_array(value);
+    if (byte_array_value == -1) {
+        return 0;
+    } else if (byte_array_value == 1) {
+        if (!_amf_write_byte(context, BYTE_ARRAY_TYPE))
+            return 0;
+        PyObject *byte_string = PyObject_GetAttrString(value, "bytes");
+        if (!byte_string)
+            return 0;
+        int return_value = serialize_byte_array(context, byte_string);
+        Py_DECREF(byte_string);
+        return return_value;
+    }
+    #endif
 
     // Generic object
     if (!_amf_write_byte(context, OBJECT_TYPE))
