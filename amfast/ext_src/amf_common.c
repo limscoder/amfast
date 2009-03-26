@@ -124,9 +124,12 @@ PyObject* get_ref_from_idx(ObjectContext *context, int idx)
     return context->data[idx];
 }
 
-/* Maps an reference and an index, DOES NOT CHECK UNIQUENESS!!. */
+/* Maps a reference and an index, DOES NOT CHECK UNIQUENESS!!. */
 static int map_object_ref(ObjectContext *context, PyObject *ref)
 {
+    // Just to make sure this object is not GCed before we get to it.
+    Py_INCREF(ref);
+
     // Make sure data array is large enough
     const size_t new_len = context->data_len + 1;
     size_t current_size = context->data_size;
@@ -142,6 +145,7 @@ static int map_object_ref(ObjectContext *context, PyObject *ref)
         context->data_size = current_size;
         context->data = (PyObject**)realloc(context->data, sizeof(PyObject*) * context->data_size);
         if (!context->data) {
+            Py_DECREF(ref);
             PyErr_SetNone(PyExc_MemoryError);
             return -1;
         }
@@ -149,9 +153,5 @@ static int map_object_ref(ObjectContext *context, PyObject *ref)
 
     context->data[context->data_len] = ref;
     context->data_len += 1;
-
-    // Just to make sure this object is not GCed before we get to it.
-    Py_INCREF(ref);
-
     return context->data_len - 1;
 }

@@ -66,10 +66,12 @@ static PyObject* deserialize_object(DecoderContext *context, int proxy);
 static PyObject* deserialize_class_def(DecoderContext *context, int header);
 static PyObject* decode_class_def(DecoderContext *context, int header);
 static PyObject* class_def_from_alias(DecoderContext *context, PyObject *alias);
-static int decode_typed_object(DecoderContext *context, PyObject *obj_value, PyObject *class_def);
+static int decode_typed_object(DecoderContext *context, PyObject *obj_value, PyObject *class_def_dict);
 static int decode_externizeable(DecoderContext *context, PyObject *obj_value, PyObject *class_def);
 static int _decode_dynamic_dict(DecoderContext *context, PyObject *dict);
 static PyObject* _decode_packet(DecoderContext *context);
+static PyObject* decode_obj_attrs(DecoderContext *context, PyObject *class_def_dict);
+static int decode_anonymous_object(DecoderContext *context, PyObject *obj_value, PyObject *class_def_dict);
 
 //AMF0
 static PyObject* decode_bool_AMF0(DecoderContext *context);
@@ -247,7 +249,12 @@ static PyObject* deserialize_object(DecoderContext *context, int proxy)
 
     // Ref not found
     // Create instance based on class def
-    PyObject *class_def = deserialize_class_def(context, header);
+    // class_def_dict ref belongs to the context
+    PyObject *class_def_dict = deserialize_class_def(context, header);
+    if (!class_def_dict)
+        return NULL;
+
+    PyObject *class_def = PyDict_GetItemString(class_def_dict, "class_def");
     if (!class_def)
         return NULL;
 
@@ -259,13 +266,11 @@ static PyObject* deserialize_object(DecoderContext *context, int proxy)
         // Check for special ArrayCollection and ObjectProxy types
         if (PyObject_HasAttrString(class_def, "ARRAY_COLLECTION_CLASS_DEF")) {
             context->pos++; // Skip Array MarkerType
-            Py_DECREF(class_def);
             return deserialize_array(context, 1);
         }
 
         if (PyObject_HasAttrString(class_def, "OBJECT_PROXY_CLASS_DEF")) {
             context->pos++; // Skip Object MarkerType
-            Py_DECREF(class_def);
             return deserialize_object(context, 1);
         }
 
@@ -276,20 +281,18 @@ static PyObject* deserialize_object(DecoderContext *context, int proxy)
 
     // Instantiate new object
     if (!obj_type) {
+        // Anonymous obj == dict
         obj_value = PyDict_New();
     } else {
         // Create obj_value for all typed objects.
         obj_value = PyObject_CallMethod(class_def, "getInstance", NULL);
     }
     
-    if (!obj_value) {
-        Py_DECREF(class_def);
+    if (!obj_value)
         return NULL;
-    }
 
     // Reference must be added before children (to allow for recursion).
     if (!map_next_object_idx(context->object_refs, obj_value)) {
-        Py_DECREF(class_def);
         Py_DECREF(obj_value);
         return NULL;
     }
@@ -301,7 +304,6 @@ static PyObject* deserialize_object(DecoderContext *context, int proxy)
     // to the proxy.
     if (proxy) {
         if (!map_next_object_idx(context->object_refs, obj_value)) {
-            Py_DECREF(class_def);
             Py_DECREF(obj_value);
             return NULL;
         }
@@ -309,13 +311,12 @@ static PyObject* deserialize_object(DecoderContext *context, int proxy)
 
     int return_value = 0;
     if (obj_type == 0) {
-        return_value = _decode_dynamic_dict(context, obj_value);
+        return_value = decode_anonymous_object(context, obj_value, class_def_dict);
     } else if (obj_type == 1) {
         return_value = decode_externizeable(context, obj_value, class_def);
     } else if (obj_type == 2) {
-        return_value = decode_typed_object(context, obj_value, class_def);
+        return_value = decode_typed_object(context, obj_value, class_def_dict);
     }
-    Py_DECREF(class_def);
 
     if (!return_value) {
         Py_DECREF(obj_value);
@@ -325,17 +326,32 @@ static PyObject* deserialize_object(DecoderContext *context, int proxy)
     return obj_value;
 }
 
-/* Decode a typed object. */
-static int decode_typed_object(DecoderContext *context, PyObject *obj_value, PyObject *class_def)
+/* Decode an anonymous object. */
+static int decode_anonymous_object(DecoderContext *context, PyObject *obj_value, PyObject *class_def_dict)
+{
+    PyObject *decoded_attrs = decode_obj_attrs(context, class_def_dict);
+    if (!decoded_attrs) {
+        return 0;
+    }
+
+    int return_value = PyDict_Merge(obj_value, decoded_attrs, 1);
+    Py_DECREF(decoded_attrs);
+    if (return_value == -1)
+        return 0;
+    return 1;
+}
+
+/* Returns a dict with values from an object. */
+static PyObject* decode_obj_attrs(DecoderContext *context, PyObject *class_def_dict)
 {
     // Put decoded attributes in this dict
     PyObject *decoded_attrs = PyDict_New();
 
     // Decode static attrs
-    PyObject *static_attrs = PyObject_GetAttrString(class_def, "_decoded_attrs");
+    PyObject *static_attrs = PyDict_GetItemString(class_def_dict, "static_attrs");
     if (!static_attrs) {
         Py_DECREF(decoded_attrs);
-        return 0;
+        return NULL;
     }
 
     Py_ssize_t static_attr_len = PyTuple_GET_SIZE(static_attrs);
@@ -344,15 +360,13 @@ static int decode_typed_object(DecoderContext *context, PyObject *obj_value, PyO
         PyObject *obj = _decode(context);
         if (!obj) {
             Py_DECREF(decoded_attrs);
-            Py_DECREF(static_attrs);
-            return 0;
+            return NULL;
         }
 
         PyObject *attr_name = PyTuple_GET_ITEM(static_attrs, i);
         if (!attr_name) {
             Py_DECREF(decoded_attrs);
-            Py_DECREF(static_attrs);
-            return 0;
+            return NULL;
         }
 
         int return_value = PyDict_SetItem(decoded_attrs, attr_name, obj);
@@ -360,18 +374,30 @@ static int decode_typed_object(DecoderContext *context, PyObject *obj_value, PyO
 
         if (return_value == -1) {
             Py_DECREF(decoded_attrs);
-            Py_DECREF(static_attrs);
-            return 0;
+            return NULL;
         }
     }
-    Py_DECREF(static_attrs);
 
     // Decode dynamic attrs
-    if (PyObject_HasAttrString(class_def, "DYNAMIC_CLASS_DEF")) {
+    PyObject *dynamic = PyDict_GetItemString(class_def_dict, "dynamic");
+    if (!dynamic)
+        return NULL;
+
+    if (dynamic == Py_True) {
         if (!_decode_dynamic_dict(context, decoded_attrs)) {
             Py_DECREF(decoded_attrs);
-            return 0;
+            return NULL;
         }
+    }
+    return decoded_attrs;
+}
+
+/* Decode a typed object. */
+static int decode_typed_object(DecoderContext *context, PyObject *obj_value, PyObject *class_def_dict)
+{
+    PyObject *decoded_attrs = decode_obj_attrs(context, class_def_dict);
+    if (!decoded_attrs) {
+        return 0;
     }
 
     // apply attributes
@@ -381,6 +407,12 @@ static int decode_typed_object(DecoderContext *context, PyObject *obj_value, PyO
             Py_DECREF(decoded_attrs);
             return 0;
         }
+    }
+
+    PyObject *class_def = PyDict_GetItemString(class_def_dict, "class_def");
+    if (!class_def) {
+        Py_DECREF(decoded_attrs);
+        return 0;
     }
 
     PyObject *return_value = PyObject_CallMethodObjArgs(class_def, context->apply_attr_vals_method_name, obj_value, decoded_attrs, NULL);
@@ -439,31 +471,35 @@ static int decode_externizeable(DecoderContext *context, PyObject *obj_value, Py
  */
 static PyObject* deserialize_class_def(DecoderContext *context, int header)
 {
-    PyObject *class_def = decode_reference(context->class_refs, header >> 1);
-    if (!class_def)
+    PyObject *class_def_dict = decode_reference(context->class_refs, header >> 1);
+    if (!class_def_dict)
         return NULL;
 
-    if (class_def != Py_False) {
-        return class_def;
+    if (class_def_dict != Py_False) {
+        return class_def_dict;
     } else {
-        Py_DECREF(Py_False);
+        Py_DECREF(class_def_dict);
     }
 
-    class_def = decode_class_def(context, header);
-    if (!class_def)
-        return 0;
-
-    // Add reference to obj
-    if (!map_next_object_idx(context->class_refs, class_def))
+    class_def_dict = decode_class_def(context, header);
+    if (!class_def_dict)
         return NULL;
 
-    return class_def;
+    // Add reference to obj
+    if (!map_next_object_idx(context->class_refs, class_def_dict))
+        return NULL;
+    // Give class_def_dict ref to context,
+    // because it should be DECREFed when
+    // the context is destroyed
+    Py_DECREF(class_def_dict);
+
+    return class_def_dict;
 }
 
 /*
  * Decode a ClassDef.
  *
- * header argument is parsed the object header.
+ * Header argument is the object header.
  */
 static PyObject* decode_class_def(DecoderContext *context, int header)
 {
@@ -471,61 +507,80 @@ static PyObject* decode_class_def(DecoderContext *context, int header)
     if (!alias)
         return NULL;
 
-    // Get alias as C-String for error handling
-    PyObject *alias_str = PyUnicode_AsASCIIString(alias);
-    if (!alias_str) {
-        Py_DECREF(alias);
-        return NULL;
+    PyObject *class_def;
+    if (PySequence_Size(alias) == 0) {
+        // This is an anonymous object.
+        class_def = Py_None;
+        Py_INCREF(class_def);
+    } else {
+        // This is a typed object.
+        class_def = class_def_from_alias(context, alias);
     }
-    char *alias_char = PyString_AsString(alias_str);
-
-    PyObject *class_def = class_def_from_alias(context, alias);
     Py_DECREF(alias);
     if (!class_def) 
         return NULL;
 
-    // Check for an externizeable class def.
-    if(PyObject_HasAttrString(class_def, "EXTERNIZEABLE_CLASS_DEF")) {
-        return(class_def);
-    }
- 
-    if ((header & 0x07FFFFFF) == EXTERNIZEABLE) {
+    // Create a dict with class def information
+    // specific to this decode context.
+    PyObject *class_def_dict = PyDict_New();
+    if (!class_def_dict) {
         Py_DECREF(class_def);
+        return NULL;
+    }
+
+    if (PyDict_SetItemString(class_def_dict, "class_def", class_def)  == -1) {
+        Py_DECREF(class_def_dict);
+        Py_DECREF(class_def);
+        return NULL;
+    }
+
+    // Check for or externizeable object
+    int externizeable = PyObject_HasAttrString(class_def, "EXTERNIZEABLE_CLASS_DEF");
+    if (externizeable) {
+        // There is nothing else we need to do
+        // with this ClassDef
+        Py_DECREF(class_def); // class_def_dict has reference now.
+        return class_def_dict;
+    }
+
+    // If the class is externizeable, but the ClassDef isn't,
+    // we have a big problem.
+    if ((header & 0x07FFFFFF) == EXTERNIZEABLE) {
+        // Get alias as C-String for error handling
+        PyObject *alias_str = PyObject_GetAttrString(class_def, "alias");
+        Py_DECREF(class_def);
+        Py_DECREF(class_def_dict);
+        if (!alias_str)
+            return NULL;
+        char *alias_char = PyString_AsString(alias_str);
+        Py_DECREF(alias_str);
+
         char error_str[512];
         sprintf(error_str, "Encoded class '%s' is externizeable, but ClassDef is not.", alias_char);
         PyErr_SetString(amfast_DecodeError, error_str);
         return NULL;
     }
+    Py_DECREF(class_def); // class_def_dict has reference now.
 
-    // Check for anonymous object
-    if (class_def == Py_None)
-        return class_def;
-
-    // Raise exception if ClassDef is dynamic,
-    // but encoding is static
-    if (PyObject_HasAttrString(class_def, "DYNAMIC_CLASS_DEF") && (!((header & DYNAMIC) == DYNAMIC))) {
-        Py_DECREF(class_def);
-        char error_str[512];
-        sprintf(error_str, "Encoded class '%s' is static, but ClassDef is dynamic.", alias_char);
-        PyErr_SetString(amfast_DecodeError, error_str);
-        return NULL;
-    } else if ((header & DYNAMIC) == DYNAMIC && (!PyObject_HasAttrString(class_def, "DYNAMIC_CLASS_DEF"))) {
-        Py_DECREF(class_def);
-        char error_str[512];
-        sprintf(error_str, "Encoded class '%s' is dynamic, but ClassDef is static.", alias_char);
-        PyErr_SetString(amfast_DecodeError, error_str);
-        return NULL;
+    // Set dynamic flag
+    if ((header & DYNAMIC) == DYNAMIC) {
+        if (PyDict_SetItemString(class_def_dict, "dynamic", Py_True) == -1) {
+            Py_DECREF(class_def_dict);
+            return NULL;
+        }
+    } else {
+        if (PyDict_SetItemString(class_def_dict, "dynamic", Py_False) == -1) {
+            Py_DECREF(class_def_dict);
+            return NULL;
+        }
     }
 
     // Decode static attrs
     int static_attr_len = header >> 4;
 
-    // Get static attr name from encoding
-    // since attrs may be in a different order
-    // and we need to move context->pos
     PyObject *decoded_attrs = PyTuple_New(static_attr_len);
     if (!decoded_attrs) {
-        Py_DECREF(class_def);
+        Py_DECREF(class_def_dict);
         return NULL;
     }
 
@@ -533,28 +588,28 @@ static PyObject* decode_class_def(DecoderContext *context, int header)
     for (i = 0; i < static_attr_len; i++) {
         PyObject *attr_name = deserialize_string(context);
         if (!attr_name) {
-            Py_DECREF(class_def);
+            Py_DECREF(class_def_dict);
             Py_DECREF(decoded_attrs);
             return NULL;
         }
 
         // steals ref to attr_name
         if (PyTuple_SetItem(decoded_attrs, i, attr_name) != 0) {
-            Py_DECREF(class_def);
+            Py_DECREF(class_def_dict);
             Py_DECREF(decoded_attrs);
             return NULL;
         }
     }
 
     // Set decoded attrs onto ClassDef
-    int return_value = PyObject_SetAttrString(class_def, "_decoded_attrs", decoded_attrs);
+    int return_value = PyDict_SetItemString(class_def_dict, "static_attrs", decoded_attrs);
     Py_DECREF(decoded_attrs);
     if (return_value == -1) {
-        Py_DECREF(class_def);
+        Py_DECREF(class_def_dict);
         return NULL;
     }
 
-    return class_def; 
+    return class_def_dict;
 }
 
 /* Retrieve a ClassDef from a class alias string. */
@@ -1086,7 +1141,13 @@ static PyObject* decode_long_string_AMF0(DecoderContext *context)
 static PyObject* decode_reference_AMF0(DecoderContext *context)
 {
     unsigned short idx = _decode_ushort(context);
-    return get_ref_from_idx(context->object_refs, (int)idx);
+    PyObject *ref = get_ref_from_idx(context->object_refs, (int)idx);
+
+    if (!ref)
+        return NULL;
+
+    Py_INCREF(ref); // This reference is getting put somewhere, so we need to increase the ref count.
+    return ref;
 }
 
 /* Decode an AMF0 dict. */
