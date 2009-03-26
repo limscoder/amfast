@@ -60,7 +60,7 @@ class SaClassDef(class_def.ClassDef):
  
             # Look at __dict__ directly,
             # otherwise SA will touch the attr
-            # TODO: what about attrs defined in __slots__??
+            # TODO: what about attrs defined in __slots__ or as properties??
             if attr in obj.__dict__:
                 vals.append(getattr(obj, attr))
             else:
