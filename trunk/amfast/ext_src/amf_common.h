@@ -20,6 +20,7 @@
 #define EXTERNIZEABLE 0x07
 
 // Type markers
+#define UNDEFINED_TYPE 0x00
 #define NULL_TYPE 0x01
 #define FALSE_TYPE 0x02
 #define TRUE_TYPE 0x03
