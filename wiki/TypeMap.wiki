@@ -3,7 +3,7 @@
 == Python -> AS3 ==
 
 || Python || AS3 ||
-|| None || NULL ||
+|| None || null ||
 || True || true ||
 || False || false ||
 || int || int ||
