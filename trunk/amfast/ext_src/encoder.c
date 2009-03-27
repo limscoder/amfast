@@ -638,7 +638,7 @@ static int encode_list(EncoderContext *context, PyObject *value)
     if (value_len < 0)
         return 0;
 
-    if (!_encode_int(context, ((int)value_len) << 1 | NULL_TYPE))
+    if (!_encode_int(context, ((int)value_len) << 1 | REFERENCE_BIT))
         return 0;
 
     // We're never writing associative array items
@@ -648,8 +648,7 @@ static int encode_list(EncoderContext *context, PyObject *value)
     // Encode each value in the list
     int i;
     for (i = 0; i < value_len; i++) {
-        // Increment ref count in case 
-        // list is modified by someone else.
+        // GetItem increments ref count 
         PyObject *list_item = PySequence_GetItem(value, i);
         if (!list_item)
             return 0;
@@ -872,7 +871,16 @@ static int serialize_byte_array(EncoderContext *context, PyObject *value)
     // ByteArray encoding is only available in 2.6+
     if (PyByteArray_Check(value)) {
         value_len = PyByteArray_GET_SIZE(value);
+    } else {
+        PyErr_SetString(amfast_EncodeError, "Cannot encode non ByteArray as byte array.");
+        return 0;
     }
+
+    if (!_encode_int(context, ((int)value_len) << 1 | REFERENCE_BIT)) {
+        return 0;
+    }
+
+    return encode_byte_array(context, value);
     #else
     PyObject *byte_string;
     if (check_byte_array(value)) {
@@ -880,23 +888,23 @@ static int serialize_byte_array(EncoderContext *context, PyObject *value)
         if (!byte_string)
             return 0;
         value_len = PyString_GET_SIZE(byte_string);
-    }
-    #endif
-
-    else {
-        PyErr_SetString(amfast_EncodeError, "Cannot encode non ByteArray/AsByteArray as byte array.");
+        if (value_len < 0) {
+            Py_DECREF(byte_string);
+            return 0;
+        }
+    } else {
+        PyErr_SetString(amfast_EncodeError, "Cannot encode non AsByteArray as byte array.");
         return 0;
     }
 
-    if (!_encode_int(context, ((int)value_len) << 1 | REFERENCE_BIT))
+    if (!_encode_int(context, ((int)value_len) << 1 | REFERENCE_BIT)) {
+        Py_DECREF(byte_string);
         return 0;
+    }
 
-    #ifdef Py_BYTEARRAYOBJECT_H
-    return encode_byte_array(context, value);
-    #else
     return_value = encode_byte_array(context, byte_string);
     Py_DECREF(byte_string);
-    return return_value;
+    return return_value; 
     #endif
 }
 
