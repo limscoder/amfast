@@ -1686,7 +1686,10 @@ static PyObject* _decode(DecoderContext *context)
 
     char byte = context->buf[context->pos];
 
-    if (byte == NULL_TYPE) {
+    if (byte == UNDEFINED_TYPE) {
+        context->pos++;
+        Py_RETURN_NONE;
+    } else if (byte == NULL_TYPE) {
         context->pos++;
         Py_RETURN_NONE;
     } else if (byte == FALSE_TYPE) {

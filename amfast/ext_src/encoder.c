@@ -371,8 +371,6 @@ static int _encode_double(EncoderContext *context, double value)
 static int encode_float(EncoderContext *context, PyObject *value)
 {
     double n = PyFloat_AsDouble(value);
-    if (n == -1.0)
-        return 0;
     return _encode_double(context, n);
 }
 
@@ -870,24 +868,36 @@ static int serialize_byte_array(EncoderContext *context, PyObject *value)
 
     // Length prefix
     Py_ssize_t value_len;
-    if (PyString_CheckExact(value)) {
-        value_len = PyString_GET_SIZE(value);
-    }
     #ifdef Py_BYTEARRAYOBJECT_H
     // ByteArray encoding is only available in 2.6+
-    else if (PyByteArray_Check(value)) {
+    if (PyByteArray_Check(value)) {
         value_len = PyByteArray_GET_SIZE(value);
     }
+    #else
+    PyObject *byte_string;
+    if (check_byte_array(value)) {
+        byte_string = PyObject_GetAttrString(value, "bytes");
+        if (!byte_string)
+            return 0;
+        value_len = PyString_GET_SIZE(byte_string);
+    }
     #endif
+
     else {
-        PyErr_SetString(amfast_EncodeError, "Cannot encode non ByteArray/String as byte array.");
+        PyErr_SetString(amfast_EncodeError, "Cannot encode non ByteArray/AsByteArray as byte array.");
         return 0;
     }
 
     if (!_encode_int(context, ((int)value_len) << 1 | REFERENCE_BIT))
         return 0;
 
+    #ifdef Py_BYTEARRAYOBJECT_H
     return encode_byte_array(context, value);
+    #else
+    return_value = encode_byte_array(context, byte_string);
+    Py_DECREF(byte_string);
+    return return_value;
+    #endif
 }
 
 /* Serializes a PyByteArray or a PyString. */
@@ -935,6 +945,9 @@ static int write_xml(EncoderContext *context, PyObject *value)
     return serialize_xml(context, value);
 }
 
+
+
+
 /* Serializes an xml.dom.Document object. */
 static int serialize_xml(EncoderContext *context, PyObject *value)
 {
@@ -981,12 +994,12 @@ static int check_byte_array(PyObject *value)
             return -1;
     }
 
-    PyObject *class_ = PyObject_GetAttrString(as_types_mod, "AsByteArray");
-    if (!class_)
+    PyObject *class = PyObject_GetAttrString(as_types_mod, "AsByteArray");
+    if (!class)
         return -1;
 
-    int return_value = PyObject_IsInstance(value, class_);
-    Py_DECREF(class_);
+    int return_value = PyObject_IsInstance(value, class);
+    Py_DECREF(class);
     return return_value;
 }
 
@@ -2023,12 +2036,7 @@ static int _encode_object(EncoderContext *context, PyObject *value)
     } else if (byte_array_value == 1) {
         if (!_amf_write_byte(context, BYTE_ARRAY_TYPE))
             return 0;
-        PyObject *byte_string = PyObject_GetAttrString(value, "bytes");
-        if (!byte_string)
-            return 0;
-        int return_value = serialize_byte_array(context, byte_string);
-        Py_DECREF(byte_string);
-        return return_value;
+        return serialize_byte_array(context, value);
     }
     #endif
 
