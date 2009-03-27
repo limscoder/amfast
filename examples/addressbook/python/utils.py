@@ -37,6 +37,8 @@ def setup_gateway(gateway):
     gateway.class_def_mapper.mapClass(SaClassDef(models.User, 'models.User'))
     gateway.class_def_mapper.mapClass(SaClassDef(models.Email, 'models.Email'))
     gateway.class_def_mapper.mapClass(SaClassDef(models.PhoneNumber, 'models.PhoneNumber'))
+
+    # These classes are for interacting with the Red5 echo test client.
     gateway.class_def_mapper.mapClass(DynamicClassDef(models.RemoteClass,
         'org.red5.server.webapp.echo.RemoteClass', amf3=False))
     gateway.class_def_mapper.mapClass(ExternizeableClassDef(models.ExternClass,

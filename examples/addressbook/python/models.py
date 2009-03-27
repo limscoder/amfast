@@ -17,6 +17,8 @@ class Email(object):
         self.label = None
         self.email = None
 
+# These classes are for interacting with the Ref5
+# echo test client.
 class RemoteClass(object):
     pass
 
