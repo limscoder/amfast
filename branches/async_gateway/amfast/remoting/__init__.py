@@ -24,7 +24,6 @@ class AsError(RemotingError):
             self.message = message
 
         RemotingError.__init__(self, self.message)
-
 class_def.assign_attrs(AsError, 'Error', ('errorId', 'name', 'message'), False)
 
 class Service(object):
@@ -77,20 +76,17 @@ class Target(object):
     def __init__(self, name):
         self.name = name
 
-    def _invoke_str(self, args):
+    def _invokeStr(self, args):
         return "<targetInvocation target=\"%s\">%s</targetInvocation>" % \
             (self.name, args)
 
-    def invoke(self, request_packet, response_packet, request_msg, response_msg, args):
+    def invoke(self, packet, msg, args):
         """Invoke a target.
 
         arguments
         ==========
-         * request_packet - Packet, Packet that is invoking the target.
-         * response_packet - Packet, Packet that is being returned to the client.
-         * request_msg - Message, the message that is invoking this target.
-             This value will be None if the target is being invoked by a package header.
-         * response_msg - Message, the message that is being returned to the client.
+         * packet - Packet, Packet that is invoking the target.
+         * msg - Message, the message that is invoking this target.
              This value will be None if the target is being invoked by a package header.
          * args - list, list of arguments to pass to the callable.
         """
@@ -108,10 +104,10 @@ class CallableTarget(Target):
         Target.__init__(self, name)
         self.callable = callable
 
-    def invoke(self, request_packet, response_packet, request_msg, response_msg, args):
+    def invoke(self, packet, msg, args):
         """Calls self.callable and passes *args."""
         if amfast.log_debug:
-            amfast.logger.debug(self._invoke_str(args))
+            amfast.logger.debug(self._invokeStr(args))
         return self.callable(*args)
 
 class ExtCallableTarget(CallableTarget):
@@ -122,10 +118,10 @@ class ExtCallableTarget(CallableTarget):
      * name - string, name of the target.
      * callable - callable, a callable that can be invoked.
     """
-    def invoke(self, request_packet, response_packet, request_msg, response_msg, args):
+    def invoke(self, packet, msg, args):
         if amfast.log_debug:
-            amfast.logger.debug(self._invoke_str(args))
-        return self.callable(request_packet, response_packet, request_msg, response_msg, *args)
+            amfast.logger.debug(self._invokeStr(args))
+        return self.callable(packet, msg, *args)
 
 class Header(object):
     """A remoting message header.
@@ -144,11 +140,11 @@ class Header(object):
     def __str__(self):
         return "<header name=\"%s\" required=\"%s\">%s</header>" % (self.name, self.required, self.value)
 
-    def invoke(self, service_mapper, request_packet, response_packet):
+    def invoke(self, request):
         """Invoke an action on this header if one has been mapped."""
-        target = service_mapper.packet_header_service.getTarget(self.name)
+        target = request.gateway.service_mapper.packet_header_service.getTarget(self.name)
         if target is not None:
-            return target.invoke(request_packet, response_packet, None, None, (self.value,))
+            return target.invoke(request, None, (self.value,))
         return False
 
 class Message(object):
@@ -177,23 +173,23 @@ class Message(object):
         return True
     is_invokable = property(_isInvokable)
 
-    def invoke(self, service_mapper, request_packet, response_packet):
+    def invoke(self, request):
         """Invoke an action on this message and return a response message."""
         try:
-            response_msg = self.acknowledge()
+            self.response_msg = self.acknowledge()
             if self.is_invokable:
-                self.value[0].invoke(service_mapper, request_packet, response_packet, self, response_msg)
+                self.value[0].invoke(request, self)
             elif self.target is not None and self.target != '':
-                self._invoke(service_mapper, request_packet, response_packet, response_msg)
+                self._invoke(request)
             else:
                 raise RemotingError("Cannot invoke message: '%s'." % self)
         except Exception, exc:
             amfast.log_exc()
-            response_msg = self.fail(exc)
+            self.response_msg = self.fail(exc)
 
-        return response_msg
+        return self.response_msg
 
-    def _invoke(self, service_mapper, request_packet, response_packet, response_msg):
+    def _invoke(self, request):
         """Invoke an action on an AMF0 style message."""
         qualified_name = self.target.split(Service.SEPARATOR)
         if len(qualified_name) < 2:
@@ -203,11 +199,11 @@ class Message(object):
             target_name = qualified_name.pop()
             service_name = Service.SEPARATOR.join(qualified_name)
 
-        target = service_mapper.getTargetByName(service_name, target_name)
+        target = request.gateway.service_mapper.getTargetByName(service_name, target_name)
         if target is None:
             raise RemotingError("Target '%s' not found." % self.target)
 
-        response_msg.value = target.invoke(request_packet, response_packet, self, response_msg, self.value)
+        self.response_msg.value = target.invoke(request, self, self.value)
 
     def fail(self, exc):
         """Return an error response message."""
@@ -268,6 +264,45 @@ class Packet(object):
         return False
     is_amf3 = property(_getAmf3)
 
+    def invoke(self):
+        """Process this packet and return a response packet."""
+        if amfast.log_debug:
+            amfast.logger.debug("<requestPacket>%s</requestPacket>" % self)
+
+        self.response = self.acknowledge()
+        try:
+            # Invoke any headers
+            for header in self.headers:
+                header.invoke(self)
+
+            # Invoke any messages
+            for message in self.messages:
+                self.response.messages.append(message.invoke(self))
+        except Exception, exc:
+            # Fail all messages
+            amfast.log_exc()
+            self.response = self.fail(exc)
+
+        if amfast.log_debug:
+            amfast.logger.debug("<responsePacket>%s</responsePacket>" % response_packet)
+
+        return self.response
+
+
+    def fail(self, exc):
+        """Return a response Packet with all messages failed."""
+        response = self.acknowledge()
+
+        for message in self.messages:
+            response.messages.append(message.fail(exc))
+        return response
+
+    def acknowledge(self):
+        """Create a response to this packet."""
+        response = Packet()
+        response.version = self.version
+        return response
+
     def __str__(self):
         header_msg = "\n  ".join(["%s" % header for header in self.headers])
 
@@ -289,49 +324,6 @@ class Packet(object):
 </Packet>
 """ % (header_msg, message_msg, self.version)
 
-    def invoke(self, service_mapper):
-        """Process this packet and return a response packet."""
-        if amfast.log_debug:
-            amfast.logger.debug("<requestPacket>%s</requestPacket>" % self)
-
-        response_packet = self.acknowledge()
-        try:
-            # Invoke any headers
-            for header in self.headers:
-                header.invoke(service_mapper, self, response_packet)
-
-            # Invoke any messages
-            for message in self.messages:
-                response_packet.messages.append(message.invoke(service_mapper, self, response_packet))
-        except Exception, exc:
-            # Fail all messages
-            amfast.log_exc()
-            response_packet = self.fail(exc)
-
-        if (response_packet.messages is None or len(response_packet.messages) == 0) and \
-            (response_packet.headers is None or len(response_packet.headers) == 0):
-            # Empty response
-            response_packet = None
-
-        if amfast.log_debug:
-            amfast.logger.debug("<responsePacket>%s</responsePacket>" % response_packet)
-
-        return response_packet
-                
-    def fail(self, exc):
-        """Return a response Packet with all messages failed."""
-        response_packet = self.acknowledge()
-
-        for message in self.messages:
-            response_packet.messages.append(message.fail(exc))
-        return response_packet
-
-    def acknowledge(self):
-        """Create a response to this packet."""
-        response_packet = Packet()
-        response_packet.version = self.version
-        return response_packet
-
 class Gateway(object):
     """An AMF remoting gateway."""
     def __init__(self, service_mapper=None, class_def_mapper=None,
@@ -352,30 +344,27 @@ class Gateway(object):
         self.use_legacy_xml = use_legacy_xml
         self.include_private = include_private
 
-    def process_packet(self, raw_packet):
+    def processPacket(self, raw_packet):
         """Process an incoming packet."""
         if amfast.log_debug:
             amfast.logger.debug("<gateway>Processing incoming packet.</gateway>")
 
-        request_packet = None
+        request = None
         try:
-            request_packet = self.decode_packet(raw_packet)
-            response_packet = request_packet.invoke(self.service_mapper)
-            if response_packet is None:
-                return None
-            else:
-                return self.encode_packet(response_packet, request_packet.is_amf3)
+            request = self.decodePacket(raw_packet)
+            request.gateway = self
+            return self.encodePacket(request.invoke())
         except Exception, exc:
             amfast.log_exc()
 
-            if request_packet is not None:
-               return self.encode_packet(request_packet.fail(exc), request_packet.is_amf3)
+            if request is not None:
+               return self.encodePacket(request.fail(exc))
             else:
                 # There isn't much we can do if
                 # the request was not decoded correctly.
                 raise exc
 
-    def decode_packet(self, raw_packet):
+    def decodePacket(self, raw_packet):
         if amfast.log_debug:
             amfast.logger.debug("<rawRequestPacket>%s</rawRequestPacket>" %
                 amfast.format_byte_string(raw_packet))
@@ -383,13 +372,13 @@ class Gateway(object):
         return decoder.decode(raw_packet, packet=True,
             class_def_mapper=self.class_def_mapper)
 
-    def encode_packet(self, packet, amf3=False):
+    def encodePacket(self, packet):
         raw_packet = encoder.encode(packet, packet=True, 
             class_def_mapper=self.class_def_mapper,
             use_array_collections=self.use_array_collections,
             use_object_proxies=self.use_object_proxies,
             use_references=self.use_references, use_legacy_xml=self.use_legacy_xml,
-            include_private=self.include_private, amf3=amf3)
+            include_private=self.include_private, amf3=packet.is_amf3)
 
         if amfast.log_debug:
             amfast.logger.debug("<rawResponsePacket>%s</rawResponsePacket>" %

@@ -54,7 +54,7 @@ class RemotingTestCase(unittest.TestCase):
         encoded += '\x00\x00\x00\x0E' # Body 2 byte length
         encoded += '\x01\x00' # Body 2 value
 
-        packet = self.gateway.decode_packet(encoded)
+        packet = self.gateway.decodePacket(encoded)
 
         # version
         self.assertEquals(packet.FLASH_8, packet.version)
@@ -92,21 +92,23 @@ class RemotingTestCase(unittest.TestCase):
         encoded += '\x00\x00\x00\x02' # Body 2 byte length
         encoded += '\x01\x00' # Body 2 value
 
-        packet = self.gateway.decode_packet(encoded)
-        encoded_packet = self.gateway.encode_packet(packet)
+        packet = self.gateway.decodePacket(encoded)
+        encoded_packet = self.gateway.encodePacket(packet)
         self.assertEquals(encoded, encoded_packet)
 
     def testHeaderTarget(self):
         header = remoting.Header(self.target_name, False, self.arg)
         packet = remoting.Packet(headers=[header])
-        packet.invoke(self.gateway.service_mapper)
+        packet.gateway = self.gateway
+        packet.invoke()
 
     def testOldStyleTarget(self):
         qualified_name = self.service_name + '.' + self.target_name
         message = remoting.Message(target=qualified_name, response='/1',
             value=(self.arg,))
         packet = remoting.Packet(messages=[message])
-        response = packet.invoke(self.gateway.service_mapper)
+        packet.gateway = self.gateway
+        response = packet.invoke()
         
         self.assertEquals(1, len(response.messages))
         self.assertEquals(True, response.messages[0].target.endswith('onResult'))
@@ -117,7 +119,8 @@ class RemotingTestCase(unittest.TestCase):
         message = remoting.Message(target='bad_target', response='/1',
             value=(self.arg,))
         packet = remoting.Packet(messages=[message])
-        response = packet.invoke(self.gateway.service_mapper)
+        packet.gateway = self.gateway
+        response = packet.invoke()
 
         self.assertEquals(1, len(response.messages))
         self.assertEquals(True, response.messages[0].target.endswith('onStatus'))
@@ -135,7 +138,8 @@ class RemotingTestCase(unittest.TestCase):
         outter_msg.value = (inner_msg, )
 
         packet = remoting.Packet(messages=[outter_msg])
-        response = packet.invoke(self.gateway.service_mapper)
+        packet.gateway = self.gateway
+        response = packet.invoke()
 
         # Check outer msg
         self.assertEquals(1, len(response.messages))
@@ -157,7 +161,8 @@ class RemotingTestCase(unittest.TestCase):
         outter_msg.value = (inner_msg, )
 
         packet = remoting.Packet(messages=[outter_msg])
-        response = packet.invoke(self.gateway.service_mapper)
+        packet.gateway = self.gateway
+        response = packet.invoke()
 
         # Check outer msg
         self.assertEquals(1, len(response.messages))
@@ -179,7 +184,8 @@ class RemotingTestCase(unittest.TestCase):
         outter_msg.value = (inner_msg, )
 
         packet = remoting.Packet(messages=[outter_msg])
-        response = packet.invoke(self.gateway.service_mapper)
+        packet.gateway = self.gateway
+        response = packet.invoke()
 
         # Check outer msg
         self.assertEquals(1, len(response.messages))
@@ -202,9 +208,9 @@ class RemotingTestCase(unittest.TestCase):
         outter_msg.value = (inner_msg, )
 
         packet = remoting.Packet(messages=[outter_msg])
-        encoded_packet = self.gateway.encode_packet(packet)
-        encoded_response = self.gateway.process_packet(encoded_packet)
-        response = self.gateway.decode_packet(encoded_response)
+        encoded_packet = self.gateway.encodePacket(packet)
+        encoded_response = self.gateway.processPacket(encoded_packet)
+        response = self.gateway.decodePacket(encoded_response)
 
         # Check outer msg
         self.assertEquals(1, len(response.messages))
