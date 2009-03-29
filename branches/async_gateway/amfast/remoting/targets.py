@@ -1,6 +1,14 @@
 """Built in Target functions."""
 
-def ro_ping(packet, msg, *args):
+import uuid
+
+def client_ping(packet, msg, *args):
     """Respond to a ping request."""
-    # TODO: set DSVersion header
+    response = msg.response_msg.value
+    if response.headers is None:
+        response.headers = {}
+
+    response.headers['DSMessagingVersion'] = 1
+    response.headers['DSId'] = str(uuid.uuid4())
+    
     return True

@@ -1,30 +1,14 @@
 """Provides an interface for performing remoting calls."""
+
+import threading
+
 import amfast
 from amfast import AmFastError, class_def, decoder, encoder
+from amfast.class_def.as_types import AsError
 
 class RemotingError(AmFastError):
     """Remoting related errors."""
     pass
-
-class AsError(RemotingError):
-    """Error object that is returned to the client.
-
-    Equivalent to: 'Error' in AS3.
-    """
-
-    APPLICATION_ERROR = 5000
-
-    def __init__(self, message='', exc=None):
-        self.errorID = self.APPLICATION_ERROR
-        if exc is not None:
-            self.name = exc.__class__.__name__
-            self.message = "%s" % exc
-        else:
-            self.name = ''
-            self.message = message
-
-        RemotingError.__init__(self, self.message)
-class_def.assign_attrs(AsError, 'Error', ('errorId', 'name', 'message'), False)
 
 class Service(object):
     """A remoting service is a service that is exposed 
@@ -51,20 +35,30 @@ class Service(object):
 
     def __init__(self, name):
         self.name = name
+
+        self._lock = threading.RLock()
         self._targets = {} # Keeps track of targets internally
 
-    def setTarget(self, target):
+    def mapTarget(self, target):
         """Add a target to the service."""
-        self._targets[target.name] = target
+        self._lock.acquire()
+        try:
+            self._targets[target.name] = target
+        finally:
+            self._lock.release()
 
-    def getTarget(self, target_name):
+    def unMapTarget(self, target):
+        """Remove a target from the service."""
+        self._lock.acquire()
+        try:
+            if target.name in self._targets:
+                del self._targets[target.name]
+        finally:
+            self._lock.release()
+
+    def getTargetByName(self, target_name):
         """Get a target from the service by name."""
         return self._targets.get(target_name, None)
-
-    def removeTarget(self, target):
-        """Remove a target from the service."""
-        if target.name in self._targets:
-            del self._targets[target.name]
 
 class Target(object):
     """A remoting target can be invoked by a message.
@@ -176,10 +170,13 @@ class Message(object):
     def invoke(self, request):
         """Invoke an action on this message and return a response message."""
         try:
-            self.response_msg = self.acknowledge()
             if self.is_invokable:
-                self.value[0].invoke(request, self)
+                inner_msg = self.value[0]
+                inner_msg._gateway_id = request.gateway.gateway_id
+                self.response_msg = self.acknowledge()
+                inner_msg.invoke(request, self)
             elif self.target is not None and self.target != '':
+                self.response_msg = self.acknowledge()
                 self._invoke(request)
             else:
                 raise RemotingError("Cannot invoke message: '%s'." % self)
@@ -277,17 +274,37 @@ class Packet(object):
 
             # Invoke any messages
             for message in self.messages:
-                self.response.messages.append(message.invoke(self))
+                result = None
+                if message.is_invokable is True:
+                    inner_msg = message.value[0]
+                    # CommandMessages should always be executed right now
+                    if inner_msg.__class__.__name__ == 'CommandMessage':
+                        result = message.invoke(self)
+                    else:
+                        # Flex IMessage
+                        channel_name = inner_msg.headers.get('DSEndpoint', None)
+                        print "GOT CHANNEL NAME: %s" % channel_name
+                        channel = self.gateway.getChannelByName(channel_name)
+                        print "GOT: %s" % channel
+                        if channel is None:
+                         result = message.fail(RemotingError("Channel '%s' is invalid." % channel_name))
+                        else:
+                            print "INVOKING--"
+                            result = channel.invoke(self, message)
+                else:
+                    # NetConnection message
+                    result = message.invoke(self)
+                self.response.messages.append(result)
+
         except Exception, exc:
             # Fail all messages
             amfast.log_exc()
             self.response = self.fail(exc)
 
         if amfast.log_debug:
-            amfast.logger.debug("<responsePacket>%s</responsePacket>" % response_packet)
+            amfast.logger.debug("<responsePacket>%s</responsePacket>" % self.response)
 
         return self.response
-
 
     def fail(self, exc):
         """Return a response Packet with all messages failed."""
@@ -324,68 +341,6 @@ class Packet(object):
 </Packet>
 """ % (header_msg, message_msg, self.version)
 
-class Gateway(object):
-    """An AMF remoting gateway."""
-    def __init__(self, service_mapper=None, class_def_mapper=None,
-        use_array_collections=False, use_object_proxies=False,
-        use_references=True, use_legacy_xml=False, include_private=False):
-
-        self.service_mapper = service_mapper
-        if self.service_mapper is None:
-            self.service_mapper = ServiceMapper()
-
-        self.class_def_mapper = class_def_mapper
-        if self.class_def_mapper is None:
-            self.class_def_mapper = class_def.ClassDefMapper()
-
-        self.use_array_collections = use_array_collections
-        self.use_object_proxies = use_object_proxies
-        self.use_references = use_references
-        self.use_legacy_xml = use_legacy_xml
-        self.include_private = include_private
-
-    def processPacket(self, raw_packet):
-        """Process an incoming packet."""
-        if amfast.log_debug:
-            amfast.logger.debug("<gateway>Processing incoming packet.</gateway>")
-
-        request = None
-        try:
-            request = self.decodePacket(raw_packet)
-            request.gateway = self
-            return self.encodePacket(request.invoke())
-        except Exception, exc:
-            amfast.log_exc()
-
-            if request is not None:
-               return self.encodePacket(request.fail(exc))
-            else:
-                # There isn't much we can do if
-                # the request was not decoded correctly.
-                raise exc
-
-    def decodePacket(self, raw_packet):
-        if amfast.log_debug:
-            amfast.logger.debug("<rawRequestPacket>%s</rawRequestPacket>" %
-                amfast.format_byte_string(raw_packet))
-
-        return decoder.decode(raw_packet, packet=True,
-            class_def_mapper=self.class_def_mapper)
-
-    def encodePacket(self, packet):
-        raw_packet = encoder.encode(packet, packet=True, 
-            class_def_mapper=self.class_def_mapper,
-            use_array_collections=self.use_array_collections,
-            use_object_proxies=self.use_object_proxies,
-            use_references=self.use_references, use_legacy_xml=self.use_legacy_xml,
-            include_private=self.include_private, amf3=packet.is_amf3)
-
-        if amfast.log_debug:
-            amfast.logger.debug("<rawResponsePacket>%s</rawResponsePacket>" %
-                amfast.format_byte_string(raw_packet))
-
-        return raw_packet
-
 class ServiceMapper(object):
     """Maps service to service name.
 
@@ -407,7 +362,8 @@ class ServiceMapper(object):
     """
 
     def __init__(self):
-        self._mapped_services = {} # used internally to keep track of Service objects.
+        self._lock = threading.RLock()
+        self._services = {} # used internally to keep track of Service objects.
         self._mapBuiltIns()
 
     def _mapBuiltIns(self):
@@ -424,7 +380,7 @@ class ServiceMapper(object):
         self.default_service = Service(Service.DEFAULT_SERVICE)
         self.mapService(self.default_service)
 
-        self.command_service.setTarget(ExtCallableTarget(targets.ro_ping,
+        self.command_service.mapTarget(ExtCallableTarget(targets.client_ping,
             messaging.CommandMessage.CLIENT_PING_OPERATION))
 
     def mapService(self, service):
@@ -434,7 +390,11 @@ class ServiceMapper(object):
         ==========
          * service - Service, the service to map.
         """
-        self._mapped_services[service.name] = service
+        self._lock.acquire()
+        try:
+            self._services[service.name] = service
+        finally:
+            self._lock.release()
 
     def unMapService(self, service):
         """Un-maps a service
@@ -443,8 +403,12 @@ class ServiceMapper(object):
         ==========
          * service - Service, the service to un-map.
         """
-        if service.name in self._mapped_services:
-            del self._mapped_services[service.name]
+        self._lock.acquire()
+        try:
+            if service.name in self._services:
+                del self._services[service.name]
+        finally:
+            self._lock.release()
 
     def getTargetByName(self, service_name, target_name):
         """Get a Target
@@ -460,7 +424,7 @@ class ServiceMapper(object):
         if service is None:
             return None
 
-        return service.getTarget(target_name)
+        return service.getTargetByName(target_name)
 
     def getServiceByName(self, service_name):
         """Get a Service
@@ -471,4 +435,4 @@ class ServiceMapper(object):
         ==========
          * service_name - string, the service name.
         """
-        return self._mapped_services.get(service_name, None)
+        return self._services.get(service_name, None)

@@ -179,7 +179,7 @@ class ClassDefMapper(object):
 
     def _mapBuiltIns(self):
         """Map built-in ClassDefs."""
-        from amfast import remoting
+        from as_types import AsError
         from amfast.remoting import flex_messages as messaging
 
         # Proxy objects
@@ -187,7 +187,7 @@ class ClassDefMapper(object):
         self.mapClass(_ObjectProxyClassDef())
 
         # Exceptions
-        self.mapClass(ClassDef(remoting.AsError, _built_in=True))
+        self.mapClass(ClassDef(AsError, _built_in=True))
         self.mapClass(ClassDef(messaging.FaultError, _built_in=True))
 
         # Flex remoting messages

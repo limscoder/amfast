@@ -4,23 +4,23 @@ import calendar
 import time
 
 from amfast import class_def, remoting
+from amfast.class_def.as_types import AsError
 
 class FlexMessageError(remoting.RemotingError):
     """Errors raised by this module."""
     pass
 
-class FaultError(remoting.AsError):
+class FaultError(AsError):
     """Equivalent to mx.rpc.Fault."""
 
     def __init__(self, message='', exc=None, detail='', content=None):
-        remoting.AsError.__init__(self, message, exc)
+        AsError.__init__(self, message, exc)
         
         self.faultCode = self.name
         self.faultString = self.message
         self.faultDetail = detail
         self.rootCause = exc
         self.content = content
-
 class_def.assign_attrs(FaultError, 'mx.rpc.Fault',
     ('errorId', 'name', 'message', 'faultCode',
         'faultString', 'faultDetail', 'rootCause', 'content'), True)
@@ -35,42 +35,35 @@ class AbstractMessage(object):
         self.headers = None
         self.messageId = None
         self.timestamp = None
+        self._gateway_id = None
 
     def invoke(self, packet, msg):
         """Invoke all message headers."""
         if self.headers is not None:
             for name, val in self.headers.iteritems():
-                target = packet.gateway.service_mapper.message_header_service.getTarget(name)
+                target = packet.gateway.service_mapper.message_header_service.getTargetByName(name)
                 if target is not None:
                     return target.invoke(packet, msg, (val,))
 
     def fail(self, exc):
         """Return an error message."""
         fault = FaultError(exc=exc)
-
-        response_message = ErrorMessage(exc=fault)
-
-        self._matchAcknowledge(response_message)
-
-        return response_message
+        response = ErrorMessage(exc=fault)
+        self._matchAcknowledge(response)
+        return response
 
     def acknowledge(self):
         """Return a successful result message."""
-        response_message = AcknowledgeMessage()
-        self._matchAcknowledge(response_message)
-        return response_message
+        response = AcknowledgeMessage()
+        self._matchAcknowledge(response)
+        return response
 
-    def _matchAcknowledge(self, response_message):
+    def _matchAcknowledge(self, response):
         """Syncs values between this message and it's response acknowledgement."""
-        response_message.messageId = self._getId()
-        response_message.timestamp = calendar.timegm(time.gmtime())
-
-        if self.clientId is not None and self.clientId != '':
-            response_message.clientId = self.clientId
-        else:
-            response_message.clientId = self._getId()
-
-        response_message.correlationId = self.messageId
+        response.messageId = self._getId()
+        response.timestamp = calendar.timegm(time.gmtime())
+        response.clientId = getattr(self, '_gateway_id', None)
+        response.correlationId = self.messageId
 
     def _getId(self):
         """Get a messageId or clientId."""
@@ -160,7 +153,7 @@ class CommandMessage(AsyncMessage):
     def invoke(self, packet, msg):
         AbstractMessage.invoke(self, packet, msg)
 
-        target = packet.gateway.service_mapper.command_service.getTarget(self.operation)
+        target = packet.gateway.service_mapper.command_service.getTargetByName(self.operation)
         if target is None:
             raise FlexMessageError("Command '%s' not found." % self.operation)
         msg.response_msg.value.body = target.invoke(packet, msg, self.body)
@@ -175,7 +168,6 @@ class AcknowledgeMessage(AsyncMessage):
 
     def __init__(self):
         AsyncMessage.__init__(self)
-
 class_def.assign_attrs(AcknowledgeMessage, 'flex.messaging.messages.AcknowledgeMessage',
     ('body', 'clientId', 'destination', 'headers',
         'messageId', 'timestamp', 'timeToLive', 'correlationId'), True)

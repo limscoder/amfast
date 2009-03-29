@@ -6,6 +6,7 @@ from twisted.application import service, strports
 from twisted.web import static, server, resource, vhost
 
 import amfast
+from amfast.remoting.gateway import Gateway
 
 import utils
 
@@ -14,7 +15,7 @@ class AmfGateway(resource.Resource):
 
     def __init__(self):
         resource.Resource.__init__(self)
-        self.gateway = amfast.remoting.Gateway()
+        self.gateway = Gateway()
         utils.setup_gateway(self.gateway)
         
         # Set this to True to see AmFast
@@ -23,7 +24,7 @@ class AmfGateway(resource.Resource):
 
     def render_POST(self, request):
         if request.content:
-            return self.gateway.process_packet(request.content.getvalue())
+            return self.gateway.processPacket(request.content.getvalue())
         else:
             raise Exception("No content")
 
