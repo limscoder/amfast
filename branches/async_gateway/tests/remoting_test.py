@@ -210,7 +210,7 @@ class RemotingTestCase(unittest.TestCase):
 
         packet = remoting.Packet(messages=[outter_msg])
         encoded_packet = self.gateway.encodePacket(packet)
-        encoded_response = self.gateway.processPacket(encoded_packet)
+        encoded_response = self.gateway.invoke(encoded_packet)
         response = self.gateway.decodePacket(encoded_response)
 
         # Check outer msg

@@ -5,7 +5,7 @@ import optparse
 import cherrypy
 
 import amfast
-from amfast.remoting.gateway import Gateway
+from amfast.remoting.gateway import Gateway, Channel
 
 import utils
 
@@ -29,7 +29,7 @@ class App(object):
     def amfGateway(self):
         c_len = int(cherrypy.request.headers['Content-Length'])
         raw_request = cherrypy.request.rfile.read(c_len)
-        return self.gateway.processPacket(raw_request)
+        return self.channel.invoke(raw_request)
 
 if __name__ == '__main__':
     usage = """usage: %s [options]""" % __file__
@@ -46,6 +46,7 @@ if __name__ == '__main__':
 
     gateway = Gateway()
     utils.setup_gateway(gateway)
+    channel = Channel('amfast-channel', gateway)
 
     # Start server
     cp_options = {
@@ -62,7 +63,7 @@ if __name__ == '__main__':
     }
 
     app = App()
-    app.gateway = gateway
+    app.channel = channel
     cherrypy.quickstart(app, '/', config=cp_options)
 
     print "Serving on %s:%s" % (options.domain, options.port)

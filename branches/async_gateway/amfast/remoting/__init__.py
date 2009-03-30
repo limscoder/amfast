@@ -58,7 +58,12 @@ class Service(object):
 
     def getTargetByName(self, target_name):
         """Get a target from the service by name."""
-        return self._targets.get(target_name, None)
+        self._lock.acquire()
+        try:
+            target = self._targets.get(target_name, None)
+        finally:
+            self._lock.release()
+        return target
 
 class Target(object):
     """A remoting target can be invoked by a message.
@@ -136,7 +141,7 @@ class Header(object):
 
     def invoke(self, request):
         """Invoke an action on this header if one has been mapped."""
-        target = request.gateway.service_mapper.packet_header_service.getTarget(self.name)
+        target = request.gateway.service_mapper.packet_header_service.getTargetByName(self.name)
         if target is not None:
             return target.invoke(request, None, (self.value,))
         return False
@@ -274,28 +279,7 @@ class Packet(object):
 
             # Invoke any messages
             for message in self.messages:
-                result = None
-                if message.is_invokable is True:
-                    inner_msg = message.value[0]
-                    # CommandMessages should always be executed right now
-                    if inner_msg.__class__.__name__ == 'CommandMessage':
-                        result = message.invoke(self)
-                    else:
-                        # Flex IMessage
-                        channel_name = inner_msg.headers.get('DSEndpoint', None)
-                        print "GOT CHANNEL NAME: %s" % channel_name
-                        channel = self.gateway.getChannelByName(channel_name)
-                        print "GOT: %s" % channel
-                        if channel is None:
-                         result = message.fail(RemotingError("Channel '%s' is invalid." % channel_name))
-                        else:
-                            print "INVOKING--"
-                            result = channel.invoke(self, message)
-                else:
-                    # NetConnection message
-                    result = message.invoke(self)
-                self.response.messages.append(result)
-
+                self.response.messages.append(message.invoke(self))
         except Exception, exc:
             # Fail all messages
             amfast.log_exc()
@@ -420,11 +404,17 @@ class ServiceMapper(object):
          * service_name - string, the service name.
          * target_name - string, the target name.
         """
-        service = self.getServiceByName(service_name)
-        if service is None:
-            return None
+        self._lock.acquire()
+        try:
+            service = self.getServiceByName(service_name)
+            if service is None:
+                target = None
+            else:
+                target = service.getTargetByName(target_name)
+        finally:
+            self._lock.release()
 
-        return service.getTargetByName(target_name)
+        return target
 
     def getServiceByName(self, service_name):
         """Get a Service
@@ -435,4 +425,9 @@ class ServiceMapper(object):
         ==========
          * service_name - string, the service name.
         """
-        return self._services.get(service_name, None)
+        self._lock.acquire()
+        try:
+            service = self._services.get(service_name, None)
+        finally:
+            self._lock.release()
+        return service
