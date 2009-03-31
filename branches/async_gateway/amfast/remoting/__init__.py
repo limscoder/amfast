@@ -175,13 +175,10 @@ class Message(object):
     def invoke(self, request):
         """Invoke an action on this message and return a response message."""
         try:
+            self.response_msg = self.acknowledge()
             if self.is_invokable:
-                inner_msg = self.value[0]
-                inner_msg._gateway_id = request.gateway.gateway_id
-                self.response_msg = self.acknowledge()
-                inner_msg.invoke(request, self)
+                self.value[0].invoke(request, self)
             elif self.target is not None and self.target != '':
-                self.response_msg = self.acknowledge()
                 self._invoke(request)
             else:
                 raise RemotingError("Cannot invoke message: '%s'." % self)
@@ -364,8 +361,11 @@ class ServiceMapper(object):
         self.default_service = Service(Service.DEFAULT_SERVICE)
         self.mapService(self.default_service)
 
+        # CommandMessages
         self.command_service.mapTarget(ExtCallableTarget(targets.client_ping,
             messaging.CommandMessage.CLIENT_PING_OPERATION))
+        self.command_service.mapTarget(ExtCallableTarget(targets.subscribe_operation,
+            messaging.CommandMessage.SUBSCRIBE_OPERATION))
 
     def mapService(self, service):
         """Maps a service

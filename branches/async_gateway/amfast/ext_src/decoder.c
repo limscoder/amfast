@@ -536,7 +536,7 @@ static PyObject* decode_class_def(DecoderContext *context, int header)
         return NULL;
     }
 
-    // Check for or externizeable object
+    // Check for externizeable object
     int externizeable = PyObject_HasAttrString(class_def, "EXTERNIZEABLE_CLASS_DEF");
     if (externizeable) {
         // There is nothing else we need to do
@@ -552,10 +552,14 @@ static PyObject* decode_class_def(DecoderContext *context, int header)
         PyObject *alias_str = PyObject_GetAttrString(class_def, "alias");
         Py_DECREF(class_def);
         Py_DECREF(class_def_dict);
-        if (!alias_str)
-            return NULL;
-        char *alias_char = PyString_AsString(alias_str);
-        Py_DECREF(alias_str);
+
+        char *alias_char;
+        if (!alias_str) {
+            alias_char = &"Unknown";
+        } else {
+            alias_char = PyString_AsString(alias_str);
+        }
+        Py_XDECREF(alias_str);
 
         char error_str[512];
         sprintf(error_str, "Encoded class '%s' is externizeable, but ClassDef is not.", alias_char);
@@ -630,20 +634,7 @@ static PyObject* class_def_from_alias(DecoderContext *context, PyObject *alias)
             return NULL;
     }
 
-    PyObject *return_value = PyObject_CallMethodObjArgs(context->class_def_mapper, context->get_class_def_method_name, alias, NULL);
-
-    // Raise exception if class is not mapped.
-    if (return_value == Py_None) {
-        PyObject *error_title = PyString_FromString("Class alias not mapped: ");
-        PyObject *error_str = PyUnicode_Concat(error_title, alias);
-        PyErr_SetObject(amfast_DecodeError, error_str);
-        Py_DECREF(error_title);
-        Py_DECREF(error_str);
-        Py_DECREF(return_value);
-        return NULL;
-    }
-
-    return return_value;
+    return PyObject_CallMethodObjArgs(context->class_def_mapper, context->get_class_def_method_name, alias, NULL);
 }
 
 /* Add the dynamic attributes of an encoded object to a dict. */

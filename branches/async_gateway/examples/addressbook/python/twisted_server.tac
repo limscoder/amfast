@@ -10,13 +10,11 @@ from amfast.remoting.gateway import Gateway, Channel
 
 import utils
 
-class AmfGateway(resource.Resource):
+class AmfChannel(resource.Resource):
     """Controller class that directs requests to the Gateway."""
 
-    def __init__(self):
+    def __init__(self, gateway):
         resource.Resource.__init__(self)
-        gateway = Gateway()
-        utils.setup_gateway(gateway)
         self.channel = Channel('amfast-channel', gateway)
         
         # Set this to True to see AmFast
@@ -35,8 +33,12 @@ root.default = static.File("../flex/deploy")
 domain = "localhost"
 root.addHost(domain, static.File("../flex/deploy"))
 
-# Mount urls
-root.putChild('amfGateway', AmfGateway())
+# Setup Gateway
+gateway = Gateway()
+utils.setup_gateway(gateway)
+
+# Setup channels
+root.putChild('amf', AmfChannel(gateway))
 
 # Setup server
 port = 8000

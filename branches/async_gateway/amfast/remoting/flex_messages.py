@@ -3,6 +3,7 @@ import uuid
 import calendar
 import time
 
+import amfast
 from amfast import class_def, remoting
 from amfast.class_def.as_types import AsError
 
@@ -35,10 +36,12 @@ class AbstractMessage(object):
         self.headers = None
         self.messageId = None
         self.timestamp = None
-        self._gateway_id = None
 
     def invoke(self, packet, msg):
         """Invoke all message headers."""
+        if amfast.log_debug:
+            amfast.logger.debug("Invoking FlexMessage:\n%s" % self)
+
         if self.headers is not None:
             for name, val in self.headers.iteritems():
                 target = packet.gateway.service_mapper.message_header_service.getTargetByName(name)
@@ -62,7 +65,6 @@ class AbstractMessage(object):
         """Syncs values between this message and it's response acknowledgement."""
         response.messageId = self._getId()
         response.timestamp = calendar.timegm(time.gmtime())
-        response.clientId = getattr(self, '_gateway_id', None)
         response.correlationId = self.messageId
 
     def _getId(self):
@@ -85,7 +87,7 @@ class AbstractMessage(object):
         attrs_str = '\n  '.join(["<attr name=\"%s\">%s</attr>" % (key, val) for key, val in attrs.iteritems()])
 
         str = """
-<FlexMessage>
+<FlexMessage: %s>
  <headers>
   %s
  </headers>
@@ -98,7 +100,7 @@ class AbstractMessage(object):
   %s
  </attributes>
 </FlexMessage>
-""" % (header_str, self.body, attrs_str)
+""" % (self.__class__.__name__, header_str, self.body, attrs_str)
         return str
 
 class_def.assign_attrs(AbstractMessage, 'flex.messaging.messages.AbstractMessage',
@@ -144,6 +146,7 @@ class CommandMessage(AsyncMessage):
     See Flex API docs for list of possible commands.
     """
 
+    SUBSCRIBE_OPERATION = 0
     CLIENT_PING_OPERATION = 5
 
     def __init__(self, operation=''):
