@@ -1,12 +1,11 @@
 /* Things used by both the encoder and the decoder. */
 #include <Python.h>
 
+// ---- AMF3
+
 // Valid AMF3 integer range
 #define MIN_INT -268435457
 #define MAX_INT 268435456
-
-// Valid AMF0 integer types
-#define MAX_USHORT 65535
 
 // Reference bit
 #define REFERENCE_BIT 0x01
@@ -33,6 +32,11 @@
 #define OBJECT_TYPE 0x0A
 #define XML_TYPE 0x0B
 #define BYTE_ARRAY_TYPE 0x0C
+
+// ---- AMF0
+
+// Valid AMF0 integer types
+#define MAX_USHORT 65535
 
 // Client types defined in AMF remoting message
 #define FLASH_8 0x00
@@ -69,7 +73,7 @@ typedef int Py_ssize_t;
 #endif
 
 /* A dynamic array of ObjectRefs. */
-typedef struct {
+/*typedef struct {
     PyObject **data;
     PyObject *references; // Map pointers to indexes
     size_t data_len;
@@ -81,4 +85,4 @@ PyObject* get_ref_from_idx(ObjectContext *context, int idx);
 int destroy_object_context(ObjectContext *context);
 int map_next_object_ref(ObjectContext *context, PyObject *ref);
 int map_next_object_idx(ObjectContext *context, PyObject *ref);
-int get_idx_from_ref(ObjectContext *context, PyObject *ref);
+int get_idx_from_ref(ObjectContext *context, PyObject *ref);*/

@@ -22,229 +22,351 @@ static PyObject *amfast_Error;
 static PyObject *amfast_DecodeError;
 static int big_endian; // Flag == 1 if architecture is big_endian, == 0 if not
 
-// ---- DECODING CONTEXT
+// ---- CONTEXT
 
-/* Context for encoding. */
 typedef struct {
-    PyObject *class_def_mapper; // Object for getting a ClassDef for an object.
-    PyObject *get_class_def_method_name; // Name of the method to call to retrieve a class def.
-    PyObject *apply_attr_vals_method_name; // Name of the method to call to apply attributes
-    ObjectContext *string_refs; // Keep track of string references
-    ObjectContext *object_refs; // Keep track of object references
-    ObjectContext *class_refs; // Keep track of class definitions references
-    char *buf; // Input buffer
-    int pos; // Current position in input buffer
-    int buf_len; // Length of the buffer
-} DecoderContext;
+    PyObject *decoder_context; // amfast.context.DecoderContext
+    PyObject *i_stream; // Input stream obj
+    PyObject *i_read; // Pointer to Python method to read from input stream
+    PyObject *_buf_str; // Current string buffer
+    PyObject *class_mapper; // Object that retrieves class defs.
+    PyObject *string_refs; // Keep track of string references
+    PyObject *obj_refs; // Keep track of obj references
+    PyObject *class_refs; // Keep track of class definitions references
+    PyObject *map_name; // PyString name of method that maps an obj to an index
+    PyObject *ret_name; // PyString name of method that retrieves an obj from an index
+    PyObject *apply_name; // PyString name of method that applies attributes to objects
+    PyObject *class_def_name; // PyString name of method to retrieve a ClassDef
+} Context;
 
-static DecoderContext* _create_decoder_context(int amf3);
-static DecoderContext* _copy_decoder_context(DecoderContext *context, int amf3);
-static int _destroy_decoder_context(DecoderContext *context);
+static Context* create_context(PyObject *decoder_context, short init);
+static int init_context(Context *context);
+static Context* copy_context(Context *context, short amf3);
+static const char* read_c_str(Context *context, long length);
+static PyObject* read_py_str(Context *context, long length);
+static char read_byte(Context *context);
+static long tell(Context *context);
+static int destroy_context(Context *context);
+static int map_idx(Context *context, PyObject *obj_context, PyObject* val);
+static int ret_obj(Context *context, PyObject *obj_context, long idx);
 
 // ---- DECODING
 
-/**
- * deserialize... functions de-reference.
- * decode... functions decode from AMF to Python
+/*
+ * deserialize... functions de-reference and decode.
+ * decode... functions decode from AMF to Python.
+ *
+ * functions starting with '_' return a C value.
  */
 
-// AMF3
-static PyObject* decode_int(DecoderContext *context);
-static int _decode_int(DecoderContext *context);
-static PyObject* decode_double(DecoderContext *context);
-static double _decode_double(DecoderContext *context);
-static PyObject* deserialize_string(DecoderContext *context);
-static PyObject* decode_string(DecoderContext *context, unsigned int string_size);
-static PyObject* deserialize_array(DecoderContext *context, int collection);
-static int decode_array(DecoderContext *context, PyObject *list_value, int array_len);
-static PyObject* decode_reference(ObjectContext *object_context, int value);
-static PyObject* deserialize_xml(DecoderContext *context);
+// COMMON
+static unsigned short _decode_ushort(Context *context);
+static unsigned int _decode_ulong(Context *context);
+static double _decode_double(Context *context);
+static PyObject* decode_double(Context *context);
+static PyObject* decode_string(Context *context, unsigned int string_size);
+static PyObject* decode_date(Context *context);
+static PyObject* decode_packet(Context *context);
 static PyObject* xml_from_string(PyObject *xml_string);
-static PyObject* as_byte_array_from_string(PyObject *byte_string);
-static PyObject* deserialize_byte_array(DecoderContext *context);
-static PyObject* decode_byte_array(DecoderContext *context, int byte_len);
-static PyObject* decode_date(DecoderContext *context);
-static PyObject* deserialize_object(DecoderContext *context, int proxy);
-static PyObject* deserialize_class_def(DecoderContext *context, int header);
-static PyObject* decode_class_def(DecoderContext *context, int header);
-static PyObject* class_def_from_alias(DecoderContext *context, PyObject *alias);
-static int decode_typed_object(DecoderContext *context, PyObject *obj_value, PyObject *class_def_dict);
-static int decode_externizeable(DecoderContext *context, PyObject *obj_value, PyObject *class_def);
-static int _decode_dynamic_dict(DecoderContext *context, PyObject *dict);
-static PyObject* _decode_packet(DecoderContext *context);
-static PyObject* decode_obj_attrs(DecoderContext *context, PyObject *class_def_dict);
-static int decode_anonymous_object(DecoderContext *context, PyObject *obj_value, PyObject *class_def_dict);
+static PyObject* byte_array_from_string(PyObject *byte_string);
+static PyObject* class_def_from_alias(Context *context, PyObject *alias);
 
-//AMF0
-static PyObject* decode_bool_AMF0(DecoderContext *context);
-static PyObject* decode_string_AMF0(DecoderContext *context);
-static PyObject* decode_reference_AMF0(DecoderContext *context);
-static PyObject* decode_dict_AMF0(DecoderContext *context);
-static int _decode_dynamic_dict_AMF0(DecoderContext *context, PyObject *dict);
-static unsigned short _decode_ushort(DecoderContext *context);
-static unsigned int _decode_ulong(DecoderContext *context);
-static PyObject* decode_array_AMF0(DecoderContext *context, int map_reference);
-static PyObject* decode_long_string_AMF0(DecoderContext *context);
-static PyObject* decode_date_AMF0(DecoderContext *context);
-static PyObject* decode_xml_AMF0(DecoderContext *context);
-static PyObject* decode_typed_object_AMF0(DecoderContext *context);
-static PyObject* decode_headers_AMF0(DecoderContext *context);
-static PyObject* decode_messages_AMF0(DecoderContext *context);
+// AMF0
+static PyObject* decode_AMF0(Context *context);
+static PyObject* decode_bool_AMF0(Context *context);
+static PyObject* decode_string_AMF0(Context *context);
+static PyObject* decode_long_string_AMF0(Context *context);
+static PyObject* decode_reference_AMF0(Context *context);
+static PyObject* decode_dict_AMF0(Context *context);
+static int decode_dynamic_dict_AMF0(Context *context, PyObject *dict);
+static PyObject* decode_array_AMF0(Context *context, short map_reference);
+static PyObject* decode_date_AMF0(Context *context);
+static PyObject* decode_xml_AMF0(Context *context);
+static PyObject* decode_typed_obj_AMF0(Context *context);
+static PyObject* decode_headers_AMF0(Context *context);
+static PyObject* decode_messages_AMF0(Context *context);
 
-// Entry functions
+// AMF3
+static PyObject* decode_reference_AMF3(Context *context, PyObject *obj_context, int val);
+static int decode_dynamic_dict_AMF3(Context *context, PyObject *dict);
+static PyObject* decode_int_AMF3(Context *context);
+static int _decode_int_AMF3(Context *context);
+static PyObject* deserialize_string_AMF3(Context *context);
+static PyObject* deserialize_array_AMF3(Context *context, int collection);
+static int decode_dynamic_array_AMF3(Context *context, PyObject *list_val, int array_len);
+static PyObject* deserialize_xml_AMF3(Context *context);
+static PyObject* deserialize_byte_array_AMF3(Context *context);
+static PyObject* decode_byte_array_AMF3(Context *context, int byte_len);
+static PyObject* deserialize_obj_AMF3(Context *context, int proxy);
+static PyObject* deserialize_class_def_AMF3(Context *context, int header);
+static PyObject* decode_class_def_AMF3(Context *context, int header);
+static int decode_typed_obj_AMF3(Context *context, PyObject *obj_val, PyObject *class_def_dict);
+static int decode_externizeable_AMF3(Context *context, PyObject *obj_val, PyObject *class_def);
+static PyObject* decode_obj_attrs_AMF3(Context *context, PyObject *class_def_dict);
+static int decode_anon_obj_AMF3(Context *context, PyObject *obj_val, PyObject *class_def_dict);
+static PyObject* decode_AMF3(Context *context);
+
+// Python EXPOSED FUNCTIONS
 static PyObject* decode(PyObject *self, PyObject *args, PyObject *kwargs);
-static PyObject* _decode_AMF0(DecoderContext *context);
-static PyObject* _decode(DecoderContext *context);
 
 // ------------------------ DECODING CONTEXT ------------------------ //
 
-/* Create a new DecoderContext. */
-static DecoderContext* _create_decoder_context(int amf3)
+/* Create a new Context. */
+static Context* create_context(PyObject *decoder_context, short init)
 {
-    DecoderContext *context;
-    context = (DecoderContext*)malloc(sizeof(DecoderContext));
+    if (!decoder_context)
+        return NULL;
+
+    Context *context;
+    context = (Context*)malloc(sizeof(Context));
     if (!context) {
         PyErr_SetNone(PyExc_MemoryError);
         return NULL;
     }
 
-    // Set python pointers to NULL
-    context->buf = NULL;
-    context->class_def_mapper = NULL;
-    context->get_class_def_method_name = NULL;
-    context->apply_attr_vals_method_name = NULL;
+    // Set refs to NULL
+    context->decoder_context = NULL;
+    context->i_stream = NULL;
+    context->i_read = NULL;
+    context->_buf_str = NULL;
+    context->class_mapper = NULL;
+    context->obj_refs = NULL;
+    context->string_refs = NULL;
+    context->class_refs = NULL;
+    context->map_name = NULL;
+    context->ret_name = NULL;
+    context->apply_name = NULL;
+    context->class_def_name = NULL;
 
-    if (amf3) {
-        context->string_refs = create_object_context(64);
-        if (!context->string_refs) {
-            free(context);
-            return NULL;
-        }
-    } else {
-        context->string_refs = NULL;
+    // Set information from DecoderContext
+    context->decoder_context = decoder_context;
+    context->i_stream = PyObject_GetAttrString(decoder_context, "file_obj");
+    if (!context->i_stream) {
+        destroy_context(context);
+        return NULL;
     }
-
-    // Always create object refs.
-    context->object_refs = create_object_context(64);
-    if (!context->object_refs) {
-        if (context->string_refs) {
-            destroy_object_context(context->string_refs);
-        }
-        free(context);
+    context->i_read = PyObject_GetAttrString(context->i_stream, "read");
+    if (!context->i_read) {
+        destroy_context(context);
+        return NULL;
+    }
+    context->class_mapper = PyObject_GetAttrString(decoder_context, "class_mapper");
+    if (!context->class_mapper) {
+        destroy_context(context);
+        return NULL;
+    }
+    context->obj_refs = PyObject_GetAttrString(decoder_context, "object_context");
+    if (!context->obj_refs) {
+        destroy_context(context);
         return NULL;
     }
 
-    if (amf3) {
-        context->class_refs = create_object_context(64);
-        if (!context->class_refs) {
-            if (context->string_refs) {
-                destroy_object_context(context->string_refs);
-            }
-            if (context->object_refs) {
-                destroy_object_context(context->object_refs);
-            }
-
-            free(context);
-            return NULL;
-        }
-    } else {
-        context->class_refs = NULL;
+    // Only get these vals if it is an AMF3 decoder.
+    PyObject *amf3 = PyObject_GetAttrString(decoder_context, "amf3");
+    if (!amf3) {
+        destroy_context(context);
+        return NULL;
     }
 
-    context->buf_len = 0;
-    context->pos = 0;
+    if (amf3 == Py_True) {
+        context->string_refs = PyObject_GetAttrString(decoder_context, "string_context");
+        if (!context->string_refs) {
+            destroy_context(context);
+            return NULL;
+        }
+        context->class_refs = PyObject_GetAttrString(decoder_context, "class_context");
+        if (!context->class_refs) {
+            destroy_context(context);
+            return NULL;
+        }
+    }
+    Py_DECREF(amf3);
+
+    if (init) {
+        if (!init_context(context)) {
+            destroy_context(context);
+            return NULL;
+        }
+    }
 
     return context;
 }
 
-/*
- *Creates a new context, and copies over the existing values.
- *
- * Use this when you need to reset reference counts.
- */
-static DecoderContext* _copy_decoder_context(DecoderContext *context, int amf3)
+/* Add optional information to a context. */
+static int init_context(Context *context)
 {
-    DecoderContext *new_context = _create_decoder_context(amf3);
+    context->map_name = PyString_InternFromString("mapObject");
+    if (!context->map_name)
+        return 0;
+
+    context->ret_name = PyString_InternFromString("getObject");
+    if (!context->ret_name)
+        return 0;
+
+    context->apply_name = PyString_InternFromString("applyAttrVals");
+    if (!context->apply_name) 
+        return 0;
+
+    context->class_def_name = PyString_InternFromString("getClassDefByAlias");
+    if (!context->class_def_name)
+        return 0;
+
+    return 1;
+}
+
+/*
+ * Creates a new context with the same stream and options,
+ * but with new reference counts.
+ */
+static Context* copy_context(Context *context, short amf3)
+{
+    PyObject *copy = PyObject_GetAttrString(context->decoder_context, "copy");
+    if (!copy)
+        return NULL;
+
+    PyObject *py_amf3;
+    if (amf3) {
+        py_amf3 = Py_True;
+    } else {
+        py_amf3 = Py_False;
+    }
+
+    PyObject *decoder_context = PyObject_CallMethodObjArgs(copy, py_amf3);
+    Py_DECREF(copy);
+    if (!decoder_context)
+        return NULL;
+
+    Context *new_context = create_context(decoder_context, 0);
     if (!new_context)
         return NULL;
 
-    new_context->buf = context->buf;
-    new_context->buf_len = context->buf_len;
-    new_context->pos = context->pos;
-
-    new_context->class_def_mapper = context->class_def_mapper;
-    if (new_context->class_def_mapper)
-        Py_INCREF(new_context->class_def_mapper);
-
-    new_context->get_class_def_method_name  = context->get_class_def_method_name;
-    if (new_context->get_class_def_method_name)
-        Py_INCREF(new_context->get_class_def_method_name);
-
-    new_context->apply_attr_vals_method_name = context->apply_attr_vals_method_name;
-    if (new_context->apply_attr_vals_method_name)
-        Py_INCREF(new_context->apply_attr_vals_method_name);
+    // Copy init properties over
+    // instead of re-creating
+    new_context->map_name = context->map_name;
+    Py_INCREF(new_context->map_name);
+    new_context->ret_name = context->ret_name;
+    Py_INCREF(new_context->ret_name);
+    new_context->apply_name = context->apply_name;
+    Py_INCREF(new_context->apply_name);
+    new_context->class_def_name = context->class_def_name;
+    Py_INCREF(new_context->class_def_name);
 
     return new_context;
 }
 
-/* De-allocate an DecoderContext. */
-static int _destroy_decoder_context(DecoderContext *context)
+/* De-allocate a Context. */
+static int destroy_context(Context *context)
 {
-    if (context->string_refs) {
-        destroy_object_context(context->string_refs);
-    }
-
-    if (context->object_refs) {
-        destroy_object_context(context->object_refs);
-    }
-
-    if (context->class_refs) {
-        destroy_object_context(context->class_refs);
-    }
-
-    if (context->class_def_mapper) {
-        Py_DECREF(context->class_def_mapper);
-    }
-
-    if (context->get_class_def_method_name) {
-        Py_DECREF(context->get_class_def_method_name);
-    }
-
-    if (context->apply_attr_vals_method_name) {
-        Py_DECREF(context->apply_attr_vals_method_name);
-    }
+    // Set refs to NULL
+    Py_XDECREF(context->decoder_context);
+    Py_XDECREF(context->i_stream);
+    Py_XDECREF(context->i_read);
+    Py_XDECREF(context->_buf_str);
+    Py_XDECREF(context->class_mapper);
+    Py_XDECREF(context->obj_refs);
+    Py_XDECREF(context->string_refs);
+    Py_XDECREF(context->class_refs);
+    Py_XDECREF(context->map_name);
+    Py_XDECREF(context->ret_name);
+    Py_XDECREF(context->apply_name);
+    Py_XDECREF(context->class_def_name);
 
     free(context);
     return 1;
 }
 
+/* Map a val to an index. */
+static int map_idx(Context *context, PyObject *obj_context, PyObject *val)
+{
+    PyObject *result = PyObject_CallMethodObjArgs(obj_context, context->map_name, val);
+    if (!result)
+        return 0;
+
+    Py_DECREF(result);
+    return 1;
+}
+
+/* Retrieve and indexed value. */
+static PyObject* ret_obj(Context *context, PyObject *obj_context, long idx)
+{
+    PyObject *py_idx = PyInt_FromLong(idx);
+    PyObject *result = PyObject_CallMethodObjArgs(obj_context, context->ret_name, py_idx);
+    Py_DECREF(py_idx);
+    return result;
+}
+
+/* 
+ * Returns position in stream.
+ */
+static long tell(Context *context)
+{
+    PyObject *pos = PyObject_CallMethod(context->i_stream, "tell", NULL);
+    if (!pos)
+        return -1;
+
+    long result = PyInt_AsLong(pos);
+    Py_DECREF(pos);
+    return result;
+}
+
+/* 
+ * Read a PyString from the context.
+ *
+ * Returns a borrowed reference.
+ */
+static PyObject* read_py_str(Context *context, long length)
+{
+    PyObject *tmp = context->_buf_str;
+    PyObject *py_length = PyInt_FromLong(length);
+    context->_buf_str = PyObject_CallFunctionObjArgs(context->i_read, py_length);
+    Py_DECREF(py_length);
+    Py_XDECREF(tmp); // Decrement reference to OLD string.
+    return context->_buf_str;
+}
+
+/* Read a string from the context. */
+static const char* read_c_str(Context *context, long length)
+{
+    PyObject* py_str = read_py_str(context, length);
+    if (!py_str)
+        return NULL;
+    return PyString_AsString(py_str);
+}
+
+/* Reads a single byte from the context. */
+static char read_byte(Context *context)
+{
+    const char *str = read_c_str(context, 1);
+    return str[0];
+}
+
 // ------------------------ DECODING --------------------------------- //
 
 /*
- * Deserialize an object.
+ * Deserialize an obj.
  *
- * proxy is flag indicating that the object being deserialized is within an ObjectProxy
+ * proxy is flag indicating that the obj being deserialized is within an ObjectProxy
  */
-static PyObject* deserialize_object(DecoderContext *context, int proxy)
+static PyObject* deserialize_obj_AMF3(Context *context, int proxy)
 {
-    int header = _decode_int(context);
+    int header = _decode_int_AMF3(context);
 
-    // Check for object reference
-    PyObject *obj_value = decode_reference(context->object_refs, header);
-    if (!obj_value)
+    // Check for obj reference
+    PyObject *obj_val = decode_reference_AMF3(context, context->obj_refs, header);
+    if (!obj_val)
         return NULL;
 
-    if (obj_value != Py_False) {
+    if (obj_val != Py_False) {
         // Ref found
         if (proxy) {
             // Map ObjectProxy idx to ref, since
-            // it points to the same object.
-            if (!map_next_object_idx(context->object_refs, obj_value)) {
-                Py_DECREF(obj_value);
+            // it points to the same obj.
+            if (!map_idx(context, context->obj_refs, obj_val)) {
+                Py_DECREF(obj_val);
                 return NULL;
             }
         }
-        return obj_value;
+        return obj_val;
     } else {
         Py_DECREF(Py_False);
     }
@@ -252,7 +374,7 @@ static PyObject* deserialize_object(DecoderContext *context, int proxy)
     // Ref not found
     // Create instance based on class def
     // class_def_dict ref belongs to the context
-    PyObject *class_def_dict = deserialize_class_def(context, header);
+    PyObject *class_def_dict = deserialize_class_def_AMF3(context, header);
     if (!class_def_dict)
         return NULL;
 
@@ -262,18 +384,20 @@ static PyObject* deserialize_object(DecoderContext *context, int proxy)
 
     int obj_type; // 0 = anonymous, 1 == externizeable, 2 == typed
     if (class_def == Py_None) {
-        // Anonymous object.
+        // Anonymous obj.
         obj_type = 0;
     } else if (PyObject_HasAttrString(class_def, "EXTERNIZEABLE_CLASS_DEF")) {
         // Check for special ArrayCollection and ObjectProxy types
         if (PyObject_HasAttrString(class_def, "ARRAY_COLLECTION_CLASS_DEF")) {
-            context->pos++; // Skip Array MarkerType
-            return deserialize_array(context, 1);
+            //TODO
+            //context->pos++; // Skip Array MarkerType
+            return deserialize_array_AMF3(context, 1);
         }
 
         if (PyObject_HasAttrString(class_def, "OBJECT_PROXY_CLASS_DEF")) {
-            context->pos++; // Skip Object MarkerType
-            return deserialize_object(context, 1);
+            // TODO
+            //context->pos++; // Skip Object MarkerType
+            return deserialize_obj_AMF3(context, 1);
         }
 
         obj_type = 1;
@@ -281,70 +405,70 @@ static PyObject* deserialize_object(DecoderContext *context, int proxy)
         obj_type = 2;
     }
 
-    // Instantiate new object
+    // Instantiate new obj
     if (!obj_type) {
         // Anonymous obj == dict
-        obj_value = PyDict_New();
+        obj_val = PyDict_New();
     } else {
-        // Create obj_value for all typed objects.
-        obj_value = PyObject_CallMethod(class_def, "getInstance", NULL);
+        // Create obj_val for all typed objs.
+        obj_val = PyObject_CallMethod(class_def, "getInstance", NULL);
     }
     
-    if (!obj_value)
+    if (!obj_val)
         return NULL;
 
     // Reference must be added before children (to allow for recursion).
-    if (!map_next_object_idx(context->object_refs, obj_value)) {
-        Py_DECREF(obj_value);
+    if (!map_idx(context, context->obj_refs, obj_val)) {
+        Py_DECREF(obj_val);
         return NULL;
     }
 
     // If this is an ObjectProxy,
     // we need to add another reference,
     // so there is one that
-    // points to the object and one that points
+    // points to the obj and one that points
     // to the proxy.
     if (proxy) {
-        if (!map_next_object_idx(context->object_refs, obj_value)) {
-            Py_DECREF(obj_value);
+        if (!map_idx(context, context->obj_refs, obj_val)) {
+            Py_DECREF(obj_val);
             return NULL;
         }
     }
 
-    int return_value = 0;
+    int return_val = 0;
     if (obj_type == 0) {
-        return_value = decode_anonymous_object(context, obj_value, class_def_dict);
+        return_val = decode_anon_obj_AMF3(context, obj_val, class_def_dict);
     } else if (obj_type == 1) {
-        return_value = decode_externizeable(context, obj_value, class_def);
+        return_val = decode_externizeable_AMF3(context, obj_val, class_def);
     } else if (obj_type == 2) {
-        return_value = decode_typed_object(context, obj_value, class_def_dict);
+        return_val = decode_typed_obj_AMF3(context, obj_val, class_def_dict);
     }
 
-    if (!return_value) {
-        Py_DECREF(obj_value);
+    if (!return_val) {
+        Py_DECREF(obj_val);
         return NULL;
     }
 
-    return obj_value;
+    return obj_val;
 }
 
-/* Decode an anonymous object. */
-static int decode_anonymous_object(DecoderContext *context, PyObject *obj_value, PyObject *class_def_dict)
+/* Decode an anonymous obj. */
+static int decode_anon_obj_AMF3(Context *context, PyObject *obj_val, PyObject *class_def_dict)
 {
-    PyObject *decoded_attrs = decode_obj_attrs(context, class_def_dict);
+    PyObject *decoded_attrs = decode_obj_attrs_AMF3(context, class_def_dict);
     if (!decoded_attrs) {
         return 0;
     }
 
-    int return_value = PyDict_Merge(obj_value, decoded_attrs, 1);
+    int return_val = PyDict_Merge(obj_val, decoded_attrs, 1);
     Py_DECREF(decoded_attrs);
-    if (return_value == -1)
+    if (return_val == -1)
         return 0;
     return 1;
 }
 
-/* Returns a dict with values from an object. */
-static PyObject* decode_obj_attrs(DecoderContext *context, PyObject *class_def_dict)
+/* Returns a dict with vals from an obj. */
+static PyObject* decode_obj_attrs_AMF3(Context *context, PyObject *class_def_dict)
 {
     // Put decoded attributes in this dict
     PyObject *decoded_attrs = PyDict_New();
@@ -359,7 +483,7 @@ static PyObject* decode_obj_attrs(DecoderContext *context, PyObject *class_def_d
     Py_ssize_t static_attr_len = PyTuple_GET_SIZE(static_attrs);
     int i;
     for (i = 0; i < static_attr_len; i++) {
-        PyObject *obj = _decode(context);
+        PyObject *obj = decode_AMF3(context);
         if (!obj) {
             Py_DECREF(decoded_attrs);
             return NULL;
@@ -371,10 +495,10 @@ static PyObject* decode_obj_attrs(DecoderContext *context, PyObject *class_def_d
             return NULL;
         }
 
-        int return_value = PyDict_SetItem(decoded_attrs, attr_name, obj);
+        int return_val = PyDict_SetItem(decoded_attrs, attr_name, obj);
         Py_DECREF(obj);
 
-        if (return_value == -1) {
+        if (return_val == -1) {
             Py_DECREF(decoded_attrs);
             return NULL;
         }
@@ -386,7 +510,7 @@ static PyObject* decode_obj_attrs(DecoderContext *context, PyObject *class_def_d
         return NULL;
 
     if (dynamic == Py_True) {
-        if (!_decode_dynamic_dict(context, decoded_attrs)) {
+        if (!decode_dynamic_dict_AMF3(context, decoded_attrs)) {
             Py_DECREF(decoded_attrs);
             return NULL;
         }
@@ -394,21 +518,12 @@ static PyObject* decode_obj_attrs(DecoderContext *context, PyObject *class_def_d
     return decoded_attrs;
 }
 
-/* Decode a typed object. */
-static int decode_typed_object(DecoderContext *context, PyObject *obj_value, PyObject *class_def_dict)
+/* Decode a typed obj. */
+static int decode_typed_obj_AMF3(Context *context, PyObject *obj_val, PyObject *class_def_dict)
 {
-    PyObject *decoded_attrs = decode_obj_attrs(context, class_def_dict);
+    PyObject *decoded_attrs = decode_obj_attrs_AMF3(context, class_def_dict);
     if (!decoded_attrs) {
         return 0;
-    }
-
-    // apply attributes
-    if (!context->apply_attr_vals_method_name) {
-        context->apply_attr_vals_method_name = PyString_FromString("applyAttrVals");
-        if (!context->apply_attr_vals_method_name) {
-            Py_DECREF(decoded_attrs);
-            return 0;
-        }
     }
 
     PyObject *class_def = PyDict_GetItemString(class_def_dict, "class_def");
@@ -417,18 +532,18 @@ static int decode_typed_object(DecoderContext *context, PyObject *obj_value, PyO
         return 0;
     }
 
-    PyObject *return_value = PyObject_CallMethodObjArgs(class_def, context->apply_attr_vals_method_name, obj_value, decoded_attrs, NULL);
+    PyObject *return_val = PyObject_CallMethodObjArgs(class_def, context->apply_name, obj_val, decoded_attrs, NULL);
     Py_DECREF(decoded_attrs);
 
-    if (!return_value)
+    if (!return_val)
         return 0;
 
-    Py_DECREF(return_value); // should be Py_None
+    Py_DECREF(return_val); // should be Py_None
     return 1;
 }
 
-/* Decode an EXTERNIZEABLE object. */
-static int decode_externizeable(DecoderContext *context, PyObject *obj_value, PyObject *class_def)
+/* Decode an EXTERNIZEABLE obj. */
+/*static int decode_externizeable_AMF3(Context *context, PyObject *obj_val, PyObject *class_def)
 {
     PyObject *method_name = PyString_FromString("readByteString");
     if (!method_name)
@@ -437,16 +552,16 @@ static int decode_externizeable(DecoderContext *context, PyObject *obj_value, Py
     // Read bytes
     size_t byte_len = context->buf_len;
     byte_len -= context->pos;
-    char char_value[byte_len];
-    memcpy(char_value, context->buf + context->pos, byte_len);
+    char char_val[byte_len];
+    memcpy(char_val, context->buf + context->pos, byte_len);
 
     PyObject *byte_array;
 
     #ifdef Py_BYTEARRAYOBJECT_H
     // ByteArray decoding is only available in 2.6+
-    byte_array = PyByteArray_FromStringAndSize(char_value, (Py_ssize_t)byte_len);
+    byte_array = PyByteArray_FromStringAndSize(char_val, (Py_ssize_t)byte_len);
     #else
-    byte_array = PyString_FromStringAndSize(char_value, (Py_ssize_t)byte_len);
+    byte_array = PyString_FromStringAndSize(char_val, (Py_ssize_t)byte_len);
     #endif
 
     if (!byte_array) {
@@ -454,7 +569,7 @@ static int decode_externizeable(DecoderContext *context, PyObject *obj_value, Py
         return 0;
     }
 
-    PyObject *parsed_len = PyObject_CallMethodObjArgs(class_def, method_name, obj_value, byte_array, NULL);
+    PyObject *parsed_len = PyObject_CallMethodObjArgs(class_def, method_name, obj_val, byte_array, NULL);
     Py_DECREF(method_name);
     Py_DECREF(byte_array);
 
@@ -464,16 +579,16 @@ static int decode_externizeable(DecoderContext *context, PyObject *obj_value, Py
     context->pos = (int)(PyInt_AsLong(parsed_len) + 1);
     Py_DECREF(parsed_len);
     return 1; 
-}
+}*/
 
 /*
  * Deserialize a ClassDef.
  *
- * header argument is the parsed object header.
+ * header argument is the parsed obj header.
  */
-static PyObject* deserialize_class_def(DecoderContext *context, int header)
+static PyObject* deserialize_class_def_AMF3(Context *context, int header)
 {
-    PyObject *class_def_dict = decode_reference(context->class_refs, header >> 1);
+    PyObject *class_def_dict = decode_reference_AMF3(context, context->class_refs, header >> 1);
     if (!class_def_dict)
         return NULL;
 
@@ -483,12 +598,12 @@ static PyObject* deserialize_class_def(DecoderContext *context, int header)
         Py_DECREF(class_def_dict);
     }
 
-    class_def_dict = decode_class_def(context, header);
+    class_def_dict = decode_class_def_AMF3(context, header);
     if (!class_def_dict)
         return NULL;
 
     // Add reference to obj
-    if (!map_next_object_idx(context->class_refs, class_def_dict))
+    if (!map_idx(context, context->class_refs, class_def_dict))
         return NULL;
     // Give class_def_dict ref to context,
     // because it should be DECREFed when
@@ -501,21 +616,21 @@ static PyObject* deserialize_class_def(DecoderContext *context, int header)
 /*
  * Decode a ClassDef.
  *
- * Header argument is the object header.
+ * Header argument is the obj header.
  */
-static PyObject* decode_class_def(DecoderContext *context, int header)
+static PyObject* decode_class_def_AMF3(Context *context, int header)
 {
-    PyObject *alias = deserialize_string(context);
+    PyObject *alias = deserialize_string_AMF3(context);
     if (!alias)
         return NULL;
 
     PyObject *class_def;
     if (PySequence_Size(alias) == 0) {
-        // This is an anonymous object.
+        // This is an anonymous obj.
         class_def = Py_None;
         Py_INCREF(class_def);
     } else {
-        // This is a typed object.
+        // This is a typed obj.
         class_def = class_def_from_alias(context, alias);
     }
     Py_DECREF(alias);
@@ -536,7 +651,7 @@ static PyObject* decode_class_def(DecoderContext *context, int header)
         return NULL;
     }
 
-    // Check for or externizeable object
+    // Check for or externizeable obj
     int externizeable = PyObject_HasAttrString(class_def, "EXTERNIZEABLE_CLASS_DEF");
     if (externizeable) {
         // There is nothing else we need to do
@@ -588,7 +703,7 @@ static PyObject* decode_class_def(DecoderContext *context, int header)
 
     int i;
     for (i = 0; i < static_attr_len; i++) {
-        PyObject *attr_name = deserialize_string(context);
+        PyObject *attr_name = deserialize_string_AMF3(context);
         if (!attr_name) {
             Py_DECREF(class_def_dict);
             Py_DECREF(decoded_attrs);
@@ -604,9 +719,9 @@ static PyObject* decode_class_def(DecoderContext *context, int header)
     }
 
     // Set decoded attrs onto ClassDef
-    int return_value = PyDict_SetItemString(class_def_dict, "static_attrs", decoded_attrs);
+    int return_val = PyDict_SetItemString(class_def_dict, "static_attrs", decoded_attrs);
     Py_DECREF(decoded_attrs);
-    if (return_value == -1) {
+    if (return_val == -1) {
         Py_DECREF(class_def_dict);
         return NULL;
     }
@@ -615,51 +730,44 @@ static PyObject* decode_class_def(DecoderContext *context, int header)
 }
 
 /* Retrieve a ClassDef from a class alias string. */
-static PyObject* class_def_from_alias(DecoderContext *context, PyObject *alias)
+static PyObject* class_def_from_alias(Context *context, PyObject *alias)
 {
-    // Check for empty string (anonymous object)
+    // Check for empty string (anonymous obj)
     if (PyUnicode_GET_SIZE(alias) == 0) {
         Py_RETURN_NONE;
     }
 
-    // Get ClassDef object from map.
-    // Create method name, if it does not exist already.
-    if (!context->get_class_def_method_name) {
-        context->get_class_def_method_name = PyString_FromString("getClassDefByAlias");
-        if (!context->get_class_def_method_name)
-            return NULL;
-    }
-
-    PyObject *return_value = PyObject_CallMethodObjArgs(context->class_def_mapper, context->get_class_def_method_name, alias, NULL);
+    PyObject *return_val = PyObject_CallMethodObjArgs(context->class_mapper, context->class_def_name, alias, NULL);
 
     // Raise exception if class is not mapped.
-    if (return_value == Py_None) {
+    if (return_val == Py_None) {
         PyObject *error_title = PyString_FromString("Class alias not mapped: ");
         PyObject *error_str = PyUnicode_Concat(error_title, alias);
         PyErr_SetObject(amfast_DecodeError, error_str);
         Py_DECREF(error_title);
         Py_DECREF(error_str);
-        Py_DECREF(return_value);
+        Py_DECREF(return_val);
         return NULL;
     }
 
-    return return_value;
+    return return_val;
 }
 
-/* Add the dynamic attributes of an encoded object to a dict. */
-static int _decode_dynamic_dict(DecoderContext *context, PyObject *dict)
+/* Add the dynamic attributes of an encoded obj to a dict. */
+static int decode_dynamic_dict_AMF3(Context *context, PyObject *dict)
 {
     while (1) {
-        if (context->buf[context->pos] == EMPTY_STRING_TYPE) {
-            context->pos++;
-            return 1;
-        }
-
-        PyObject *key = deserialize_string(context);
+        PyObject *key = deserialize_string_AMF3(context);
         if (!key)
             return 0;
 
-        PyObject *val = _decode(context);
+        if (PyUnicode_GET_SIZE(key) == 0) {
+            // Empty string marks end of name/value pairs
+            Py_DECREF(key);
+            return 1;
+        }
+
+        PyObject *val = decode_AMF3(context);
         if (!val) {
             Py_DECREF(key);
             return 0;
@@ -680,45 +788,49 @@ static int _decode_dynamic_dict(DecoderContext *context, PyObject *dict)
  * Deserialize an array.
  * collection argument is a flag if this array is an array collection.
  */
-static PyObject* deserialize_array(DecoderContext *context, int collection)
+static PyObject* deserialize_array_AMF3(Context *context, int collection)
 {
-    int header = _decode_int(context);
+    int header = _decode_int_AMF3(context);
 
     // Check for reference
-    PyObject *list_value = decode_reference(context->object_refs, header);
-    if (!list_value)
+    PyObject *list_val = decode_reference_AMF3(context, context->obj_refs, header);
+    if (!list_val)
         return NULL;
 
-    if (list_value != Py_False) {
+    if (list_val != Py_False) {
         // Ref found
         if (collection) {
             // Map ArrayCollection idx to ref, since
             // it points to the same list.
-            if (!map_next_object_idx(context->object_refs, list_value)) {
-                Py_DECREF(list_value);
+            if (!map_idx(context, context->obj_refs, list_val)) {
+                Py_DECREF(list_val);
                 return NULL;
             }
         }
-        return list_value;
+        return list_val;
     } else {
         Py_DECREF(Py_False);
     }
 
     // Create list of correct length
     int array_len = header >> 1;
+    /*
+     * TODO
     if (context->buf[context->pos] == EMPTY_STRING_TYPE) {
         // Regular array
-        list_value = PyList_New(array_len);
+        list_val = PyList_New(array_len);
     } else {
         // Associative array
-        list_value = PyDict_New();
+        list_val = PyDict_New();
     }
-    if (!list_value)
+    if (!list_val)
         return NULL;
+    */
+    return NULL;
 
     // Reference must be added before children (to allow for recursion).
-    if (!map_next_object_idx(context->object_refs, list_value)) {
-        Py_DECREF(list_value);
+    if (!map_idx(context, context->obj_refs, list_val)) {
+        Py_DECREF(list_val);
         return NULL;
     }
 
@@ -728,61 +840,63 @@ static PyObject* deserialize_array(DecoderContext *context, int collection)
     // points to the array and one that points
     // to the collection.
     if (collection) {
-        if (!map_next_object_idx(context->object_refs, list_value)) {
-            Py_DECREF(list_value);
+        if (!map_idx(context, context->obj_refs, list_val)) {
+            Py_DECREF(list_val);
             return NULL;
         }
     }
 
     // Populate list
-    if (!decode_array(context, list_value, array_len)) {
-        Py_DECREF(list_value);
+    if (!decode_dynamic_array_AMF3(context, list_val, array_len)) {
+        Py_DECREF(list_val);
         return NULL;
     }
 
-    return list_value;
+    return list_val;
 }
 
-/* Populate an array with values from the buffer. */
-static int decode_array(DecoderContext *context, PyObject *list_value, int array_len)
+/* Populate an array with vals from the buffer. */
+static int decode_dynamic_array_AMF3(Context *context, PyObject *list_val, int array_len)
 {
     int assoc = 0;
+    /*
+     * TODO
     if (context->buf[context->pos] == EMPTY_STRING_TYPE) {
         // Regular array.
         assoc = 0;
         context->pos++;
     } else {
-        if (!_decode_dynamic_dict(context, list_value))
+        if (!decode_dynamic_dict_AMF3(context, list_val))
             return 0;
         assoc = 1;
-    }
+    }*/
 
     // Add each item to the list
     int i;
     if (assoc) {
         for (i = 0; i < array_len; i++) {
-            PyObject *value = _decode(context);
-            if (!value)
+            PyObject *val = decode_AMF3(context);
+            if (!val)
                 return 0;
 
             PyObject *key = PyInt_FromLong((long)i);
             if (!key) {
-               Py_DECREF(value);
+               Py_DECREF(val);
                return 0;
             }
 
-            int return_value = PyDict_SetItem(list_value, key, value);
-            Py_DECREF(value);
+            int return_val = PyDict_SetItem(list_val, key, val);
+            Py_DECREF(val);
             Py_DECREF(key);
-            if (return_value == -1)
+            if (return_val == -1)
                 return 0;
         }
     } else {
         for (i = 0; i < array_len; i++) {
-            PyObject *value = _decode(context);
-            if (!value)
+            PyObject *val = decode_AMF3(context);
+            if (!val)
                 return 0;
-            PyList_SET_ITEM(list_value, i, value);
+            PyList_SET_ITEM(list_val, i, val);
         }
     }
 
@@ -790,36 +904,36 @@ static int decode_array(DecoderContext *context, PyObject *list_value, int array
 }
 
 /* Deserialize date. */
-static PyObject* deserialize_date(DecoderContext *context)
+static PyObject* deserialize_date(Context *context)
 {
-    int header = _decode_int(context);
+    int header = _decode_int_AMF3(context);
 
     // Check for reference
-    PyObject *date_value = decode_reference(context->object_refs, header);
-    if (!date_value)
+    PyObject *date_val = decode_reference_AMF3(context, context->obj_refs, header);
+    if (!date_val)
         return NULL;
 
-    if (date_value != Py_False) {
-        return date_value;
+    if (date_val != Py_False) {
+        return date_val;
     } else {
         Py_DECREF(Py_False);
     }
 
-    date_value = decode_date(context);
-    if (!date_value)
+    date_val = decode_date(context);
+    if (!date_val)
         return NULL;
 
     // Add reference
-    if (!map_next_object_idx(context->object_refs, date_value)) {
-        Py_DECREF(date_value);
+    if (!map_idx(context, context->obj_refs, date_val)) {
+        Py_DECREF(date_val);
         return NULL;
     }
 
-    return date_value;
+    return date_val;
 }
 
 /* Decode a date. */
-static PyObject* decode_date(DecoderContext *context)
+static PyObject* decode_date(Context *context)
 {
     double epoch_millisecs = _decode_double(context);
     PyObject *epoch_float = PyFloat_FromDouble(epoch_millisecs / 1000);
@@ -846,95 +960,87 @@ static PyObject* decode_date(DecoderContext *context)
 }
 
 /* Deserialize a byte array. */
-static PyObject* deserialize_byte_array(DecoderContext *context)
+static PyObject* deserialize_byte_array_AMF3(Context *context)
 {
-    int header = _decode_int(context);
+    int header = _decode_int_AMF3(context);
 
     // Check for reference
-    PyObject *byte_array_value = decode_reference(context->object_refs, header);
-    if (!byte_array_value)
+    PyObject *byte_array_val = decode_reference_AMF3(context, context->obj_refs, header);
+    if (!byte_array_val)
         return NULL;
 
-    if (byte_array_value != Py_False) {
-        return byte_array_value;
+    if (byte_array_val != Py_False) {
+        return byte_array_val;
     } else {
         Py_DECREF(Py_False);
     }
 
-    byte_array_value = decode_byte_array(context, header >> 1);
-    if (!byte_array_value)
+    byte_array_val = decode_byte_array_AMF3(context, header >> 1);
+    if (!byte_array_val)
         return NULL;
     
     // Add reference
-    if (!map_next_object_idx(context->object_refs, byte_array_value)) {
-        Py_DECREF(byte_array_value);
+    if (!map_idx(context, context->obj_refs, byte_array_val)) {
+        Py_DECREF(byte_array_val);
         return NULL;
     }
 
-    return byte_array_value;
+    return byte_array_val;
 }
 
 /* Decode a byte array. */
-static PyObject* decode_byte_array(DecoderContext *context, int byte_len)
+static PyObject* decode_byte_array_AMF3(Context *context, int byte_len)
 {
-    PyObject *byte_array_value;
-    char char_value[byte_len];
-
-    memcpy(char_value, context->buf + context->pos, byte_len);
-
-    #ifdef Py_BYTEARRAYOBJECT_H
-    // ByteArray decoding is only available in 2.6+
-    byte_array_value = PyByteArray_FromStringAndSize(char_value, (Py_ssize_t)byte_len);
-    #else
-    PyObject *byte_string = PyString_FromStringAndSize(char_value, (Py_ssize_t)byte_len);
-    byte_array_value = as_byte_array_from_string(byte_string);
-    Py_DECREF(byte_string);
-    #endif
-
-    if (!byte_array_value)
+    PyObject *byte_array_val;
+    PyObject *str_val = read_py_str(context, (long)byte_len);
+    if (!str_val)
         return NULL;
 
-    context->pos += byte_len;
+    #ifdef Py_BYTEARRAYOBJECT_H
+    byte_array_val = PyByteArray_FromObject(str_val);
+    #else
+    byte_array_val = byte_array_from_string(str_val);
+    #endif
 
-    return byte_array_value;
+    return byte_array_val;
 }
 
 /* Deserialize an XML Doc. */
-static PyObject* deserialize_xml(DecoderContext *context)
+static PyObject* deserialize_xml_AMF3(Context *context)
 {
-    int header = _decode_int(context);
+    int header = _decode_int_AMF3(context);
 
     // Check for reference
-    PyObject *xml_value = decode_reference(context->object_refs, header);
-    if (!xml_value)
+    PyObject *xml_val = decode_reference_AMF3(context, context->obj_refs, header);
+    if (!xml_val)
         return NULL;
 
-    if (xml_value != Py_False) {
-        return xml_value;
+    if (xml_val != Py_False) {
+        return xml_val;
     } else {
         Py_DECREF(Py_False);
     }
 
     // No reference found
-    PyObject *unicode_value = decode_string(context, header >> 1);
-    if (!unicode_value)
+    PyObject *unicode_val = decode_string(context, header >> 1);
+    if (!unicode_val)
         return NULL;
 
-    xml_value = xml_from_string(unicode_value);
-    Py_DECREF(unicode_value);
-    if (!xml_value)
+    xml_val = xml_from_string(unicode_val);
+    Py_DECREF(unicode_val);
+    if (!xml_val)
         return NULL;
 
     // Add reference
-    if (!map_next_object_idx(context->object_refs, xml_value)) {
-        Py_DECREF(xml_value);
+    if (!map_idx(context, context->obj_refs, xml_val)) {
+        Py_DECREF(xml_val);
         return NULL;
     }
 
-    return xml_value;
+    return xml_val;
 }
 
-/* Create an XML value from a string. */
+/* Create an XML val from a string. */
 static PyObject* xml_from_string(PyObject *xml_string)
 {
     if (!xml_dom_mod) {
@@ -954,7 +1060,7 @@ static PyObject* xml_from_string(PyObject *xml_string)
 }
 
 /* Create an AsByteArray from a string. */
-static PyObject* as_byte_array_from_string(PyObject *byte_string)
+static PyObject* byte_array_from_string(PyObject *byte_string)
 {
     if (!as_types_mod) {
         // Import amfast.class_def.as_types
@@ -973,68 +1079,67 @@ static PyObject* as_byte_array_from_string(PyObject *byte_string)
 }
 
 /* Deserialize a string. */
-static PyObject* deserialize_string(DecoderContext *context)
+static PyObject* deserialize_string_AMF3(Context *context)
 {
-    int header = _decode_int(context);
+    int header = _decode_int_AMF3(context);
 
     // Check for null string
     if (header == EMPTY_STRING_TYPE) {
         PyObject *empty_string = PyString_FromStringAndSize(NULL, 0);
-        PyObject *return_value = PyUnicode_FromObject(empty_string);
+        PyObject *return_val = PyUnicode_FromObject(empty_string);
         Py_DECREF(empty_string);
-        return return_value;
+        return return_val;
     }
 
     // Check for reference
-    PyObject *unicode_value = decode_reference(context->string_refs, header);
-    if (!unicode_value)
+    PyObject *unicode_val = decode_reference_AMF3(context, context->string_refs, header);
+    if (!unicode_val)
         return NULL;
 
-    if (unicode_value != Py_False) {
-        return unicode_value;
+    if (unicode_val != Py_False) {
+        return unicode_val;
     } else {
         Py_DECREF(Py_False);
     }
 
     // No reference found
-    unicode_value = decode_string(context, header >> 1);
-    if (!unicode_value)
+    unicode_val = decode_string(context, header >> 1);
+    if (!unicode_val)
         return NULL;
 
     // Add reference
-    if (!map_next_object_idx(context->string_refs, unicode_value)) {
-        Py_DECREF(unicode_value);
+    if (!map_idx(context, context->string_refs, unicode_val)) {
+        Py_DECREF(unicode_val);
         return NULL;
     }
 
-    return unicode_value;
+    return unicode_val;
 }
 
 /* Decode a string. */
-static PyObject* decode_string(DecoderContext *context, unsigned int string_size)
+static PyObject* decode_string(Context *context, unsigned int string_size)
 {
-    PyObject *unicode_value = PyUnicode_DecodeUTF8(context->buf + context->pos, string_size, NULL);
-    if (!unicode_value)
+    const char *str = read_c_str(context, (long)string_size);
+    PyObject *unicode_val = PyUnicode_DecodeUTF8(str, (Py_ssize_t)string_size, NULL);
+    if (!unicode_val)
         return NULL;
 
-    context->pos += string_size;
-    return unicode_value;
+    return unicode_val;
 }
 
 /*
  * Checks a decoded int for the presence of a reference
  *
- * Returns PyObject if object reference was found.
- * returns PyFalse if object reference was not found.
+ * Returns PyObject if obj reference was found.
+ * returns PyFalse if obj reference was not found.
  * returns NULL if call failed.
  */
-static PyObject* decode_reference(ObjectContext *object_context, int value)
+static PyObject* decode_reference_AMF3(Context *context, PyObject *obj_context, int val)
 {
     // Check for index reference
-    if ((value & REFERENCE_BIT) == 0) {
-        int idx = value >> 1;
-
-        PyObject *ref = get_ref_from_idx(object_context, idx);
+    if ((val & REFERENCE_BIT) == 0) {
+        int idx = val >> 1;
+        PyObject *ref = ret_obj(context, obj_context, (long)idx);
         if (!ref)
             return NULL;
 
@@ -1046,103 +1151,107 @@ static PyObject* decode_reference(ObjectContext *object_context, int value)
 }
 
 /* Decode a double to a native C double. */
-static double _decode_double(DecoderContext *context)
+static double _decode_double(Context *context)
 {
+    const char *bytes = read_c_str(context, 8);
+
     // Put bytes from byte array into double
     union aligned {
-        double d_value;
-        char c_value[8];
+        double d_val;
+        char c_val[8];
     } d;
 
     if (big_endian) {
-        memcpy(d.c_value, context->buf + context->pos, 8);
+        memcpy(d.c_val, bytes, 8);
     } else {
         // Flip endianness
-        d.c_value[0] = context->buf[context->pos + 7];
-        d.c_value[1] = context->buf[context->pos + 6],
-        d.c_value[2] = context->buf[context->pos + 5],
-        d.c_value[3] = context->buf[context->pos + 4],
-        d.c_value[4] = context->buf[context->pos + 3],
-        d.c_value[5] = context->buf[context->pos + 2],
-        d.c_value[6] = context->buf[context->pos + 1],
-        d.c_value[7] = context->buf[context->pos];
+        d.c_val[0] = bytes[7];
+        d.c_val[1] = bytes[6];
+        d.c_val[2] = bytes[5];
+        d.c_val[3] = bytes[4];
+        d.c_val[4] = bytes[3];
+        d.c_val[5] = bytes[2];
+        d.c_val[6] = bytes[1];
+        d.c_val[7] = bytes[0];
     }
-    context->pos += 8;
 
-    return d.d_value;
+    return d.d_val;
 }
 
 /* Decode a native C unsigned short. */
-static unsigned short _decode_ushort(DecoderContext *context)
+static unsigned short _decode_ushort(Context *context)
 {
+    const char *bytes = read_c_str(context, 2);
+
     // Put bytes from byte array into short
     union aligned {
-        unsigned short s_value;
-        char c_value[2];
+        unsigned short s_val;
+        char c_val[2];
     } s;
 
     if (big_endian) {
-        memcpy(s.c_value, context->buf + context->pos, 2);
+        memcpy(s.c_val, bytes, 2);
     } else {
         // Flip endianness
-        s.c_value[0] = context->buf[context->pos + 1];
-        s.c_value[1] = context->buf[context->pos];
+        s.c_val[0] = bytes[1];
+        s.c_val[1] = bytes[0];
     }
-    context->pos += 2;
 
-    return s.s_value;
+    return s.s_val;
 }
 
 /* Decode a native C unsigned int. */
-static unsigned int _decode_ulong(DecoderContext *context)
+static unsigned int _decode_ulong(Context *context)
 {
+    const char *bytes = read_c_str(context, 4);
+
     // Put bytes from byte array into short
     union aligned {
-        unsigned int i_value;
-        char c_value[4];
+        unsigned int i_val;
+        char c_val[4];
     } i;
 
     if (big_endian) {
-        memcpy(i.c_value, context->buf + context->pos, 4);
+        memcpy(i.c_val, bytes, 4);
     } else {
         // Flip endianness
-        i.c_value[0] = context->buf[context->pos + 3];
-        i.c_value[1] = context->buf[context->pos + 2];
-        i.c_value[2] = context->buf[context->pos + 1];
-        i.c_value[3] = context->buf[context->pos];
+        i.c_val[0] = bytes[3];
+        i.c_val[1] = bytes[2];
+        i.c_val[2] = bytes[1];
+        i.c_val[3] = bytes[0];
     }
-    context->pos += 4;
 
-    return i.i_value;
+    return i.i_val;
 }
 
 /* Decode a double to a PyFloat. */
-static PyObject* decode_double(DecoderContext *context)
+static PyObject* decode_double(Context *context)
 {
     return PyFloat_FromDouble(_decode_double(context));
 }
 
 /* Decode an int to a native C int. */
-static int _decode_int(DecoderContext *context)
+static int _decode_int_AMF3(Context *context)
 {
     int result = 0;
     int byte_cnt = 0;
+    char byte = read_byte(context);
 
     // If 0x80 is set, int includes the next byte, up to 4 total bytes
-    while ((context->buf[context->pos] & 0x80) && (byte_cnt < 3)) {
+    while ((byte & 0x80) && (byte_cnt < 3)) {
         result <<= 7;
-        result |= context->buf[context->pos] & 0x7F;
-        context->pos++;
+        result |= byte & 0x7F;
+        byte = read_byte(context);
         byte_cnt++;
     }
 
     // shift bits in last byte
     if (byte_cnt < 3) {
         result <<= 7; // shift by 7, since the 1st bit is reserved for next byte flag
-        result |= context->buf[context->pos] & 0x7F;
+        result |= byte & 0x7F;
     } else {
         result <<= 8; // shift by 8, since no further bytes are possible and 1st bit is not used for flag.
-        result |= context->buf[context->pos] & 0xff;
+        result |= byte & 0xff;
     }
 
     // Move sign bit, since we're converting 29bit->32bit
@@ -1150,50 +1259,50 @@ static int _decode_int(DecoderContext *context)
         result -= 0x20000000;
     }
 
-    context->pos++;
     return result;
 }
 
 /* Decode an int to a PyInt. */
-static PyObject* decode_int(DecoderContext *context)
+static PyObject* decode_int_AMF3(Context *context)
 {
-    return PyInt_FromLong((long)_decode_int(context)); 
+    return PyInt_FromLong((long)_decode_int_AMF3(context)); 
 }
 
 /* Decode an AMF0 Boolean. */
-static PyObject* decode_bool_AMF0(DecoderContext *context)
+static PyObject* decode_bool_AMF0(Context *context)
 {
     PyObject *boolean;
-    if (context->buf[context->pos] == TRUE_AMF0) {
+    char byte = read_byte(context);
+
+    if (byte == TRUE_AMF0) {
         boolean = Py_True;
     } else {
         boolean = Py_False;
     }
 
     Py_INCREF(boolean);
-    context->pos++;
     return boolean;
 }
 
 /* Decode an AMF0 String. */
-static PyObject* decode_string_AMF0(DecoderContext *context)
+static PyObject* decode_string_AMF0(Context *context)
 {
    unsigned short string_size = _decode_ushort(context);
    return decode_string(context, (unsigned int)string_size); 
 }
 
 /* Decode a long AMF0 String. */
-static PyObject* decode_long_string_AMF0(DecoderContext *context)
+static PyObject* decode_long_string_AMF0(Context *context)
 {
    unsigned int string_size = _decode_ulong(context);
    return decode_string(context, string_size);
 }
 
 /* Decode an AMF0 Reference. */
-static PyObject* decode_reference_AMF0(DecoderContext *context)
+static PyObject* decode_reference_AMF0(Context *context)
 {
     unsigned short idx = _decode_ushort(context);
-    PyObject *ref = get_ref_from_idx(context->object_refs, (int)idx);
+    PyObject *ref = ret_obj(context, context->obj_refs, (long)idx);
 
     if (!ref)
         return NULL;
@@ -1203,28 +1312,28 @@ static PyObject* decode_reference_AMF0(DecoderContext *context)
 }
 
 /* Decode an AMF0 dict. */
-static PyObject* decode_dict_AMF0(DecoderContext *context)
+static PyObject* decode_dict_AMF0(Context *context)
 {
-    PyObject *obj_value = PyDict_New();
-    if (!obj_value)
+    PyObject *obj_val = PyDict_New();
+    if (!obj_val)
         return NULL;
 
-    // Add object to reference
-    if (!map_next_object_idx(context->object_refs, obj_value)) {
-        Py_DECREF(obj_value);
-        return NULL;
-    }
-
-    if (!_decode_dynamic_dict_AMF0(context, obj_value)) {
-        Py_DECREF(obj_value);
+    // Add obj to reference
+    if (!map_idx(context, context->obj_refs, obj_val)) {
+        Py_DECREF(obj_val);
         return NULL;
     }
 
-    return obj_value;
+    if (!decode_dynamic_dict_AMF0(context, obj_val)) {
+        Py_DECREF(obj_val);
+        return NULL;
+    }
+
+    return obj_val;
 }
 
 /* Decode an dynamic AMF0 dict. */
-static int _decode_dynamic_dict_AMF0(DecoderContext *context, PyObject *dict)
+static int decode_dynamic_dict_AMF0(Context *context, PyObject *dict)
 {
     while (1) {
         PyObject *key = decode_string_AMF0(context);
@@ -1236,7 +1345,7 @@ static int _decode_dynamic_dict_AMF0(DecoderContext *context, PyObject *dict)
             return 1;
         }
 
-        PyObject *val = _decode_AMF0(context);
+        PyObject *val = decode_AMF0(context);
         if (!val) {
             Py_DECREF(key);
             return 0;
@@ -1258,18 +1367,18 @@ static int _decode_dynamic_dict_AMF0(DecoderContext *context, PyObject *dict)
  * of a NetConnection message, map_reference should be 0.
  *
  */
-static PyObject* decode_array_AMF0(DecoderContext *context, int map_reference)
+static PyObject* decode_array_AMF0(Context *context, short map_reference)
 {
-    int array_len = _decode_ulong(context);
+    unsigned int array_len = _decode_ulong(context);
 
-    PyObject *list_value = PyList_New(array_len);
-    if (!list_value)
+    PyObject *list_val = PyList_New(array_len);
+    if (!list_val)
         return NULL;
 
     if (map_reference) {
         // Reference must be added before children (to allow for recursion).
-        if (!map_next_object_idx(context->object_refs, list_value)) {
-            Py_DECREF(list_value);
+        if (!map_idx(context, context->obj_refs, list_val)) {
+            Py_DECREF(list_val);
             return NULL;
         }
     }
@@ -1277,35 +1386,35 @@ static PyObject* decode_array_AMF0(DecoderContext *context, int map_reference)
     // Add each item to the list
     int i;
     for (i = 0; i < array_len; i++) {
-        PyObject *value = _decode_AMF0(context);
-        if (!value) {
-            Py_DECREF(list_value);
+        PyObject *val = decode_AMF0(context);
+        if (!val) {
+            Py_DECREF(list_val);
             return NULL;
         }
-        PyList_SET_ITEM(list_value, i, value);
+        PyList_SET_ITEM(list_val, i, val);
     }
 
-    return list_value;
+    return list_val;
 }
 
 /* Decode an AMF0 Date. */
-static PyObject* decode_date_AMF0(DecoderContext *context)
+static PyObject* decode_date_AMF0(Context *context)
 {
-    // TODO: use timezone value to adjust datetime
-    PyObject *date_value = decode_date(context);
-    int tz = _decode_ushort(context); // timezone value.
+    // TODO: use timezone val to adjust datetime
+    PyObject *date_val = decode_date(context);
+    int tz = _decode_ushort(context); // timezone val.
 
     // Add date to reference count
-    if (!map_next_object_idx(context->object_refs, date_value)) {
-        Py_DECREF(date_value);
+    if (!map_idx(context, context->obj_refs, date_val)) {
+        Py_DECREF(date_val);
         return NULL;
     }
 
-    return date_value;
+    return date_val;
 }
 
 /* Decode an AMF0 XML-Doc. */
-static PyObject* decode_xml_AMF0(DecoderContext *context)
+static PyObject* decode_xml_AMF0(Context *context)
 {
     PyObject *xml_string = decode_long_string_AMF0(context);
     if (!xml_string)
@@ -1318,8 +1427,8 @@ static PyObject* decode_xml_AMF0(DecoderContext *context)
     return xml_obj;
 }
 
-/* Decode AMF0 typed object. */
-static PyObject* decode_typed_object_AMF0(DecoderContext *context)
+/* Decode AMF0 typed obj. */
+static PyObject* decode_typed_obj_AMF0(Context *context)
 {
     PyObject *alias = decode_string_AMF0(context);
     if (!alias)
@@ -1330,22 +1439,22 @@ static PyObject* decode_typed_object_AMF0(DecoderContext *context)
     if (!class_def)
         return NULL;
 
-    // Anonymous object.
+    // Anonymous obj.
     if (class_def == Py_None) {
         Py_DECREF(class_def);
         return decode_dict_AMF0(context);
     }
 
-    PyObject *obj_value = PyObject_CallMethod(class_def, "getInstance", NULL);
-    if (!obj_value) {
+    PyObject *obj_val = PyObject_CallMethod(class_def, "getInstance", NULL);
+    if (!obj_val) {
         Py_DECREF(class_def);
         return NULL;
     }
 
     // Reference must be added before children (to allow for recursion).
-    if (!map_next_object_idx(context->object_refs, obj_value)) {
+    if (!map_idx(context, context->obj_refs, obj_val)) {
         Py_DECREF(class_def);
-        Py_DECREF(obj_value);
+        Py_DECREF(obj_val);
         return NULL;
     }
 
@@ -1353,43 +1462,32 @@ static PyObject* decode_typed_object_AMF0(DecoderContext *context)
     PyObject *decoded_attrs = PyDict_New();
     if (!decoded_attrs) {
         Py_DECREF(class_def);
-        Py_DECREF(obj_value);
+        Py_DECREF(obj_val);
         return NULL;
     }
 
-    if (!_decode_dynamic_dict_AMF0(context, decoded_attrs)) {
+    if (!decode_dynamic_dict_AMF0(context, decoded_attrs)) {
         Py_DECREF(class_def);
-        Py_DECREF(obj_value);
+        Py_DECREF(obj_val);
         Py_DECREF(decoded_attrs);
         return NULL;
     }
 
-    // apply attributes
-    if (!context->apply_attr_vals_method_name) {
-        context->apply_attr_vals_method_name = PyString_FromString("applyAttrVals");
-        if (!context->apply_attr_vals_method_name) {
-            Py_DECREF(class_def);
-            Py_DECREF(obj_value);
-            Py_DECREF(decoded_attrs);
-            return NULL;
-        }
-    }
-
-    PyObject *return_value = PyObject_CallMethodObjArgs(class_def, context->apply_attr_vals_method_name, obj_value, decoded_attrs, NULL);
+    PyObject *return_val = PyObject_CallMethodObjArgs(class_def, context->apply_name, obj_val, decoded_attrs, NULL);
     Py_DECREF(class_def);
     Py_DECREF(decoded_attrs);
 
-    if (!return_value) {
-        Py_DECREF(obj_value);
+    if (!return_val) {
+        Py_DECREF(obj_val);
         return NULL;
     }
 
-    Py_DECREF(return_value); // should be Py_None
-    return obj_value;
+    Py_DECREF(return_val); // should be Py_None
+    return obj_val;
 }
 
 /* Decode an AMF0 NetConnection packet. */
-static PyObject* _decode_packet(DecoderContext *context)
+static PyObject* decode_packet(Context *context)
 {
     if (!remoting_mod) {
         remoting_mod = PyImport_ImportModule("amfast.remoting");
@@ -1445,7 +1543,7 @@ static PyObject* _decode_packet(DecoderContext *context)
 }
 
 /* Decode AMF0 packet headers. */
-static PyObject* decode_headers_AMF0(DecoderContext *context)
+static PyObject* decode_headers_AMF0(Context *context)
 {
     unsigned short header_count = _decode_ushort(context);
     PyObject *header_list = PyList_New(header_count);
@@ -1467,10 +1565,10 @@ static PyObject* decode_headers_AMF0(DecoderContext *context)
             return NULL;
         }
 
-        int byte_len = _decode_ulong(context); // Byte length of header.
+        unsigned int byte_len = _decode_ulong(context); // Byte length of header.
 
         // We need a new context for each header
-        DecoderContext *new_context = _copy_decoder_context(context, 0);
+        Context *new_context = copy_context(context, 0);
         if (!new_context) {
             Py_DECREF(header_list);
             Py_DECREF(header_name);
@@ -1478,10 +1576,9 @@ static PyObject* decode_headers_AMF0(DecoderContext *context)
             return NULL;
         }
 
-        PyObject *header_obj = _decode_AMF0(new_context);
-        context->pos = new_context->pos;
+        PyObject *header_obj = decode_AMF0(new_context);
 
-        if (!_destroy_decoder_context(new_context)) {
+        if (!destroy_context(new_context)) {
             Py_DECREF(header_list);
             Py_DECREF(header_name);
             Py_DECREF(required);
@@ -1496,7 +1593,7 @@ static PyObject* decode_headers_AMF0(DecoderContext *context)
             return NULL;
         }
 
-        // Create header object
+        // Create header obj
         PyObject *header_class = PyObject_GetAttrString(remoting_mod, "Header");
         if (!header_class) {
             Py_DECREF(header_list);
@@ -1523,7 +1620,7 @@ static PyObject* decode_headers_AMF0(DecoderContext *context)
 }
 
 /* Decode AMF0 packet messages. */
-static PyObject* decode_messages_AMF0(DecoderContext *context)
+static PyObject* decode_messages_AMF0(Context *context)
 {
     unsigned short message_count = _decode_ushort(context);
     PyObject *message_list = PyList_New(message_count);
@@ -1545,10 +1642,10 @@ static PyObject* decode_messages_AMF0(DecoderContext *context)
             return NULL;
         }
 
-        int byte_len = _decode_ulong(context); // Message byte length
+        unsigned int byte_len = _decode_ulong(context); // Message byte length
 
         // We need a new context for each message
-        DecoderContext *new_context = _copy_decoder_context(context, 0);
+        Context *new_context = copy_context(context, 0);
         if (!new_context) {
             Py_DECREF(message_list);
             Py_DECREF(target);
@@ -1557,18 +1654,17 @@ static PyObject* decode_messages_AMF0(DecoderContext *context)
         }
 
         PyObject *message_obj;
-        if (PyUnicode_GET_SIZE(response) > 0 && new_context->buf[new_context->pos] == ARRAY_AMF0) {
+        if (PyUnicode_GET_SIZE(response) > 0) {
             // If this is a list of arguments for a RPC,
             // then the list of arguments should not be
             // added to the reference count!
-            new_context->pos++;
+            PyObject *str = read_py_str(new_context, 1); // Skip array marker
             message_obj = decode_array_AMF0(new_context, 0);
         } else {
-            message_obj = _decode_AMF0(new_context);
+            message_obj = decode_AMF0(new_context);
         }
 
-        context->pos = new_context->pos;
-        if (!_destroy_decoder_context(new_context)) {
+        if (!destroy_context(new_context)) {
             Py_DECREF(message_list);
             Py_DECREF(target);
             Py_DECREF(response);
@@ -1583,7 +1679,7 @@ static PyObject* decode_messages_AMF0(DecoderContext *context)
             return NULL;
         }
 
-        // Create message object
+        // Create message obj
         PyObject *message_class = PyObject_GetAttrString(remoting_mod, "Message");
         if (!message_class) {
             Py_DECREF(message_list);
@@ -1610,213 +1706,138 @@ static PyObject* decode_messages_AMF0(DecoderContext *context)
     return message_list;
 }
 
-/* Decode individual AMF0 objects from buffer. */
-static PyObject* _decode_AMF0(DecoderContext *context)
+/* Decode individual AMF0 objs from buffer. */
+static PyObject* decode_AMF0(Context *context)
 {
-    if (context->pos > context->buf_len) {
-        PyErr_SetString(amfast_DecodeError, "Parsed past end of buffer.");
-        return NULL;
-    }
-
-    char byte = context->buf[context->pos];
+    const char byte = read_byte(context);
 
     if (byte == AMF3_AMF0) {
         // AMF3 item requires new reference counts.
-        DecoderContext *new_context = _copy_decoder_context(context, 1);
-        new_context->pos++;
-        PyObject *return_value = _decode(new_context);
-        context->pos = new_context->pos;
-        _destroy_decoder_context(new_context);
-        return return_value;
+        Context *new_context = copy_context(context, 1);
+        PyObject *return_val = decode_AMF3(new_context);
+        if (!destroy_context(new_context)) {
+            return_val = NULL;
+        }
+        return return_val;
     } else if (byte == NUMBER_AMF0) {
-        context->pos++;
         return decode_double(context);
     } else if (byte == BOOL_AMF0) {
-        context->pos++;
         return decode_bool_AMF0(context);
     } else if (byte == STRING_AMF0) {
-        context->pos++;
         return decode_string_AMF0(context);
     } else if (byte == NULL_AMF0) {
-        context->pos++;
         Py_RETURN_NONE;
     } else if (byte == UNDEFINED_AMF0) {
-        context->pos++;
         Py_RETURN_NONE;
     } else if (byte == REF_AMF0) {
-        context->pos++;
         return decode_reference_AMF0(context);
     } else if (byte == OBJECT_AMF0) {
-        context->pos++;
         return decode_dict_AMF0(context);
     } else if (byte == MIXED_ARRAY_AMF0) {
-        context->pos++;
-        context->pos += 4; // skip encoded max index
+        char *str = read_py_string(context, 4);// skip encoded max index
         return decode_dict_AMF0(context);
     } else if (byte == ARRAY_AMF0) {
-        context->pos++;
         return decode_array_AMF0(context, 1);
     } else if (byte == LONG_STRING_AMF0) {
-        context->pos++;
         return decode_long_string_AMF0(context);
     } else if (byte == DATE_AMF0) {
-        context->pos++;
         return decode_date_AMF0(context);
     } else if (byte == XML_DOC_AMF0) {
-        context->pos++;
         return decode_xml_AMF0(context);
     } else if (byte == TYPED_OBJ_AMF0) {
-        context->pos++;
-        return decode_typed_object_AMF0(context);
+        return decode_typed_obj_AMF0(context);
     }
 
     char error_str[100];
-    sprintf(error_str, "Unknown AMF0 type marker byte: '%X' at position: %d", byte, context->pos);
+    sprintf(error_str, "Unknown AMF0 type marker byte: '%X' at position: %d", byte, tell(context) - 1);
     PyErr_SetString(amfast_DecodeError, error_str);
     return NULL;
 }
 
-/* Decode individual AMF3 objects from buffer. */
-static PyObject* _decode(DecoderContext *context)
+/* Decode individual AMF3 objs from buffer. */
+static PyObject* decode_AMF3(Context *context)
 {
-    if (context->pos > context->buf_len) {
-        PyErr_SetString(amfast_DecodeError, "Parsed past end of buffer.");
-        return NULL;
-    }
-
-    char byte = context->buf[context->pos];
+    const char byte = read_byte(context);
 
     if (byte == UNDEFINED_TYPE) {
-        context->pos++;
         Py_RETURN_NONE;
     } else if (byte == NULL_TYPE) {
-        context->pos++;
         Py_RETURN_NONE;
     } else if (byte == FALSE_TYPE) {
-        context->pos++;
         Py_RETURN_FALSE;
     } else if (byte == TRUE_TYPE) {
-        context->pos++;
         Py_RETURN_TRUE;
     } else if (byte == INT_TYPE) {
-        context->pos++;
-        return decode_int(context);
+        return decode_int_AMF3(context);
     } else if (byte == STRING_TYPE) {
-        context->pos++;
-        return deserialize_string(context);
+        return deserialize_string_AMF3(context);
     } else if (byte == DOUBLE_TYPE) {
-        context->pos++;
         return decode_double(context);
     } else if (byte == ARRAY_TYPE) {
-        context->pos++;
-        return deserialize_array(context, 0);
+        return deserialize_array_AMF3(context, 0);
     } else if (byte == OBJECT_TYPE) {
-        context->pos++;
-        return deserialize_object(context, 0);
+        return deserialize_obj_AMF3(context, 0);
     } else if (byte == BYTE_ARRAY_TYPE) {
-        context->pos++;
-        return deserialize_byte_array(context);
+        return deserialize_byte_array_AMF3(context);
     } else if ((byte == XML_TYPE) || (byte == XML_DOC_TYPE)) {
-        context->pos++;
-        return deserialize_xml(context);
+        return deserialize_xml_AMF3(context);
     } else if (byte == DATE_TYPE) {
-        context->pos++;
         return deserialize_date(context);
     }
 
     char error_str[100];
-    sprintf(error_str, "Unknown AMF3 type marker byte: '%X' at position: %d", byte, context->pos);
+    sprintf(error_str, "Unknown AMF3 type marker byte: '%X' at position: %d", byte, tell(context) - 1);
     PyErr_SetString(amfast_DecodeError, error_str);
     return NULL;
 }
 
-/* Decode an AMF buffer to Python object. */
+// ---- Python EXPOSED FUNCTIONS
+
+/* Decode an AMF stream to a Python obj. */
 static PyObject* decode(PyObject *self, PyObject *args, PyObject *kwargs)
 {
-    PyObject *value;
-    PyObject *class_def_mapper = Py_None;
-    Py_INCREF(class_def_mapper);
-    int packet = 0;
-    int amf3 = 0;
+    PyObject *decoder_context;
 
-    static char *kwlist[] = {"value", "packet", "amf3", "class_def_mapper", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|iiO", kwlist,
-        &value, &packet, &amf3, &class_def_mapper))
+    if (!PyArg_ParseTuple(args, "O", kwlist, &decoder_context))
         return NULL;
 
-    DecoderContext *context = _create_decoder_context(amf3);
-    if (!context) {
-        Py_DECREF(class_def_mapper);
+    Context *context = create_context(decoder_context);
+    if (!context)
         return NULL;
-    }
 
-    context->buf_len = (int)PyString_GET_SIZE(value);
-    context->buf = PyString_AsString(value);
-    if (!context->buf) {
-        Py_DECREF(class_def_mapper);
-        _destroy_decoder_context(context);
+    PyObject *amf3 = PyObject_GetAttrString(context->decoder_context, "amf3");
+    if (!amf3)
         return NULL;
-    }
 
-    // Set defaults
-    if (class_def_mapper != Py_None) {
-        // Use user supplied ClassDefMapper.
-        context->class_def_mapper = class_def_mapper;
-        Py_INCREF(context->class_def_mapper);
-        Py_DECREF(Py_None);
+    PyObject *result;
+    if (amf3 == Py_True) {
+        result = decode_AMF3(context);
     } else {
-        // Create anonymous ClassDefMapper
-        Py_DECREF(Py_None);
-        if (!class_def_mod) {
-            class_def_mod = PyImport_ImportModule("amfast.class_def");
-            if(!class_def_mod) {
-                _destroy_decoder_context(context);
-                return NULL;
-            }
-        }
-
-        PyObject *class_def = PyObject_GetAttrString(class_def_mod, "ClassDefMapper");
-        if (!class_def) {
-            _destroy_decoder_context(context);
-            return NULL;
-        }
-
-        context->class_def_mapper = PyObject_CallFunctionObjArgs(class_def, NULL);
-        Py_DECREF(class_def);
-        if (!context->class_def_mapper) {
-            _destroy_decoder_context(context);
-            return NULL;
-        }
+        result = decode_AMF0(context);
     }
+    Py_DECREF(amf3);
 
-    PyObject *return_value;
-    if (packet) {
-        return_value = _decode_packet(context);
-    } else if (amf3) {
-        return_value = _decode(context);
-    } else {
-        return_value = _decode_AMF0(context);
-    }
-
-    _destroy_decoder_context(context);
-    return return_value;
+    destroy_context(result);
+    return result;
 }
+
+// ---- Module init
 
 /* Expose functions as Python module functions. */
 static PyMethodDef decoder_methods[] = {
     {"decode", (PyCFunction)decode, METH_VARARGS | METH_KEYWORDS,
     "Description:\n"
     "=============\n"
-    "Decode an AMF stream to Python objects.\n\n"
+    "Decode an AMF stream to Python objs.\n\n"
     "Useage:\n"
     "===========\n"
-    "py_obj = decode(value, **kwargs)\n\n"
+    "py_obj = decode(val, **kwargs)\n\n"
     "Optional keyword arguments:\n"
     "============================\n"
     " * packet - bool - True to decode as an AMF NetConnection packet (decode a remoting call). - Default = False\n"
     " * amf3 - bool - True to decode as AMF3 format. - Default = False\n"
-    " * class_def_mapper - ClassDefMapper - object that retrieves ClassDef objects used for customizing \n"
-    "    de-serialization of objects - Default = None (all objects are anonymous)\n"},
+    " * class_mapper - ClassDefMapper - obj that retrieves ClassDef objs used for customizing \n"
+    "    de-serialization of objs - Default = None (all objs are anonymous)\n"},
     {NULL, NULL, 0, NULL}   /* sentinel */
 };
 
