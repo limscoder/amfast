@@ -2,19 +2,78 @@
 <mx:Application xmlns:mx="http://www.adobe.com/2006/mxml">
 	<mx:Panel width="100%" height="100%"
 		title="Flex -- AmFast -- SQLAlchemy Address Book Example">
-		<mx:Form>
-			<mx:FormItem label="server:">
-				<mx:TextInput
-					id="server"
-					text="localhost" />
-			</mx:FormItem>
+		<mx:HBox width="100%">
+			<mx:Form>
+				<mx:FormItem label="remoting url:">
+					<mx:TextInput
+						id="remotingUrl"
+						text="http://localhost:8000/amf"
+						width="300"/>
+				</mx:FormItem>
+				
+				<mx:FormItem label="messaging url:">
+					<mx:TextInput
+						id="messagingUrl"
+						text="http://localhost:8000/amfPolling"
+						width="300"/>
+				</mx:FormItem>
+				
+				<mx:FormItem label="server time:"
+					width="100%"
+					toolTip="Server time is pushed from the server. Click 'Subscribe' to start receiving messages.">
+					<mx:Label id="serverTime"
+						width="200"/>
+				</mx:FormItem>
+			</mx:Form>
 			
-			<mx:FormItem label="port:">
-				<mx:TextInput
-					id="port"
-					text="8000" />
-			</mx:FormItem>
-		</mx:Form>
+			<mx:VRule />
+			
+			<mx:Form>
+				<mx:FormItem>
+					<mx:Label text="Messaging" />
+				</mx:FormItem>
+				
+				<mx:FormItem width="100%">
+					<mx:Button
+						label="Subscribe"
+						click="subscribeServerTime()"
+						toolTip="Subscribe server time messages."
+						width="100%"/>
+				</mx:FormItem>
+				
+				<mx:FormItem width="100%">
+					<mx:Button
+						label="UnSubscribe"
+						click="unSubscribeServerTime()"
+						toolTip="UnSubscribe server time messages."
+						width="100%"/>
+				</mx:FormItem>
+			</mx:Form>
+			
+			<mx:VRule />
+			
+			<mx:Form>
+				<mx:FormItem>
+					<mx:Label text="Tests" />
+				</mx:FormItem>
+				
+				<mx:FormItem width="100%">
+					<mx:Button
+						label="Raise Exception"
+						click="raiseException()"
+						toolTip="Raise an exception on the server side."
+						width="100%"/>
+				</mx:FormItem>
+				
+				<mx:FormItem width="100%">
+					<mx:Button
+						label="Red5 Echo Test"
+						click="launchEchoTest()"
+						toolTip="Launch Red5's echo test .swf."
+						width="100%"/>
+				</mx:FormItem>
+			</mx:Form>
+		</mx:HBox>
 		
 		<mx:DataGrid
 			id="userGrid"
@@ -49,22 +108,25 @@
 				label="Remove"
 				click="removeUser()"
 				toolTip="Remove selected users." />
-			<mx:Button
-				label="Raise Exception"
-				click="raiseException()"
-				toolTip="Raise an exception on the server side." />
-			
 		</mx:HBox>
 	</mx:Panel>
 	
 	<mx:Script>
 		<![CDATA[
-			import flash.net.registerClassAlias;
+			import mx.messaging.messages.ErrorMessage;
+			import flash.net.*;
+		
+			import mx.messaging.messages.AcknowledgeMessage;
+			import mx.messaging.Consumer;
 		
 			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
 			import mx.managers.PopUpManager;
+			import mx.messaging.Consumer;
 			import mx.messaging.ChannelSet;
 			import mx.messaging.channels.AMFChannel;
+			import mx.messaging.events.MessageAckEvent;
+			import mx.messaging.events.MessageFaultEvent;
 			import mx.rpc.remoting.mxml.RemoteObject;
 			import mx.rpc.AbstractOperation;
 			import mx.rpc.events.*;
@@ -74,6 +136,8 @@
 
 			protected var service:RemoteObject;
 			protected var serviceUrl:String;
+			protected var consumers:Object;
+			protected var consumerUrl:String;
 		
 			[Bindable]
 			protected var users:ArrayCollection;
@@ -83,16 +147,14 @@
 			 */
 			public function getService():RemoteObject
 			{
-				var url:String = 'http://' + server.text +
-					':' + port.text + '/amfGateway';
-				if (url == serviceUrl && service != null) {
+				if (remotingUrl.text == serviceUrl && service != null) {
 					// Use existing service
 					return service;
 				}
 				
 				// Create the AMF Channel
-				serviceUrl = url;
-				var channel:AMFChannel = new AMFChannel("amfast-channel", serviceUrl);
+				serviceUrl = remotingUrl.text;
+				var channel:AMFChannel = new AMFChannel("amf-channel", serviceUrl);
 
 				// Create a channel set and add your channel(s) to it
 				var channels:ChannelSet = new ChannelSet();
@@ -104,7 +166,90 @@
 				remoteObject.channelSet = channels;
 				return remoteObject;
 			}
+			
+			/**
+			 * Create a message Consumer with url from user input.
+			 */
+			public function getConsumer(destination:String):Consumer
+			{
+				if (consumers == null) {
+					consumers = {};
+				}
+				
+				if (messagingUrl.text == consumerUrl &&
+					consumers.hasOwnProperty(destination)) {
+					// Use existing consumer
+					return consumers[destination];
+				}
+				
+				var consumer:Consumer = new Consumer();
+				consumer.destination = destination;
+				consumers[destination] = consumer;
+				
+				// Create the AMF Channel
+				consumerUrl = messagingUrl.text;
+				var channel:AMFChannel = new AMFChannel("amf-polling-channel", consumerUrl);
 
+				// Create a channel set and add your channel(s) to it
+				var channels:ChannelSet = new ChannelSet();
+				channels.addChannel(channel);
+				
+				consumer.channelSet = channels;
+				consumer.resubscribeInterval = 1;
+				consumer.addEventListener(MessageAckEvent.ACKNOWLEDGE,
+					acknowledgeHandler, false, 0 , true);
+				consumer.addEventListener(MessageFaultEvent.FAULT,
+					faultHandler, false, 0, true);
+					
+				return consumer;
+			}
+			
+			protected function subscribeServerTime():void
+			{
+				var consumer:Consumer = getConsumer('serverTime');
+				consumer.subscribe();
+			}
+			
+			protected function unSubscribeServerTime():void
+			{
+				var consumer:Consumer = getConsumer('serverTime');
+				if (consumer.subscribed) {
+					consumer.unsubscribe();
+				}
+			}
+			
+			/**
+			 * Handle an incoming message.
+			 */
+			protected function acknowledgeHandler(event:MessageAckEvent):void
+			{
+				if (!(event.message.body is Date)) {
+					return;
+				}
+				
+				serverTime.text = event.message.body.toUTCString();
+			}
+			
+			/**
+			 * Handle a failed message.
+			 */ 
+			protected function faultHandler(event:MessageFaultEvent):void
+			{
+				Alert.show(event.faultString, 'Message Fault',
+					Alert.OK, this, null, null);
+			}
+			
+			/**
+			 * Launch the echo test .swf from 
+			 * The Red5 project - http://code.google.com/p/red5/
+			 */
+			protected function launchEchoTest():void
+			{
+				var request:URLRequest = new URLRequest('red5Test.html');
+				flash.net.navigateToURL(request, "_blank");
+				return;	
+			}
+				 
 			/**
 			 * Insert default data
 			 */
@@ -112,8 +257,8 @@
 			{
 				var remoteObj:RemoteObject = getService();
 				var operation:AbstractOperation = remoteObj.getOperation('insertDefaultData');
-                operation.addEventListener(ResultEvent.RESULT, insertDefaultData_resultHandler);
-                operation.send();
+				operation.addEventListener(ResultEvent.RESULT, insertDefaultData_resultHandler);
+				operation.send();
 			}
 			
 			protected function insertDefaultData_resultHandler(event:Event):void
@@ -129,7 +274,7 @@
 			{
 				var remoteObj:RemoteObject = getService();
 				var operation:AbstractOperation = remoteObj.getOperation('raiseException');
-                operation.send();
+				operation.send();
 			}
 			
 			/**
@@ -139,8 +284,8 @@
 			{
 				var remoteObj:RemoteObject = getService();
 				var operation:AbstractOperation = remoteObj.getOperation('loadAll');
-                operation.addEventListener(ResultEvent.RESULT, loadAll_resultHandler);
-                operation.send(SAObject.getRemoteAlias(models.User));
+				operation.addEventListener(ResultEvent.RESULT, loadAll_resultHandler);
+				operation.send(SAObject.getRemoteAlias(models.User));
 			}
 			
 			protected function loadAll_resultHandler(event:Event):void
@@ -181,9 +326,9 @@
 				
 				var remoteObj:RemoteObject = getService();
 				var operation:AbstractOperation = remoteObj.getOperation('removeList');
-                operation.addEventListener(ResultEvent.RESULT, remove_resultHandler);
-                
-                operation.send(SAObject.getRemoteAlias(models.User), removeKeys);
+				operation.addEventListener(ResultEvent.RESULT, remove_resultHandler);
+				
+				operation.send(SAObject.getRemoteAlias(models.User), removeKeys);
 			}
 			
 			protected function remove_resultHandler(event:Event):void
