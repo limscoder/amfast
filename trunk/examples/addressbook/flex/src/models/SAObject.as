@@ -10,9 +10,9 @@ package models
 	import mx.rpc.remoting.RemoteObject;
 	import mx.utils.ObjectUtil;
 		
-   /**
-	* A base-class for classes mapped with SQLAlchemy on the server side.
-	*/
+	/**
+	 * A base-class for classes mapped with SQLAlchemy on the server side.
+	 */
 	public class SAObject
 	{
 		protected const LOAD_ERROR_MSG:String = 'Cannot load attribute of un-persisted object.';
@@ -45,20 +45,20 @@ package models
 		public var sa_loading:ArrayCollection = new ArrayCollection();
 
 		/**
-         * Returns true if object is persistent.
-         */
+		 * Returns true if object is persistent.
+		 */
 		public function isPersistent():Boolean
 		{
 			if (sa_key == null || sa_key.length < 1) {
 				return false;
 			}
-			        
+			
 			for each(var item:Object in sa_key) {
 				if (item == null) {
-			    	return false;
+					return false;
 				}
 			}
-			        
+			
 			return true;
 		}
 		
@@ -180,14 +180,14 @@ package models
 		protected function loadAttr_resultHandler(event:Event):void
 		{
 			event.target.removeEventListener(ResultEvent.RESULT, loadAttr_resultHandler);
-						
+			
 			var attr:String = AbstractEvent(event).token.message.body[2];
 			setAttr(attr, ResultEvent(event).result);
 			unSetAttrLoading(attr);
 		}
 				
 		/**
-		  * Save a single persistent attribute.
+		 * Save a single persistent attribute.
 		 */
 		public function saveAttr(attr:String):void
 		{
@@ -198,7 +198,7 @@ package models
 			var remoteObj:RemoteObject = Application.application.getService();
 			remoteObj.saveAttr(sa_key, attr, this[attr]);
 		}
-				
+			
 		/**
 		 * Persist the entire object.
 		 */
@@ -219,7 +219,7 @@ package models
 
 			var remoteObj:RemoteObject = Application.application.getService();
 			var operation:AbstractOperation = remoteObj.getOperation('remove');
-            operation.send(getRemoteAlias(this), sa_key);
+			operation.send(getRemoteAlias(this), sa_key);
 		}
 	}
 }
