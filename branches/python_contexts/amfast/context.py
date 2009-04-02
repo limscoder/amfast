@@ -97,9 +97,12 @@ class DecoderContext(object):
             self.string_context = IdxContext()
             self.class_context = IdxContext()
 
-    def copy(self, amf3=None):
+    def copy(self, file_obj=None, amf3=None):
         """Resets object contexts, but uses the original file object."""
+        if file_obj is None:
+            file_obj = self.file_obj
+
         if amf3 is None:
             amf3 = self.amf3
 
-        return self.__class__(self.file_obj, self.class_def_mapper, amf3=amf3)
+        return self.__class__(file_obj, self.class_def_mapper, amf3=amf3)

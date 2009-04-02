@@ -1,6 +1,15 @@
 /* Things used by both the encoder and the decoder. */
 #include <Python.h>
 
+// Python date handling API
+#ifndef DATETIME_H
+#include <datetime.h>
+#endif
+
+// Use to test for endianness at run time.
+const int endian_test = 1;
+#define is_bigendian() ((*(char*)&endian_test) == 0)
+
 // ---- AMF3
 
 // Valid AMF3 integer range
@@ -16,6 +25,9 @@
 // Object Headers
 #define STATIC 0x03
 #define DYNAMIC 0x0B
+#define EXTERNALIZABLE 0x07
+
+// TODO: GET rid of this
 #define EXTERNIZEABLE 0x07
 
 // Type markers

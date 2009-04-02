@@ -2,15 +2,7 @@
 #include <string.h>
 #include <time.h>
 
-#ifndef DATETIME_H
-#include <datetime.h>
-#endif
-
 #include "amf_common.h"
-
-// Use to test for endianness at run time.
-const int endian_test = 1;
-#define is_bigendian() ((*(char*)&endian_test) == 0)
 
 // ------------------------ DECLARATIONS --------------------------------- //
 
