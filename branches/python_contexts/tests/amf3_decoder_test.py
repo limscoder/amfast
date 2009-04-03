@@ -126,14 +126,13 @@ class Amf3DecoderTestCase(unittest.TestCase):
         self.assertEquals('eggs', result['spam']);
 
     def testObjectProxy(self):
-        return
         encoded = '\x0A\x07\x3Bflex.messaging.io.ObjectProxy' # Object header 
         encoded += '\x0A\x0B\x01' # Object header
         encoded += '\x09spam' # key
         encoded += '\x06\x09eggs' #value
         encoded += '\x01' # empty string terminator
 
-        result = decoder.decode(encoded, amf3=True)
+        result = decoder.decode(DecoderContext(encoded, amf3=True))
         self.assertEquals('eggs', result['spam']);
 
     def testDictRef(self):
@@ -146,7 +145,6 @@ class Amf3DecoderTestCase(unittest.TestCase):
         self.assertEquals(result[0], result[1])
 
     def testArrayCollection(self):
-        return
         encoded = '\x0A\x07\x43flex.messaging.io.ArrayCollection' # Object header 
         encoded += '\x09\x09\x01' #array header
         encoded += '\x04\x00' #array element 1
@@ -154,17 +152,16 @@ class Amf3DecoderTestCase(unittest.TestCase):
         encoded += '\x04\x02' #array element 3
         encoded += '\x04\x03' #array element 4
 
-        result = decoder.decode(encoded, amf3=True)
+        result = decoder.decode(DecoderContext(encoded, amf3=True))
         for i in range(4):
             self.assertEquals(i, result[i])
 
     def testArrayCollectionRef(self):
-        return
         encoded = '\x0A\x07\x43flex.messaging.io.ArrayCollection\x09\x05\x01' # array header
         encoded += '\x0A\x01\x09\x09\x01\x04\x00\x04\x01\x04\x02\x04\x03' # array element 1 (test_tuple encoded)
         encoded += '\x0A\x04' # array element 2 (reference to test_tuple)
 
-        result = decoder.decode(encoded, amf3=True)
+        result = decoder.decode(DecoderContext(encoded, amf3=True))
         self.assertEquals([].__class__, result.__class__)
         self.assertEquals(result[0], result[1])
         for i in range(4):

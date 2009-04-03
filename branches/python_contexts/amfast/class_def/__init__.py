@@ -132,7 +132,6 @@ class ExternClassDef(ClassDef):
         """
         raise ClassDefError("This method must be implemented by a sub-class.")
 
-# TODO: Remove this
 class _ProxyClassDef(ExternClassDef):
     """A special class used internally to encode/decode Proxied objects."""
 
@@ -147,27 +146,14 @@ class _ProxyClassDef(ExternClassDef):
         ExternClassDef.__init__(self, self._ProxyObject, self.PROXY_ALIAS,
             None, _built_in=True)
 
-class _ArrayCollectionClassDef(ExternClassDef):
+class _ArrayCollectionClassDef(_ProxyClassDef):
     """A special ClassDef used internally to encode/decode an ArrayCollection."""
 
-    PROXY_CLASS_DEF = True #TODO: remove
-    ARRAY_COLLECTION_CLASS_DEF = True #TODO: remove
-    PROXY_ALIAS = 'flex.messaging.io.ArrayCollection' # TODO: remove
-
-    class _ProxyObject(object):
-        """Empty class used for mapping."""
-        pass
+    ARRAY_COLLECTION_CLASS_DEF = True
+    PROXY_ALIAS = 'flex.messaging.io.ArrayCollection'
 
     def __init__(self):
-        ExternClassDef.__init__(self, self._ProxyObject,
-            'flex.messaging.io.ArrayCollection',
-            None, _built_in=True)
-
-    def getInstance(self):
-        return []
-
-    def readExternal(self, obj, context):
-        pass
+        _ProxyClassDef.__init__(self)
 
 class _ObjectProxyClassDef(_ProxyClassDef):
     """A special ClassDef used internally to encode/decode an ObjectProxy."""
@@ -177,6 +163,8 @@ class _ObjectProxyClassDef(_ProxyClassDef):
 
     def __init__(self):
         _ProxyClassDef.__init__(self)
+
+
 
 class ClassDefMapper(object):
     """Map classes to ClassDefs, retrieve class_defs by class or alias name."""

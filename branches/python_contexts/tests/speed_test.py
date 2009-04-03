@@ -62,8 +62,8 @@ class SpeedTestCase(unittest.TestCase):
 
     def speedTestComplexDict(self, amf3=False):
         complex = {'element': 'ignore', 'objects': self.buildComplex()}
-        encoded = encoder.encode(complex, use_array_collections=False,
-            use_object_proxies=False, class_def_mapper=self.class_mapper,
+        encoded = encoder.encode(complex, use_array_collections=True,
+            use_object_proxies=True, class_def_mapper=self.class_mapper,
             amf3=amf3)
         decoded = decoder.decode(DecoderContext(encoded,
             class_def_mapper=self.class_mapper, amf3=amf3))
@@ -82,6 +82,7 @@ class SpeedTestCase(unittest.TestCase):
         self.resultTest(decoded['objects'])
 
     def testSpeedAmf0(self):
+        return
         for i in xrange(self.test_nu):
             print i
             self.speedTestComplexDict(amf3=False)
@@ -90,19 +91,18 @@ class SpeedTestCase(unittest.TestCase):
         return
         for i in xrange(self.test_nu):
             print i
-            self.testPyamfComplexDict(amf3=False)
+            self.speedTestPyamfComplexDict(amf3=False)
 
-    def testSpeed(self):
-        return
-        for i in xrange(10000):
-            print "%s ..." % i
-            self.testComplexDict()
+    def testSpeedAmf3(self):
+        for i in xrange(self.test_nu):
+            print i
+            self.speedTestComplexDict(amf3=True)
 
-    def testPyamfSpeed(self):
+    def testPyamfSpeediAmf3(self):
         return
-        for i in xrange(10000):
-            print "%s ..." % i
-            self.testPyamfComplexDict()
+        for i in xrange(self.test_nu):
+            print i
+            self.testPyamfComplexDict(amf3=True)
 
 def suite():
     return unittest.TestLoader().loadTestsFromTestCase(SpeedTestCase)
