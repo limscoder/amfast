@@ -46,6 +46,55 @@ static void Buffer_dealloc(BufferObj *self)
 }
 
 /*
+ * Returns the current position in the buffer.
+ */
+int Buffer_tell(BufferObj *self)
+{
+    return self->pos;
+}
+
+/*
+ * Python exposed version of Buffer_tell.
+ */
+static PyObject* PyBuffer_tell(BufferObj *self)
+{
+    return PyInt_FromLong((long)Buffer_tell(self));
+}
+
+/*
+ * Moves to a specific position in the buffer.
+ *
+ * Returns position or -1 on error.
+ */
+int Buffer_seek(BufferObj *self, int pos)
+{
+    if (pos < 0 || pos >= self->len) {
+        PyErr_SetString(amfast_BufferError, "Position is out of range.");
+        return -1;
+    }
+
+    self->pos = pos;
+    return pos;
+}
+
+/*
+ * Python exposed version of Buffer_seek.
+ */
+static PyObject* PyBuffer_seek(BufferObj *self, PyObject *args, PyObject *kwargs)
+{
+    int pos;
+
+    if (!PyArg_ParseTuple(args, "i", &pos))
+        return NULL;
+
+    int new_pos = Buffer_seek(self, pos);
+    if (new_pos == -1)
+        return NULL;
+
+    return PyInt_FromLong((long)new_pos);
+}
+
+/*
  * Returns a pointer to the current buffer position
  * and increments the position by the given length.
  */
@@ -69,7 +118,7 @@ char* Buffer_read(BufferObj *self, int len)
 /*
  * Returns a PyString.
  */
-PyObject* Buffer_read_PyString(BufferObj *self, int len)
+PyObject* Buffer_readPyString(BufferObj *self, int len)
 {
     char *str = Buffer_read(self, len);
     if (str == NULL)
@@ -79,7 +128,7 @@ PyObject* Buffer_read_PyString(BufferObj *self, int len)
 }
 
 /*
- * Python exposed version of Buffer_read_PyString.
+ * Python exposed version of Buffer_readPyString.
  */
 static PyObject* PyBuffer_read(BufferObj *self, PyObject *args, PyObject *kwargs)
 {
@@ -88,7 +137,7 @@ static PyObject* PyBuffer_read(BufferObj *self, PyObject *args, PyObject *kwargs
     if (!PyArg_ParseTuple(args, "i", &len))
         return NULL;
 
-    return Buffer_read_PyString(self, len);
+    return Buffer_readPyString(self, len);
 }
 
 static PyMethodDef Buffer_methods[] = {
@@ -97,6 +146,13 @@ static PyMethodDef Buffer_methods[] = {
      "arguments\n"
      "==========\n"
      " * len - int, length to read from buffer."},
+    {"tell", (PyCFunction)PyBuffer_tell, METH_NOARGS,
+     "Returns the current position in the buffer.\n\n"},
+    {"seek", (PyCFunction)PyBuffer_seek, METH_VARARGS,
+     "Moves to a specified position in the buffer.\n\n"
+     "arguments\n"
+     "==========\n"
+     " * pos - int, position to move to in the buffer."},
     {NULL}  /* Sentinel */
 };
 

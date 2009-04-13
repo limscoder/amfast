@@ -10,4 +10,6 @@ typedef struct {
 } BufferObj;
 
 char* Buffer_read(BufferObj *self, int len);
-PyObject* Buffer_read_PyString(BufferObj *self, int len);
+PyObject* Buffer_readPyString(BufferObj *self, int len);
+int Buffer_tell(BufferObj *self);
+int Buffer_seek(BufferObj *self, int pos);
