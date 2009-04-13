@@ -9,7 +9,12 @@ extensions = [
             os.path.join('amfast', 'ext_src', 'amf_common.c'), ]),
     Extension('amfast.decoder',
         sources = [os.path.join('amfast', 'ext_src', 'decoder.c'),
-            os.path.join('amfast', 'ext_src', 'amf_common.c')])]
+            os.path.join('amfast', 'ext_src', 'amf_common.c')]),
+    Extension('amfast.buffer',
+        sources = [os.path.join('amfast', 'ext_src', 'buffer.c')]),
+    Extension('amfast.context',
+        sources = [os.path.join('amfast', 'ext_src', 'context.c')])
+    ]
 
 setup(name="AmFast",
     version = "0.2.3",

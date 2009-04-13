@@ -2278,12 +2278,12 @@ initencoder(void)
         return;
     }
 
-    Py_INCREF(amfast_EncodeError);
     if (PyModule_AddObject(module, "EncodeError", amfast_EncodeError) == -1) {
         return;
     }
 
     // Determine endianness of architecture
+    const int endian_test = 1;
     if (is_bigendian()) {
         big_endian = 1;
     } else {

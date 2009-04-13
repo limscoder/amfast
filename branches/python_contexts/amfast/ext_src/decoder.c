@@ -1901,6 +1901,7 @@ initdecoder(void)
     }
 
     // Determine endianness of architecture
+    const int endian_test = 1;
     if (is_bigendian()) {
         big_endian = 1;
     } else {
