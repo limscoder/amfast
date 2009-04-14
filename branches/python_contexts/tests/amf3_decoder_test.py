@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import unittest
 
+from StringIO import StringIO
+
 from amfast.context import DecoderContext
 import amfast.decoder as decoder
 import amfast.class_def as class_def
@@ -156,6 +158,10 @@ class Amf3DecoderTestCase(unittest.TestCase):
         for i in range(4):
             self.assertEquals(i, result[i])
 
+        result = decoder.decode(DecoderContext(StringIO(encoded), amf3=True))
+        for i in range(4):
+            self.assertEquals(i, result[i])
+
     def testArrayCollectionRef(self):
         encoded = '\x0A\x07\x43flex.messaging.io.ArrayCollection\x09\x05\x01' # array header
         encoded += '\x0A\x01\x09\x09\x01\x04\x00\x04\x01\x04\x02\x04\x03' # array element 1 (test_tuple encoded)
@@ -189,9 +195,13 @@ class Amf3DecoderTestCase(unittest.TestCase):
 
         result = decoder.decode(DecoderContext(encoded,
             class_def_mapper=self.class_mapper, amf3=True))
-        self.class_mapper.unmapClass(self.Spam)
-
         self.assertEquals('eggs', result.spam)
+
+        result = decoder.decode(DecoderContext(StringIO(encoded),
+            class_def_mapper=self.class_mapper, amf3=True))
+        self.assertEquals('eggs', result.spam)
+
+        self.class_mapper.unmapClass(self.Spam)
 
     def testDynamicObj(self):
         self.class_mapper.mapClass(class_def.DynamicClassDef(self.Spam, 'alias.spam', ()))
@@ -201,9 +211,13 @@ class Amf3DecoderTestCase(unittest.TestCase):
 
         result = decoder.decode(DecoderContext(encoded,
             class_def_mapper=self.class_mapper, amf3=True))
-        self.class_mapper.unmapClass(self.Spam)
-
         self.assertEquals('eggs', result.spam)
+
+        result = decoder.decode(DecoderContext(StringIO(encoded),
+            class_def_mapper=self.class_mapper, amf3=True))
+        self.assertEquals('eggs', result.spam)
+
+        self.class_mapper.unmapClass(self.Spam)
 
     def testStaticDynamicObj(self):
         self.class_mapper.mapClass(class_def.DynamicClassDef(self.Spam, 'alias.spam', ('spam',)))
@@ -218,17 +232,22 @@ class Amf3DecoderTestCase(unittest.TestCase):
 
         result = decoder.decode(DecoderContext(encoded,
             class_def_mapper=self.class_mapper, amf3=True))
-        self.class_mapper.unmapClass(self.Spam)
-
         self.assertEquals('eggs', result.spam)
         self.assertEquals('foo', result.ham)
+
+        result = decoder.decode(DecoderContext(StringIO(encoded),
+            class_def_mapper=self.class_mapper, amf3=True))
+        self.assertEquals('eggs', result.spam)
+        self.assertEquals('foo', result.ham)
+
+        self.class_mapper.unmapClass(self.Spam)
 
     def testExternizeable(self):
         custom_encoding = '\x01\x02\x03\x04\x05'
 
         class ExternClass(class_def.ExternClassDef):
             def readExternal(ext_self, obj, context):
-                byte_string = context.file_obj.read(5);
+                byte_string = context.buffer.read(5);
                 self.assertEquals(custom_encoding, byte_string)
                 obj.spam = 'eggs'
 

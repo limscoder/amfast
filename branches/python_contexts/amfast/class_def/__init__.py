@@ -164,8 +164,6 @@ class _ObjectProxyClassDef(_ProxyClassDef):
     def __init__(self):
         _ProxyClassDef.__init__(self)
 
-
-
 class ClassDefMapper(object):
     """Map classes to ClassDefs, retrieve class_defs by class or alias name."""
     def __init__(self, class_def_attr='_amf_alias'):

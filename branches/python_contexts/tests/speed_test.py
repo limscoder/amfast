@@ -98,7 +98,7 @@ class SpeedTestCase(unittest.TestCase):
             print i
             self.speedTestComplexDict(amf3=True)
 
-    def testPyamfSpeediAmf3(self):
+    def testPyamfSpeedAmf3(self):
         return
         for i in xrange(self.test_nu):
             print i

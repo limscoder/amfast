@@ -18,6 +18,7 @@ typedef struct {
     PyObject_HEAD;
     PyObject *buf; // Input
     PyObject *_buf_str; // Temporary storage of PyString read from file-like-obj
+    PyObject *amf3; // True to decode as AMF3.
     PyObject *class_mapper; // Object that retrieves ClassDef objects.
     PyObject *obj_refs; // IdxObj for objects
     PyObject *string_refs; // IdxObj for strings
@@ -27,9 +28,9 @@ typedef struct {
     PyObject *class_def_name; // PyString name of method to retrieve a ClassDef
     PyObject *extern_name; // PyString name of method to read externalizable objects
     int int_buf; // 1 if we're using an amfast.buffer.Buffer object as the input, 0 if not
-    int amf3; // 1 to encode objects using AMF3, 0 to encode objects using AMF0
 } DecoderObj;
 
+int Decoder_check(PyObject *self);
 PyObject* Decoder_copy(DecoderObj *self, int amf3);
 int Decoder_tell(DecoderObj *self);
 PyObject* Decoder_readPyString(DecoderObj *self, int len);

@@ -95,6 +95,7 @@ static PyObject* PyIdx_map(IdxObj *self, PyObject *args, PyObject *kwargs)
 
 /*
  * Retrieves an indexed object.
+ * Returns new ref.
  */
 PyObject* Idx_ret(IdxObj *self, int idx)
 {
@@ -186,6 +187,7 @@ static PyObject* Decoder_new(PyTypeObject *type, PyObject *args, PyObject *kwarg
     if (self != NULL) {
         self->buf = NULL;
         self->_buf_str = NULL;
+        self->amf3 = NULL;
         self->class_mapper = NULL;
         self->obj_refs = NULL;
         self->string_refs = NULL;
@@ -195,7 +197,6 @@ static PyObject* Decoder_new(PyTypeObject *type, PyObject *args, PyObject *kwarg
         self->class_def_name = NULL;
         self->extern_name = NULL;
         self->int_buf = 0;
-        self->amf3 = 0;
     }
 
     return (PyObject *)self;
@@ -210,22 +211,22 @@ static int Decoder_initIdx(DecoderObj *self)
     if (idx_class == NULL)
         return -1;
 
-    PyObject *ref = PyObject_CallFunctionObjArgs(idx_class, NULL);
+    PyObject *ref = PyObject_CallObject(idx_class, NULL);
     if (ref == NULL) {
         Py_DECREF(idx_class);
         return -1;
     }
     self->obj_refs = ref;
 
-    if (self->amf3 == 1) {
-        ref = PyObject_CallFunctionObjArgs(idx_class, NULL);
+    if (self->amf3 == Py_True) {
+        ref = PyObject_CallObject(idx_class, NULL);
         if (ref == NULL) {
             Py_DECREF(idx_class);
             return -1;
         }
         self->string_refs = ref;
 
-        ref = PyObject_CallFunctionObjArgs(idx_class, NULL);
+        ref = PyObject_CallObject(idx_class, NULL);
         if (ref == NULL) {
             Py_DECREF(idx_class);
             return -1;
@@ -240,7 +241,7 @@ static int Decoder_initIdx(DecoderObj *self)
 static int Decoder_init(DecoderObj *self, PyObject *args, PyObject *kwargs)
 {
     static char *kwlist[] = {"buffer", "class_def_mapper", "amf3", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|Oi", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|OO", kwlist,
         &self->buf, &self->class_mapper, &self->amf3))
         return -1;
 
@@ -256,6 +257,8 @@ static int Decoder_init(DecoderObj *self, PyObject *args, PyObject *kwargs)
             return -1;
         self->buf = buf;
         self->int_buf = 1;
+    } else {
+        Py_INCREF(self->buf);
     }
 
     if (self->class_mapper == NULL) {
@@ -264,11 +267,13 @@ static int Decoder_init(DecoderObj *self, PyObject *args, PyObject *kwargs)
         if (mapper_class == NULL)
             return -1;
 
-        PyObject *mapper = PyObject_CallFunctionObjArgs(mapper_class, NULL);
+        PyObject *mapper = PyObject_CallObject(mapper_class, NULL);
         Py_DECREF(mapper_class);
         if (mapper == NULL)
             return -1;
         self->class_mapper = mapper;
+    } else {
+        Py_INCREF(self->class_mapper);
     }
 
     // Init object reference indexes.
@@ -308,6 +313,7 @@ static void Decoder_dealloc(DecoderObj *self)
 {
     Py_XDECREF(self->buf);
     Py_XDECREF(self->_buf_str);
+    Py_XDECREF(self->amf3);
     Py_XDECREF(self->class_mapper);
     Py_XDECREF(self->obj_refs);
     Py_XDECREF(self->string_refs);
@@ -343,13 +349,24 @@ PyObject* Decoder_copy(DecoderObj *self, int amf3)
 
     // Copy values from original
     new_decoder->buf = self->buf;
+    Py_XINCREF(new_decoder->buf);
     new_decoder->class_mapper = self->class_mapper;
+    Py_XINCREF(new_decoder->class_mapper);
     new_decoder->read_name = self->read_name;
+    Py_XINCREF(new_decoder->read_name);
     new_decoder->apply_name = self->apply_name;
+    Py_XINCREF(new_decoder->apply_name);
     new_decoder->class_def_name = self->class_def_name;
+    Py_XINCREF(new_decoder->class_def_name);
     new_decoder->extern_name = self->extern_name;
+    Py_XINCREF(new_decoder->extern_name);
     new_decoder->int_buf = self->int_buf;
-    new_decoder->amf3 = amf3;
+    if (amf3 == 1) {
+        new_decoder->amf3 = Py_True;
+    } else {
+        new_decoder->amf3 = Py_False;
+    }
+    Py_XINCREF(new_decoder->amf3);
 
     // Reset indexes
     if (Decoder_initIdx(new_decoder) == -1) {
@@ -358,6 +375,26 @@ PyObject* Decoder_copy(DecoderObj *self, int amf3)
     }
 
     return (PyObject*)new_decoder;
+}
+
+/*
+ * Returns 1 if object is a DecoderContext.
+ */
+int Decoder_check(PyObject *self)
+{
+    if (PyObject_HasAttrString(self, "buffer") == 0) {
+        return 0;
+    }
+
+    if (PyObject_HasAttrString(self, "obj_refs") == 0) {
+        return 0;
+    }
+
+    if (PyObject_HasAttrString(self, "class_def_mapper") == 0) {
+        return 0;
+    }
+
+    return 1;
 }
 
 /* 
@@ -420,9 +457,9 @@ static PyObject* PyDecoder_readPyString(DecoderObj *self, PyObject *args, PyObje
 int Decoder_skipBytes(DecoderObj *self, int len)
 {
     if (self->int_buf) {
-        int pos = Buffer_tell(self->buf);
+        int pos = Buffer_tell((BufferObj*)self->buf);
         pos += len;
-        int result = Buffer_seek(self->buf, pos);
+        int result = Buffer_seek((BufferObj*)self->buf, pos);
         if (result == -1) {
             return 0;
         }
@@ -447,7 +484,7 @@ int Decoder_skipBytes(DecoderObj *self, int len)
 char* Decoder_readCString(DecoderObj *self, int len)
 {
     if (self->int_buf) {
-        return Buffer_read(self->buf, len); 
+        return Buffer_read((BufferObj*)self->buf, len); 
     }
 
     PyObject* py_str = Decoder_readPyString(self, len);
@@ -482,7 +519,7 @@ static PyMethodDef Decoder_methods[] = {
      "Copy the decoder context. Settings are preserved, but index counts are reset.\n\n"
      "arguments\n"
      "==========\n"
-     " * amf3 - bool, True to encode as AMF3."},
+     " * amf3 - bool, True to decode as AMF3."},
     {"read", (PyCFunction)PyDecoder_readPyString, METH_VARARGS,
      "Reads from the buffer.\n\n"
      "arguments\n"
@@ -494,6 +531,8 @@ static PyMethodDef Decoder_methods[] = {
 static PyMemberDef Decoder_members[] = {
     {"buffer", T_OBJECT_EX, offsetof(DecoderObj, buf), 0,
      "The object being encoded."},
+    {"amf3", T_OBJECT_EX, offsetof(DecoderObj, amf3), 0,
+     "True to decode as AMF3."},
     {"class_def_mapper", T_OBJECT_EX, offsetof(DecoderObj, class_mapper), 0,
      "The object the retrieves ClassDef objects."},
     {"obj_refs", T_OBJECT_EX, offsetof(DecoderObj, obj_refs), 0,

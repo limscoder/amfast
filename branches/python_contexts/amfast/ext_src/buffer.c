@@ -68,11 +68,6 @@ static PyObject* PyBuffer_tell(BufferObj *self)
  */
 int Buffer_seek(BufferObj *self, int pos)
 {
-    if (pos < 0 || pos >= self->len) {
-        PyErr_SetString(amfast_BufferError, "Position is out of range.");
-        return -1;
-    }
-
     self->pos = pos;
     return pos;
 }
@@ -102,6 +97,11 @@ char* Buffer_read(BufferObj *self, int len)
 {
     if (self->src_str == NULL) {
         PyErr_SetString(amfast_BufferError, "Cannot read from write-only buffer.");
+        return NULL;
+    }
+
+    if ((self->pos + len) < 0) {
+        PyErr_SetString(amfast_BufferError, "Attempted to read before start of buffer.");
         return NULL;
     }
 

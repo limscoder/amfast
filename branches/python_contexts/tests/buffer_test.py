@@ -9,7 +9,19 @@ class BufferTestCase(unittest.TestCase):
     def testRead(self):
         buf = Buffer(self.test_string)
         self.assertEquals(self.test_string[0], buf.read(1))
-        self.assertEquals(self.test_string[1:6], buf.read(5))
+        self.assertEquals(1, buf.tell())
+        self.assertEquals(self.test_string[1:len(self.test_string)], buf.read(len(self.test_string) - 1 ))
+
+    def testSeek(self):
+        buf = Buffer(self.test_string)
+        buf.seek(len(self.test_string) - 1)
+        self.assertEquals(self.test_string[-1], buf.read(1))
+        buf.seek(0)
+        self.assertEquals(self.test_string[0], buf.read(1))
+
+    def testSeekLonRaisesException(self):
+        buf = Buffer(self.test_string)
+        self.assertRaises(BufferError, buf.seek, (len(self.test_string)))
 
     def testReadLongRaisesException(self):
         buf = Buffer(self.test_string)

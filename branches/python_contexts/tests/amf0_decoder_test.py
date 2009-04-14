@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import unittest
 
+from StringIO import StringIO
+
 from amfast.context import DecoderContext
 import amfast.decoder as decoder
 import amfast.class_def as class_def
@@ -60,12 +62,18 @@ class Amf0DecoderTestCase(unittest.TestCase):
         result = decoder.decode(DecoderContext(encoded))
         self.assertEquals('eggs', result['spam'])
 
+        result = decoder.decode(DecoderContext(StringIO(encoded)))
+        self.assertEquals('eggs', result['spam'])
+
     def testMixedArray(self):
         encoded = '\x08\x00\x00\x00\x00' # mixed array header
         encoded += '\x00\x04spam\x02\x00\x04eggs' #values
         encoded += '\x00\x00\t' # terminator
 
         result = decoder.decode(DecoderContext(encoded))
+        self.assertEquals('eggs', result['spam'])
+
+        result = decoder.decode(DecoderContext(StringIO(encoded)))
         self.assertEquals('eggs', result['spam'])
 
     def testArray(self):
@@ -76,6 +84,10 @@ class Amf0DecoderTestCase(unittest.TestCase):
         encoded += '\x00\x3f\xf3\xc0\xca\x42\x83\xde\x1b' #element 3
 
         result = decoder.decode(DecoderContext(encoded))
+        for i, obj in enumerate(decoded):
+            self.assertEquals(obj, result[i])
+
+        result = decoder.decode(DecoderContext(StringIO(encoded)))
         for i, obj in enumerate(decoded):
             self.assertEquals(obj, result[i])
 
