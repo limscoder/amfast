@@ -37,3 +37,33 @@ PyObject* Decoder_readPyString(DecoderObj *self, int len);
 int Decoder_skipBytes(DecoderObj *self, int len);
 char* Decoder_readCString(DecoderObj *self, int len);
 char Decoder_readByte(DecoderObj *self);
+
+typedef struct {
+    PyObject_HEAD
+    PyObject *refs;
+    int idx;
+} RefObj;
+
+int Ref_map(RefObj *self, PyObject *obj);
+int Ref_ret(RefObj *self, PyObject *obj);
+
+typedef struct {
+    PyObject_HEAD;
+    PyObject *buf; // Input
+    PyObject *amf3; // True to encode as AMF3.
+    PyObject *use_collections; // True to encode lists and tuples as ArrayCollections.
+    PyObject *use_proxies; // True to encode dicts as ObjectProxies
+    PyObject *use_refs; // True to encode objects as references.
+    PyObject *use_legacy_xml; // True to encode XML as XMLDocument instead of e4x
+    PyObject *include_private; // True to encode attributes starting with '_' - Default = False
+    PyObject *class_mapper; // Object that retrieves ClassDef objects.
+    PyObject *obj_refs; // IdxObj for objects
+    PyObject *string_refs; // IdxObj for strings
+    PyObject *class_refs; // IdxObj for ClassDefs
+    PyObject *write_name; // PyString name of method to write to buffer
+    PyObject *extern_name; // PyString name of method to write externalizable objects
+    int int_buf; // 1 if we're using an amfast.buffer.Buffer object as the output, 0 if not
+} EncoderObj;
+
+int Encoder_writePyString(EncoderObj *self, PyObject *py_str);
+int Encoder_writeCString(EncoderObj *self, char *str, int len);

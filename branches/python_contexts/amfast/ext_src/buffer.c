@@ -32,6 +32,9 @@ static int Buffer_init(BufferObj *self, PyObject *args, PyObject *kwargs)
         Py_INCREF(self->src_str);
         self->buf = PyString_AsString(self->src_str);
         self->len = PyString_GET_SIZE(self->src_str);
+    } else {
+        self->len = 256;
+        self->buf = (char*)malloc(sizeof(char*) * (size_t)self->len);
     }
 
     return 0;
@@ -95,11 +98,6 @@ static PyObject* PyBuffer_seek(BufferObj *self, PyObject *args, PyObject *kwargs
  */
 char* Buffer_read(BufferObj *self, int len)
 {
-    if (self->src_str == NULL) {
-        PyErr_SetString(amfast_BufferError, "Cannot read from write-only buffer.");
-        return NULL;
-    }
-
     if ((self->pos + len) < 0) {
         PyErr_SetString(amfast_BufferError, "Attempted to read before start of buffer.");
         return NULL;
@@ -130,22 +128,126 @@ PyObject* Buffer_readPyString(BufferObj *self, int len)
 /*
  * Python exposed version of Buffer_readPyString.
  */
-static PyObject* PyBuffer_read(BufferObj *self, PyObject *args, PyObject *kwargs)
+static PyObject* PyBuffer_readPyString(BufferObj *self, PyObject *args, PyObject *kwargs)
 {
     int len;
 
     if (!PyArg_ParseTuple(args, "i", &len))
         return NULL;
 
+    if (self->src_str == NULL) {
+        PyErr_SetString(amfast_BufferError, "Cannot read from write-only buffer.");
+        return NULL;
+    }
+
     return Buffer_readPyString(self, len);
 }
 
+/*
+ * Expand the length of the buffer.
+ *
+ * len == number of bytes to expand by.
+ *
+ * Returns size of new buffer, or -1 if failed.
+ *
+ */
+static int Buffer_grow(BufferObj *self, int len)
+{
+    int new_len = self->pos + len;
+    int current_len = self->len;
+
+    while (new_len > current_len) {
+        // Buffer is not large enough.
+        // Double its memory, so that we don't need to realloc everytime.
+        current_len *= 2;
+    }
+
+    if (current_len != self->len) {
+        self->buf = (char*)realloc(self->buf, sizeof(char*) * (size_t)current_len);
+        if (self->buf == NULL) {
+            PyErr_SetNone(PyExc_MemoryError);
+            return -1;
+        }
+        self->len = current_len;
+    }
+
+    return current_len;
+}
+
+/*
+ * Write a C string.
+ *
+ * Returns 1 on success, 0 on failure.
+ */
+int Buffer_writeCStringLength(BufferObj *self, char *str, int len)
+{
+    if (Buffer_grow(self, len) == -1)
+        return 0;
+
+    memcpy(self->buf + self->pos, str, (size_t)len);
+    self->pos += len;
+    return 1;
+}
+
+/*
+ * Writes a Python string.
+ */
+int Buffer_writePyString(BufferObj *self, PyObject* py_str)
+{
+    char *c_str = PyString_AS_STRING(py_str);
+    int len = PyString_GET_SIZE(py_str);
+
+    return Buffer_writeCStringLength(self, c_str, len);
+}
+
+/*
+ * Python exposed version of Buffer_writePyString.
+ */
+static PyObject* PyBuffer_writePyString(BufferObj *self, PyObject *args, PyObject *kwargs)
+{
+    PyObject *py_str;
+
+    if (!PyArg_ParseTuple(args, "O", &py_str))
+        return NULL;
+
+    if (self->src_str != NULL) {
+        PyErr_SetString(amfast_BufferError, "Cannot write to read-only buffer.");
+        return NULL;
+    }
+
+    if (PyString_Check(py_str) == 0) {
+        PyErr_SetString(amfast_BufferError, "Argument must be a string.");
+        return NULL;
+    }
+
+    int result = Buffer_writePyString(self, py_str);
+    if (result == 0)
+        return NULL;
+
+    Py_RETURN_NONE;
+}
+
+/*
+ * Gets Python string for entire buffer.
+ */
+static PyObject* PyBuffer_getPyString(BufferObj *self, PyObject *args, PyObject *kwargs)
+{
+    if (self->src_str == NULL) {
+        return PyString_FromStringAndSize(self->buf, (Py_ssize_t)self->pos);
+    } else {
+        Py_XINCREF(self->src_str);
+        return self->src_str;
+    }
+}
+
 static PyMethodDef Buffer_methods[] = {
-    {"read", (PyCFunction)PyBuffer_read, METH_VARARGS,
+    {"read", (PyCFunction)PyBuffer_readPyString, METH_VARARGS,
      "Read from buffer. Returns a string.\n\n"
      "arguments\n"
      "==========\n"
      " * len - int, length to read from buffer."},
+    {"getvalue", (PyCFunction)PyBuffer_getPyString, METH_VARARGS,
+     "Gets a string value.\n"},
     {"tell", (PyCFunction)PyBuffer_tell, METH_NOARGS,
      "Returns the current position in the buffer.\n\n"},
     {"seek", (PyCFunction)PyBuffer_seek, METH_VARARGS,
@@ -153,6 +255,11 @@ static PyMethodDef Buffer_methods[] = {
      "arguments\n"
      "==========\n"
      " * pos - int, position to move to in the buffer."},
+    {"write", (PyCFunction)PyBuffer_writePyString, METH_VARARGS,
+     "Writes a string to the buffer.\n\n"
+     "arguments\n"
+     "==========\n"
+     " * str - str, string to write to the buffer."},
     {NULL}  /* Sentinel */
 };
 

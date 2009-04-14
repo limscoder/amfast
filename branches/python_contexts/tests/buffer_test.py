@@ -19,9 +19,32 @@ class BufferTestCase(unittest.TestCase):
         buf.seek(0)
         self.assertEquals(self.test_string[0], buf.read(1))
 
-    def testSeekLonRaisesException(self):
+    def testGetValue(self):
         buf = Buffer(self.test_string)
-        self.assertRaises(BufferError, buf.seek, (len(self.test_string)))
+        self.assertEquals(self.test_string, buf.getValue())
+
+    def testWrite(self):
+        buf = Buffer()
+        buf.write(self.test_string)
+        self.assertEquals(self.test_string, buf.getValue())
+  
+    def testWriteLong(self):
+        tester = 's' * 65537
+        buf = Buffer()
+        buf.write(tester)
+        self.assertEquals(tester, buf.getValue())
+
+    def testWriteNonStringRaisesException(self):
+        buf = Buffer()
+        self.assertRaises(BufferError, buf.write, (len(self.test_string)))
+
+    def testReadFromWriteRaisesException(self):
+        buf = Buffer()
+        self.assertRaises(BufferError, buf.read, 1)
+
+    def testWriteFromReadRaisesException(self):
+        buf = Buffer(self.test_string)
+        self.assertRaises(BufferError, buf.write, self.test_string)
 
     def testReadLongRaisesException(self):
         buf = Buffer(self.test_string)
