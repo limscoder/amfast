@@ -1433,7 +1433,7 @@ static int write_object_AMF0(EncoderObj *context, PyObject *value)
             return 0;
 
         // Create new context for AMF3 encoder
-        EncoderObj *new_context = (EncoderObj*)Encoder_copy(context, 1);
+        EncoderObj *new_context = (EncoderObj*)Encoder_copy(context, 1, 0);
         if (new_context == NULL)
             return 0;
 
@@ -1546,7 +1546,7 @@ static int write_object_AMF0(EncoderObj *context, PyObject *value)
 }
 
 /* Encode an AMF packet. */
-static int _encode_packet(EncoderObj *context, PyObject *value)
+static int encode_packet(EncoderObj *context, PyObject *value)
 {
     // write flash version
     PyObject *client_type = PyObject_GetAttrString(value, "version");
@@ -1690,26 +1690,34 @@ static int encode_packet_header_AMF0(EncoderObj *context, PyObject *value)
         return 0;
 
     // Encode header value with a new context, so references are reset
-    !!!TODO!!! 
-    !!!HERE!!!
-    We have to create a context with a new buffer,
-    !!!Because we have to encode the byte length before the bytes!!!
+    EncoderObj *new_context = (EncoderObj*)Encoder_copy(context, 0, 1);
+    if (!new_context) {
+        Py_DECREF(body);
+        return 0;
+    }
 
-    EncoderObj *new_context = (EncoderObj*)Encoder_copy(context, 0);
     result = encode_AMF0(new_context, body);
     Py_DECREF(body);
     if (!result) {
-        _destroy_encoder_context(new_context);
+        Py_DECREF(new_context);
         return 0;
     }
 
-    if (!encode_ulong(context, (unsigned int)new_context->buf_len)) {
-        _destroy_encoder_context(new_context);
+    int new_len = Encoder_tell(new_context);
+    char *new_buf = Encoder_read(new_context); // Don't decref new_context until we've used new_buf
+    if (new_buf == NULL) {
+        Py_DECREF(new_context);
+        return 0;
+    }
+    printf("GOT LEN: %d\n", new_len);
+
+    if (!encode_ulong(context, (unsigned int)new_len)) {
+        Py_DECREF(new_context);
         return 0;
     }
 
-    result = Encoder_writeCStringLength(context, new_context->buf, new_context->buf_len);
-    _destroy_encoder_context(new_context);
+    result = Encoder_writeCStringLength(context, new_buf, new_len);
+    Py_DECREF(new_context);
     return result;
 }
 
@@ -1742,14 +1750,10 @@ static int encode_packet_message_AMF0(EncoderObj *context, PyObject *value)
     }
 
     // Encode message body with a new context, so references are reset
-    //
-    
-    !!!TODO!!!
-    Copy with new buffer so that 
-    We can create encode the message length 1st
-    !!!!!
-
-    EncoderObj *new_context = _copy_encoder_context(context, context->use_amf3);
+    int amf3 = 0;
+    if (context->amf3 == Py_True)
+        amf3 = 1;
+    EncoderObj *new_context = (EncoderObj*)Encoder_copy(context, amf3, 1);
 
     if (PySequence_Size(response) > 0 && (PyList_Check(body) || PyTuple_Check(body))) {
         // We're encoding a request,
@@ -1767,18 +1771,22 @@ static int encode_packet_message_AMF0(EncoderObj *context, PyObject *value)
     }
     Py_DECREF(response);
     Py_DECREF(body);
-    if (!result) {
-        _destroy_encoder_context(new_context);
+
+    int new_len = Encoder_tell(new_context);
+    char *new_buf = Encoder_read(new_context); // Don't decref new_context until we've used new_buf
+    if (new_buf == NULL) {
+        Py_DECREF(new_context);
+        return 0;
+    }
+    printf("GOT LEN 2: %d\n", new_len);
+
+    if (!encode_ulong(context, (unsigned int)new_len)) {
+        Py_DECREF(new_context);
         return 0;
     }
 
-    if (!encode_ulong(context, (unsigned int)new_context->buf_len)) {
-        _destroy_encoder_context(new_context);
-        return 0;
-    }
-
-    result = Encoder_writeCStringLength(context, new_context->buf, new_context->buf_len);
-    _destroy_encoder_context(new_context);
+    result = Encoder_writeCStringLength(context, new_buf, new_len);
+    Py_DECREF(new_context);
     return result;
 }
 
@@ -1906,7 +1914,7 @@ static PyObject* py_encode(PyObject *self, PyObject *args, PyObject *kwargs)
     PyObject *value;
     EncoderObj *context;
 
-    if (!PyArg_ParseTuple(args, "O", &context))
+    if (!PyArg_ParseTuple(args, "OO", &value, &context))
         return NULL;
 
     if (Encoder_check((PyObject*)context) != 1) {
@@ -1914,12 +1922,18 @@ static PyObject* py_encode(PyObject *self, PyObject *args, PyObject *kwargs)
         return NULL;
     }
 
-    PyObject *result;
+    int result;
     if (context->amf3 == Py_True) {
-        result = encode_AMF3(value, context);
+        result = encode_AMF3(context, value);
     } else {
-        result = encode_AMF0(value, context);
+        result = encode_AMF0(context, value);
     }
+
+    if (result == 0) {
+        return NULL;
+    }
+
+    return PyObject_GetAttrString((PyObject*)context, "buffer");
 }
 
 /* Encode an AMF Packet object in AMF. */
@@ -1928,7 +1942,7 @@ static PyObject* py_encode_packet(PyObject *self, PyObject *args, PyObject *kwar
     PyObject *value;
     EncoderObj *context;
 
-    if (!PyArg_ParseTuple(args, "O", &context))
+    if (!PyArg_ParseTuple(args, "OO", &value, &context))
         return NULL;
 
     if (Encoder_check((PyObject*)context) != 1) {
@@ -1936,7 +1950,12 @@ static PyObject* py_encode_packet(PyObject *self, PyObject *args, PyObject *kwar
         return NULL;
     }
 
-    return encode_packet(value, context);
+    int result = encode_packet(context, value);
+    if (result == 0) {
+        return NULL;
+    }
+
+    return PyObject_GetAttrString((PyObject*)context, "buffer");
 }
 
 /* Expose functions as Python module functions. */

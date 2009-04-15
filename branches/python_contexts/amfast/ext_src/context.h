@@ -68,7 +68,10 @@ typedef struct {
     int int_buf; // 1 if we're using an amfast.buffer.Buffer object as the output, 0 if not
 } EncoderObj;
 
+int Encoder_check(PyObject *self);
 int Encoder_writePyString(EncoderObj *self, PyObject *py_str);
 int Encoder_writeCStringLength(EncoderObj *self, char *str, int len);
 int Encoder_writeByte(EncoderObj *self, char byte);
-PyObject* Encoder_copy(EncoderObj *self, int amf3);
+int Encoder_tell(EncoderObj *self);
+char* Encoder_read(EncoderObj *self);
+PyObject* Encoder_copy(EncoderObj *self, int amf3, int new_buf);

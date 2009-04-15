@@ -21,18 +21,18 @@ class BufferTestCase(unittest.TestCase):
 
     def testGetValue(self):
         buf = Buffer(self.test_string)
-        self.assertEquals(self.test_string, buf.getValue())
+        self.assertEquals(self.test_string, buf.getvalue())
 
     def testWrite(self):
         buf = Buffer()
         buf.write(self.test_string)
-        self.assertEquals(self.test_string, buf.getValue())
+        self.assertEquals(self.test_string, buf.getvalue())
   
     def testWriteLong(self):
         tester = 's' * 65537
         buf = Buffer()
         buf.write(tester)
-        self.assertEquals(tester, buf.getValue())
+        self.assertEquals(tester, buf.getvalue())
 
     def testWriteNonStringRaisesException(self):
         buf = Buffer()

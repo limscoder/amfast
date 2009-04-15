@@ -192,8 +192,26 @@ static PyObject* Ref_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
     return (PyObject *)self;
 }
 
-static int Ref_init(RefObj *self, PyObject *args, PyObject *kwargs)
+static int Ref_check(PyObject *self)
 {
+    PyObject *class = PyObject_GetAttrString(context_mod, "Ref");
+    if (class == NULL)
+        return 0;
+
+    int result = PyObject_IsInstance(self, class);
+    Py_DECREF(class);
+    return result;
+}
+
+static int Ref_init(PyObject *self_raw, PyObject *args, PyObject *kwargs)
+{
+    if (Ref_check(self_raw) == 0) {
+        PyErr_SetString(amfast_ContextError, "__init__ argument must be amfast.context.Ref");
+        return -1;
+    }
+
+    RefObj *self = (RefObj*)self_raw;
+
     self->refs = PyDict_New();
     if (self->refs == NULL)
         return -1;
@@ -405,8 +423,16 @@ static int Decoder_initIdx(DecoderObj *self)
     return 0;
 }
 
-static int Decoder_init(DecoderObj *self, PyObject *args, PyObject *kwargs)
+static int Decoder_init(PyObject *self_raw, PyObject *args, PyObject *kwargs)
 {
+    if (Decoder_check(self_raw) == 0) {
+        PyErr_SetString(amfast_ContextError, "__init__ argument must be amfast.context.DecoderContext");
+        return -1;
+    }
+
+    DecoderObj *self = (DecoderObj*)self_raw;
+
+
     static char *kwlist[] = {"buffer", "class_def_mapper", "amf3", NULL};
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|OO", kwlist,
         &self->buf, &self->class_mapper, &self->amf3))
@@ -549,23 +575,13 @@ PyObject* Decoder_copy(DecoderObj *self, int amf3)
  */
 int Decoder_check(PyObject *self)
 {
-    if (PyObject_HasAttrString(self, "buffer") == 0) {
+    PyObject *class = PyObject_GetAttrString(context_mod, "DecoderContext");
+    if (class == NULL)
         return 0;
-    }
 
-    if (PyObject_HasAttrString(self, "obj_refs") == 0) {
-        return 0;
-    }
-
-    if (PyObject_HasAttrString(self, "class_def_mapper") == 0) {
-        return 0;
-    }
-
-    if (PyObject_HasAttrString(self, "include_private") == 1) {
-        return 0;
-    }
-
-    return 1;
+    int result = PyObject_IsInstance(self, class);
+    Py_DECREF(class);
+    return result;
 }
 
 /* 
@@ -834,8 +850,15 @@ static int Encoder_initRef(EncoderObj *self)
     return 0;
 }
 
-static int Encoder_init(EncoderObj *self, PyObject *args, PyObject *kwargs)
+static int Encoder_init(PyObject *self_raw, PyObject *args, PyObject *kwargs)
 {
+    if (Encoder_check(self_raw) == 0) {
+        PyErr_SetString(amfast_ContextError, "__init__ argument must be amfast.context.EncoderContext");
+        return -1;
+    }
+
+    EncoderObj *self = (EncoderObj*)self_raw;
+
     static char *kwlist[] = {"buffer", "class_def_mapper", "amf3", NULL};
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|OOO", kwlist,
         &self->buf, &self->class_mapper, &self->amf3))
@@ -913,10 +936,10 @@ static void Encoder_dealloc(EncoderObj *self)
 }
 
 /*
- * Copy a Encoder with all the same settings, but
+ * Copy an Encoder with all the same settings, but
  * reset the index references.
  */
-PyObject* Encoder_copy(EncoderObj *self, int amf3)
+PyObject* Encoder_copy(EncoderObj *self, int amf3, int new_buf)
 {
     PyObject *encoder_class = PyObject_GetAttrString(context_mod, "EncoderContext");
     if (encoder_class == NULL)
@@ -934,9 +957,25 @@ PyObject* Encoder_copy(EncoderObj *self, int amf3)
     if (new_encoder == NULL)
         return NULL;
 
+    if (new_buf == 1) {
+        // Create a new buffer object.
+        PyObject *buf_class = PyObject_GetAttrString(buffer_mod, "Buffer");
+        if (buf_class == NULL)
+            return NULL;
+
+        PyObject *buf = PyObject_CallObject(buf_class, NULL);
+        Py_DECREF(buf_class);
+        if (buf == NULL)
+            return NULL;
+        new_encoder->buf = buf;
+        new_encoder->int_buf = 1;
+    } else {
+        new_encoder->buf = self->buf;
+        Py_XINCREF(new_encoder->buf);
+        new_encoder->int_buf = self->int_buf;
+    }
+
     // Copy values from original
-    new_encoder->buf = self->buf;
-    Py_XINCREF(new_encoder->buf);
     new_encoder->use_collections = self->use_collections;
     Py_XINCREF(new_encoder->use_collections);
     new_encoder->use_proxies = self->use_proxies;
@@ -949,17 +988,16 @@ PyObject* Encoder_copy(EncoderObj *self, int amf3)
     Py_XINCREF(new_encoder->include_private);
     new_encoder->class_mapper = self->class_mapper;
     Py_XINCREF(new_encoder->class_mapper);
-    new_decoder->array_collection_def = self->array_collection_def;
-    Py_XINCREF(new_decoder->array_collection_def);
-    new_decoder->object_proxy_def = self->object_proxy_def;
-    Py_XINCREF(new_decoder->object_proxy_def);
+    new_encoder->array_collection_def = self->array_collection_def;
+    Py_XINCREF(new_encoder->array_collection_def);
+    new_encoder->object_proxy_def = self->object_proxy_def;
+    Py_XINCREF(new_encoder->object_proxy_def);
     new_encoder->class_def_name = self->class_def_name;
     Py_XINCREF(new_encoder->class_def_name);
     new_encoder->write_name = self->write_name;
     Py_XINCREF(new_encoder->write_name);
     new_encoder->extern_name = self->extern_name;
     Py_XINCREF(new_encoder->extern_name);
-    new_encoder->int_buf = self->int_buf;
     if (amf3 == 1) {
         new_encoder->amf3 = Py_True;
     } else {
@@ -981,23 +1019,13 @@ PyObject* Encoder_copy(EncoderObj *self, int amf3)
  */
 int Encoder_check(PyObject *self)
 {
-    if (PyObject_HasAttrString(self, "buffer") == 0) {
+    PyObject *class = PyObject_GetAttrString(context_mod, "EncoderContext");
+    if (class == NULL)
         return 0;
-    }
 
-    if (PyObject_HasAttrString(self, "obj_refs") == 0) {
-        return 0;
-    }
-
-    if (PyObject_HasAttrString(self, "class_def_mapper") == 0) {
-        return 0;
-    }
-
-    if (PyObject_HasAttrString(self, "include_private") == 0) {
-        return 0;
-    }
-
-    return 1;
+    int result = PyObject_IsInstance(self, class);
+    Py_DECREF(class);
+    return result;
 }
 
 /* 
@@ -1019,6 +1047,20 @@ int Encoder_tell(EncoderObj *self)
 }
 
 /*
+ * Returns the current string.
+ */
+char* Encoder_read(EncoderObj *self)
+{
+    if (self->int_buf == 1) {
+        BufferObj *buf = (BufferObj*)self->buf;
+        return buf->buf;
+    }
+
+    PyErr_SetString(amfast_ContextError, "Can't read from unknown buffer type.");
+    return NULL;
+}
+
+/*
  * Python exposed version of Encoder_copy.
  */
 static PyObject* PyEncoder_copy(EncoderObj *self, PyObject *args, PyObject *kwargs)
@@ -1026,12 +1068,13 @@ static PyObject* PyEncoder_copy(EncoderObj *self, PyObject *args, PyObject *kwar
     int amf3 = 0;
     if (self->amf3 == Py_True)
         amf3 = 1;
+    int new_buf = 0;
 
-    static char *kwlist[] = {"amf3", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|i", kwlist, &amf3))
+    static char *kwlist[] = {"amf3", "new_buf", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|ii", kwlist, &amf3, &new_buf))
         return NULL;
 
-    return Encoder_copy(self, amf3);
+    return Encoder_copy(self, amf3, new_buf);
 }
 
 /*
@@ -1102,7 +1145,8 @@ static PyMethodDef Encoder_methods[] = {
      "Copy the encoder context. Settings are preserved, but index counts are reset.\n\n"
      "arguments\n"
      "==========\n"
-     " * amf3 - bool, True to encode as AMF3."},
+     " * amf3 - bool, True to encode as AMF3."
+     " * new_buf - bool, True to encode to a new Buffer object."},
     {"write", (PyCFunction)PyEncoder_writePyString, METH_VARARGS,
      "Writes a string to the buffer.\n\n"
      "arguments\n"
