@@ -787,6 +787,9 @@ static PyObject* Encoder_new(PyTypeObject *type, PyObject *args, PyObject *kwarg
         self->obj_refs = NULL;
         self->string_refs = NULL;
         self->class_refs = NULL;
+        self->array_collection_def = NULL;
+        self->object_proxy_def = NULL;
+        self->class_def_name = NULL;
         self->write_name = NULL;
         self->extern_name = NULL;
         self->int_buf = 0;
@@ -901,6 +904,9 @@ static void Encoder_dealloc(EncoderObj *self)
     Py_XDECREF(self->obj_refs);
     Py_XDECREF(self->string_refs);
     Py_XDECREF(self->class_refs);
+    Py_XDECREF(self->array_collection_def);
+    Py_XDECREF(self->object_proxy_def);
+    Py_XDECREF(self->class_def_name);
     Py_XDECREF(self->write_name);
     Py_XDECREF(self->extern_name);
     self->ob_type->tp_free((PyObject*)self);
@@ -943,6 +949,12 @@ PyObject* Encoder_copy(EncoderObj *self, int amf3)
     Py_XINCREF(new_encoder->include_private);
     new_encoder->class_mapper = self->class_mapper;
     Py_XINCREF(new_encoder->class_mapper);
+    new_decoder->array_collection_def = self->array_collection_def;
+    Py_XINCREF(new_decoder->array_collection_def);
+    new_decoder->object_proxy_def = self->object_proxy_def;
+    Py_XINCREF(new_decoder->object_proxy_def);
+    new_encoder->class_def_name = self->class_def_name;
+    Py_XINCREF(new_encoder->class_def_name);
     new_encoder->write_name = self->write_name;
     Py_XINCREF(new_encoder->write_name);
     new_encoder->extern_name = self->extern_name;
@@ -1059,7 +1071,7 @@ static PyObject* PyEncoder_writePyString(EncoderObj *self, PyObject *args, PyObj
 /*
  * Writes a CString to the buffer.
  */
-int Encoder_writeCString(EncoderObj *self, char *str, int len)
+int Encoder_writeCStringLength(EncoderObj *self, char *str, int len)
 {
     if (self->int_buf == 1) {
         return Buffer_writeCStringLength((BufferObj*)self->buf, str, len);
@@ -1072,6 +1084,17 @@ int Encoder_writeCString(EncoderObj *self, char *str, int len)
     int result = Encoder_writePyString(self, py_str);
     Py_DECREF(py_str);
     return result;
+}
+
+/*
+ * Writes a byte to the buffer.
+ */
+int Encoder_writeByte(EncoderObj *self, char byte)
+{
+    char bytes[1];
+    bytes[0] = byte;
+
+    return Encoder_writeCStringLength(self, bytes, 1);
 }
 
 static PyMethodDef Encoder_methods[] = {

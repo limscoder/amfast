@@ -60,10 +60,15 @@ typedef struct {
     PyObject *obj_refs; // IdxObj for objects
     PyObject *string_refs; // IdxObj for strings
     PyObject *class_refs; // IdxObj for ClassDefs
+    PyObject *array_collection_def; // ClassDef for ArrayCollection
+    PyObject *object_proxy_def; // ClassDef for ObjectProxy
+    PyObject *class_def_name; // Name of method to get class def
     PyObject *write_name; // PyString name of method to write to buffer
     PyObject *extern_name; // PyString name of method to write externalizable objects
     int int_buf; // 1 if we're using an amfast.buffer.Buffer object as the output, 0 if not
 } EncoderObj;
 
 int Encoder_writePyString(EncoderObj *self, PyObject *py_str);
-int Encoder_writeCString(EncoderObj *self, char *str, int len);
+int Encoder_writeCStringLength(EncoderObj *self, char *str, int len);
+int Encoder_writeByte(EncoderObj *self, char byte);
+PyObject* Encoder_copy(EncoderObj *self, int amf3);

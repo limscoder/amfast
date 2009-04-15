@@ -3,6 +3,7 @@
 #include <time.h>
 
 #include "amf_common.h"
+#include "context.h"
 
 // ------------------------ DECLARATIONS --------------------------------- //
 
@@ -26,80 +27,80 @@ static int big_endian; // Flag == 1 if architecture is big_endian, == 0 if not
  */
 
 // COMMON
-static int encode_packet(EncoderContext *context, PyObject *value);
-static int encode_ushort(EncoderContext *context, unsigned short value);
-static int encode_ulong(EncoderContext *context, unsigned int value);
-static int _encode_double(EncoderContext *context, double value);
-static int encode_float(EncoderContext *context, PyObject *value);
-static int encode_string(EncoderContext *context, PyObject *value);
-static int encode_date(EncoderContext *context, PyObject *value);
+static int encode_packet(EncoderObj *context, PyObject *value);
+static int encode_ushort(EncoderObj *context, unsigned short value);
+static int encode_ulong(EncoderObj *context, unsigned int value);
+static int _encode_double(EncoderObj *context, double value);
+static int encode_float(EncoderObj *context, PyObject *value);
+static int encode_string(EncoderObj *context, PyObject *value);
+static int encode_date(EncoderObj *context, PyObject *value);
 static int check_xml(PyObject *value);
 static int check_byte_array(PyObject *value);
-static PyObject * class_def_from_class(EncoderContext *context, PyObject *value);
-static PyObject * attributes_from_object(EncoderContext *context, PyObject *value);
+static PyObject * class_def_from_class(EncoderObj *context, PyObject *value);
+static PyObject * attributes_from_object(EncoderObj *context, PyObject *value);
 static PyObject* static_attr_vals_from_class_def(PyObject *class_def, PyObject *value);
 static PyObject* dynamic_attrs_from_class_def(PyObject *class_def, PyObject *value);
 
 // AMF0
-static int encode_bool_AMF0(EncoderContext *context, PyObject *value);
-static int encode_int_AMF0(EncoderContext *context, PyObject *value);
-static int encode_long_AMF0(EncoderContext *context, PyObject *value);
-static int encode_float_AMF0(EncoderContext *context, PyObject *value);
-static int write_string_AMF0(EncoderContext *context, PyObject *value);
-static int encode_string_AMF0(EncoderContext *context, PyObject *value, int allow_long);
-static int write_unicode_AMF0(EncoderContext *context, PyObject *value);
-static int encode_unicode_AMF0(EncoderContext *context, PyObject *value, int allow_long);
-static int write_reference_AMF0(EncoderContext *context, PyObject *value);
-static int write_list_AMF0(EncoderContext *context, PyObject *value, int write_reference);
-static int write_dict_AMF0(EncoderContext *context, PyObject *value);
-static int encode_dynamic_dict_AMF0(EncoderContext *context, PyObject *value);
-static int encode_object_as_string_AMF0(EncoderContext *context, PyObject *value, int allow_long);
-static int write_date_AMF0(EncoderContext *context, PyObject *value);
-static int encode_class_def_AMF0(EncoderContext *context, PyObject *value);
-static int encode_object_AMF0(EncoderContext *context, PyObject *value);
-static int write_object_AMF0(EncoderContext *context, PyObject *value);
-static int write_anonymous_object_AMF0(EncoderContext *context, PyObject *value);
-static int encode_packet_header_AMF0(EncoderContext *context, PyObject *value);
-static int encode_packet_message_AMF0(EncoderContext *context, PyObject *value);
-static int encode_AMF0(EncoderContext *context, PyObject *value);
+static int encode_bool_AMF0(EncoderObj *context, PyObject *value);
+static int encode_int_AMF0(EncoderObj *context, PyObject *value);
+static int encode_long_AMF0(EncoderObj *context, PyObject *value);
+static int encode_float_AMF0(EncoderObj *context, PyObject *value);
+static int write_string_AMF0(EncoderObj *context, PyObject *value);
+static int encode_string_AMF0(EncoderObj *context, PyObject *value, int allow_long);
+static int write_unicode_AMF0(EncoderObj *context, PyObject *value);
+static int encode_unicode_AMF0(EncoderObj *context, PyObject *value, int allow_long);
+static int write_reference_AMF0(EncoderObj *context, PyObject *value);
+static int write_list_AMF0(EncoderObj *context, PyObject *value, int write_reference);
+static int write_dict_AMF0(EncoderObj *context, PyObject *value);
+static int encode_dynamic_dict_AMF0(EncoderObj *context, PyObject *value);
+static int encode_object_as_string_AMF0(EncoderObj *context, PyObject *value, int allow_long);
+static int write_date_AMF0(EncoderObj *context, PyObject *value);
+static int encode_class_def_AMF0(EncoderObj *context, PyObject *value);
+static int encode_object_AMF0(EncoderObj *context, PyObject *value);
+static int write_object_AMF0(EncoderObj *context, PyObject *value);
+static int write_anonymous_object_AMF0(EncoderObj *context, PyObject *value);
+static int encode_packet_header_AMF0(EncoderObj *context, PyObject *value);
+static int encode_packet_message_AMF0(EncoderObj *context, PyObject *value);
+static int encode_AMF0(EncoderObj *context, PyObject *value);
 
 // AMF3
-static int encode_long_AMF3(EncoderContext *context, PyObject *value);
-static int _encode_int_AMF3(EncoderContext *context, int value);
-static int write_int_AMF3(EncoderContext *context, PyObject *value);
-static int encode_none_AMF3(EncoderContext *context);
-static int encode_bool_AMF3(EncoderContext *context, PyObject *value);
-static int serialize_unicode_AMF3(EncoderContext *context, PyObject *value);
-static int encode_unicode_AMF3(EncoderContext *context, PyObject *value);
-static int serialize_string_AMF3(EncoderContext *context, PyObject *value);
-static int serialize_object_as_string_AMF3(EncoderContext *context, PyObject *value);
-static int write_list_AMF3(EncoderContext *context, PyObject *value);
-static int serialize_list_AMF3(EncoderContext *context, PyObject *value);
-static int encode_list_AMF3(EncoderContext *context, PyObject *value);
-static int encode_array_collection_header_AMF3(EncoderContext *context);
-static int serialize_dict_AMF3(EncoderContext *context, PyObject *value);
-static int encode_dict_AMF3(EncoderContext *context, PyObject *value);
-static int encode_dynamic_dict_AMF3(EncoderContext *context, PyObject *value);
-static int encode_object_proxy_header_AMF3(EncoderContext *context);
-static int serialize_date_AMF3(EncoderContext *context, PyObject *value);
-static int encode_reference_AMF3(EncoderContext *context, ObjectContext *object_context, PyObject *value, int bit);
-static int write_xml_AMF3(EncoderContext *context, PyObject *value);
-static int serialize_xml_AMF3(EncoderContext *context, PyObject *value);
-static int serialize_object_AMF3(EncoderContext *context, PyObject *value);
-static int encode_object_AMF3(EncoderContext *context, PyObject *value);
-static int serialize_class_def_AMF3(EncoderContext *context, PyObject *value);
-static int encode_class_def_AMF3(EncoderContext *context, PyObject *value);
-static int serialize_byte_array_AMF3(EncoderContext *context, PyObject *value);
-static int encode_byte_array_AMF3(EncoderContext *context, PyObject *value);
-static int encode_AMF3(EncoderContext *context, PyObject *value);
-static int encode_unknown_object_AMF3(EncoderContext *context, PyObject *value);
+static int encode_long_AMF3(EncoderObj *context, PyObject *value);
+static int _encode_int_AMF3(EncoderObj *context, int value);
+static int write_int_AMF3(EncoderObj *context, PyObject *value);
+static int encode_none_AMF3(EncoderObj *context);
+static int encode_bool_AMF3(EncoderObj *context, PyObject *value);
+static int serialize_unicode_AMF3(EncoderObj *context, PyObject *value);
+static int encode_unicode_AMF3(EncoderObj *context, PyObject *value);
+static int serialize_string_AMF3(EncoderObj *context, PyObject *value);
+static int serialize_object_as_string_AMF3(EncoderObj *context, PyObject *value);
+static int write_list_AMF3(EncoderObj *context, PyObject *value);
+static int serialize_list_AMF3(EncoderObj *context, PyObject *value);
+static int encode_list_AMF3(EncoderObj *context, PyObject *value);
+static int encode_array_collection_header_AMF3(EncoderObj *context);
+static int serialize_dict_AMF3(EncoderObj *context, PyObject *value);
+static int encode_dict_AMF3(EncoderObj *context, PyObject *value);
+static int encode_dynamic_dict_AMF3(EncoderObj *context, PyObject *value);
+static int encode_object_proxy_header_AMF3(EncoderObj *context);
+static int serialize_date_AMF3(EncoderObj *context, PyObject *value);
+static int encode_reference_AMF3(EncoderObj *context, RefObj *ref_context, PyObject *value, int bit);
+static int write_xml_AMF3(EncoderObj *context, PyObject *value);
+static int serialize_xml_AMF3(EncoderObj *context, PyObject *value);
+static int serialize_object_AMF3(EncoderObj *context, PyObject *value);
+static int encode_object_AMF3(EncoderObj *context, PyObject *value);
+static int serialize_class_def_AMF3(EncoderObj *context, PyObject *value);
+static int encode_class_def_AMF3(EncoderObj *context, PyObject *value);
+static int serialize_byte_array_AMF3(EncoderObj *context, PyObject *value);
+static int encode_byte_array_AMF3(EncoderObj *context, PyObject *value);
+static int encode_AMF3(EncoderObj *context, PyObject *value);
+static int encode_unknown_object_AMF3(EncoderObj *context, PyObject *value);
 
 // Python exposed functions
-static PyObject* pyencode_AMF3(PyObject *self, PyObject *args, PyObject *kwargs);
+static PyObject* py_encode(PyObject *self, PyObject *args, PyObject *kwargs);
 static PyObject* py_encode_packet(PyObject *self, PyObject *args, PyObject *kwargs);
 
 /* Encode a native C double. */
-static int _encode_double(EncoderContext *context, double value)
+static int _encode_double(EncoderObj *context, double value)
 {
    // Put bytes from double into byte array
    union aligned { // use the same memory for d_value and c_value
@@ -111,23 +112,23 @@ static int _encode_double(EncoderContext *context, double value)
 
    // AMF numbers are encoded in big endianness
    if (big_endian) {
-       return _amf_write_string_size(context, char_value, 8);
+       return Encoder_writeCStringLength(context, char_value, 8);
    } else {
        // Flip endianness
        char flipped[8] = {char_value[7], char_value[6], char_value[5], char_value[4], char_value[3], char_value[2], char_value[1], char_value[0]};
-       return _amf_write_string_size(context, flipped, 8);
+       return Encoder_writeCStringLength(context, flipped, 8);
    }
 }
 
 /* Encode a PyFloat. */
-static int encode_float(EncoderContext *context, PyObject *value)
+static int encode_float(EncoderObj *context, PyObject *value)
 {
     double n = PyFloat_AsDouble(value);
     return _encode_double(context, n);
 }
 
 /* Encode a PyLong. */
-static int encode_long_AMF3(EncoderContext *context, PyObject *value)
+static int encode_long_AMF3(EncoderObj *context, PyObject *value)
 {
     double n = PyLong_AsDouble(value);
     if (n == -1.0)
@@ -136,7 +137,7 @@ static int encode_long_AMF3(EncoderContext *context, PyObject *value)
 }
 
 /* Encode a native C int. */
-static int _encode_int_AMF3(EncoderContext *context, int value)
+static int _encode_int_AMF3(EncoderObj *context, int value)
 {
     char tmp[4];
     size_t tmp_size;
@@ -177,85 +178,85 @@ static int _encode_int_AMF3(EncoderContext *context, int value)
         return 0;        
     }
 
-    return _amf_write_string_size(context, tmp, tmp_size);
+    return Encoder_writeCStringLength(context, tmp, tmp_size);
 }
 
 /* Writes a PyInt. */
-static int write_int_AMF3(EncoderContext *context, PyObject *value)
+static int write_int_AMF3(EncoderObj *context, PyObject *value)
 {
     long n = PyInt_AsLong(value);
     if (n < MAX_INT && n > MIN_INT) {
         // Int is in valid AMF3 int range.
-        if (_amf_write_byte(context, INT_TYPE) != 1)
+        if (Encoder_writeByte(context, INT_TYPE) != 1)
             return 0;
         return _encode_int_AMF3(context, n);
     } else {
         // Int is too big, it must be encoded as a double
-        if (_amf_write_byte(context, DOUBLE_TYPE) != 1)
+        if (Encoder_writeByte(context, DOUBLE_TYPE) != 1)
             return 0;
         return _encode_double(context, (double)n);
     }
 }
 
 /* Encode a Py_None. */
-static int encode_none_AMF3(EncoderContext *context)
+static int encode_none_AMF3(EncoderObj *context)
 {
-    return _amf_write_byte(context, NULL_TYPE);
+    return Encoder_writeByte(context, NULL_TYPE);
 }
 
 /* Encode a PyBool. */
-static int encode_bool_AMF3(EncoderContext *context, PyObject *value)
+static int encode_bool_AMF3(EncoderObj *context, PyObject *value)
 {
     if (value == Py_True) {
-        return _amf_write_byte(context, TRUE_TYPE);
+        return Encoder_writeByte(context, TRUE_TYPE);
     } else {
-        return _amf_write_byte(context, FALSE_TYPE);
+        return Encoder_writeByte(context, FALSE_TYPE);
     }
 }
 
 /* Serialize a PyUnicode. */
-static int serialize_unicode_AMF3(EncoderContext *context, PyObject *value)
+static int serialize_unicode_AMF3(EncoderObj *context, PyObject *value)
 {
     // Check for empty string
     if (PyUnicode_GET_SIZE(value) == 0) {
         // References are never used for empty strings.
-        return _amf_write_byte(context, EMPTY_STRING_TYPE);
+        return Encoder_writeByte(context, EMPTY_STRING_TYPE);
     }
 
     // Check for idx
-    int return_value = encode_reference_AMF3(context, context->string_refs, value, 0);
-    if (return_value > -1)
-        return return_value;
+    int result = encode_reference_AMF3(context, (RefObj*)context->string_refs, value, 0);
+    if (result > -1)
+        return result;
 
     return encode_unicode_AMF3(context, value); 
 }
 
 /* Encode a PyUnicode. */
-static int encode_unicode_AMF3(EncoderContext *context, PyObject *value)
+static int encode_unicode_AMF3(EncoderObj *context, PyObject *value)
 {
     PyObject *PyString_value = PyUnicode_AsUTF8String(value);
     return encode_string(context, PyString_value);
 }
 
 /* Serialize a PyString. */
-static int serialize_string_AMF3(EncoderContext *context, PyObject *value)
+static int serialize_string_AMF3(EncoderObj *context, PyObject *value)
 {
     // Check for empty string
     if (PyString_GET_SIZE(value) == 0) {
         // References are never used for empty strings.
-        return _amf_write_byte(context, EMPTY_STRING_TYPE);
+        return Encoder_writeByte(context, EMPTY_STRING_TYPE);
     }
 
     // Check for idx
-    int return_value = encode_reference_AMF3(context, context->string_refs, value, 0);
-    if (return_value > -1)
-        return return_value;
+    int result = encode_reference_AMF3(context, (RefObj*)context->string_refs, value, 0);
+    if (result > -1)
+        return result;
 
     return encode_string(context, value);
 }
 
 /* Encode a PyString as UTF8. */
-static int encode_string(EncoderContext *context, PyObject *value)
+static int encode_string(EncoderObj *context, PyObject *value)
 {
     /*
      *  TODO: The following code assumes all strings
@@ -274,11 +275,11 @@ static int encode_string(EncoderContext *context, PyObject *value)
         return 0;
 
     // Write string.
-    return _amf_write_string_size(context, char_value, (int)string_len);
+    return Encoder_writeCStringLength(context, char_value, (int)string_len);
 }
 
 /* Encode a PyString or a PyUnicode. */
-static int serialize_object_as_string_AMF3(EncoderContext *context, PyObject *value)
+static int serialize_object_as_string_AMF3(EncoderObj *context, PyObject *value)
 {
     if (PyString_Check(value)) {
         return serialize_string_AMF3(context, value);
@@ -290,13 +291,13 @@ static int serialize_object_as_string_AMF3(EncoderContext *context, PyObject *va
     if (!str_rep)
         return 0;
 
-    int return_value = serialize_string_AMF3(context, str_rep);
+    int result = serialize_string_AMF3(context, str_rep);
     Py_DECREF(str_rep);
-    return return_value;
+    return result;
 }
 
 /* Encode a PyString or a PyUnicode to AMF0. */
-static int encode_object_as_string_AMF0(EncoderContext *context, PyObject *value, int allow_long)
+static int encode_object_as_string_AMF0(EncoderObj *context, PyObject *value, int allow_long)
 {
     if (PyUnicode_Check(value)) {
         return encode_unicode_AMF0(context, value, allow_long);
@@ -308,13 +309,13 @@ static int encode_object_as_string_AMF0(EncoderContext *context, PyObject *value
     if (!str_rep)
         return 0;
 
-    int return_value = encode_string_AMF0(context, str_rep, allow_long);
+    int result = encode_string_AMF0(context, str_rep, allow_long);
     Py_DECREF(str_rep);
-    return return_value;
+    return result;
 }
 
 /* Encode an ArrayCollection header. */
-static int encode_array_collection_header_AMF3(EncoderContext *context)
+static int encode_array_collection_header_AMF3(EncoderObj *context)
 {
     // If ClassDef object has not been created,
     // for ArrayCollection, create it.
@@ -329,7 +330,7 @@ static int encode_array_collection_header_AMF3(EncoderContext *context)
             return 0;
         }
 
-        PyObject *class_def = PyObject_CallMethodObjArgs(context->class_def_mapper, method_name, alias, NULL);
+        PyObject *class_def = PyObject_CallMethodObjArgs(context->class_mapper, method_name, alias, NULL);
         Py_DECREF(method_name);
         Py_DECREF(alias);
 
@@ -344,21 +345,21 @@ static int encode_array_collection_header_AMF3(EncoderContext *context)
         return 0;
 
     // Add an extra item to the index for the array following the collection
-    if (!map_next_object_ref(context->object_refs, Py_None))
+    if (Ref_map((RefObj*)context->obj_refs, Py_None) == -1)
         return 0;
 
-    return _amf_write_byte(context, ARRAY_TYPE);
+    return Encoder_writeByte(context, ARRAY_TYPE);
 }
 
 /* Writes a PyList or PyTuple. */
-static int write_list_AMF3(EncoderContext *context, PyObject *value)
+static int write_list_AMF3(EncoderObj *context, PyObject *value)
 {
     // Write type marker
     if (context->use_collections == Py_True) {
-        if (!_amf_write_byte(context, OBJECT_TYPE))
+        if (!Encoder_writeByte(context, OBJECT_TYPE))
             return 0;
     } else {
-        if (_amf_write_byte(context, ARRAY_TYPE) != 1)
+        if (Encoder_writeByte(context, ARRAY_TYPE) != 1)
             return 0;
     }
     
@@ -366,12 +367,12 @@ static int write_list_AMF3(EncoderContext *context, PyObject *value)
 }
 
 /* Serializes a PyList or PyTuple. */
-static int serialize_list_AMF3(EncoderContext *context, PyObject *value)
+static int serialize_list_AMF3(EncoderObj *context, PyObject *value)
 {
     // Check for idx
-    int return_value = encode_reference_AMF3(context, context->object_refs, value, 0);
-    if (return_value > -1)
-        return return_value;
+    int result = encode_reference_AMF3(context, (RefObj*)context->obj_refs, value, 0);
+    if (result > -1)
+        return result;
 
     // Write ArrayCollection header
     if (context->use_collections == Py_True) {
@@ -383,7 +384,7 @@ static int serialize_list_AMF3(EncoderContext *context, PyObject *value)
 }
 
 /* Encode a PyList or PyTuple. */
-static int encode_list_AMF3(EncoderContext *context, PyObject *value)
+static int encode_list_AMF3(EncoderObj *context, PyObject *value)
 {
     // Add size of list to header
     Py_ssize_t value_len = PySequence_Size(value);
@@ -394,7 +395,7 @@ static int encode_list_AMF3(EncoderContext *context, PyObject *value)
         return 0;
 
     // We're never writing associative array items
-    if (!_amf_write_byte(context, NULL_TYPE))
+    if (!Encoder_writeByte(context, NULL_TYPE))
         return 0;
 
     // Encode each value in the list
@@ -405,9 +406,9 @@ static int encode_list_AMF3(EncoderContext *context, PyObject *value)
         if (!list_item)
             return 0;
 
-        int return_value = encode_AMF3(context, list_item);
+        int result = encode_AMF3(context, list_item);
         Py_DECREF(list_item);
-        if (!return_value)
+        if (!result)
             return 0;
     }
 
@@ -415,7 +416,7 @@ static int encode_list_AMF3(EncoderContext *context, PyObject *value)
 }
 
 /* Encode an ObjectProxy header. */
-static int encode_object_proxy_header_AMF3(EncoderContext *context)
+static int encode_object_proxy_header_AMF3(EncoderObj *context)
 {
     // If ClassDef object has not been created
     // for ObjectProxy, create it.
@@ -430,7 +431,7 @@ static int encode_object_proxy_header_AMF3(EncoderContext *context)
             return 0;
         }
 
-        PyObject *class_def = PyObject_CallMethodObjArgs(context->class_def_mapper, method_name, alias, NULL);
+        PyObject *class_def = PyObject_CallMethodObjArgs(context->class_mapper, method_name, alias, NULL);
         Py_DECREF(method_name);
         Py_DECREF(alias);
 
@@ -445,20 +446,20 @@ static int encode_object_proxy_header_AMF3(EncoderContext *context)
          return 0;
 
     // Add an extra item to the index for the object following the proxy
-    if (!map_next_object_ref(context->object_refs, Py_None))
+    if (Ref_map((RefObj*)context->obj_refs, Py_None) == -1)
         return 0;
 
     // Include type marker
-    return _amf_write_byte(context, OBJECT_TYPE);
+    return Encoder_writeByte(context, OBJECT_TYPE);
 }
 
 /* Serialize a PyDict. */
-static int serialize_dict_AMF3(EncoderContext *context, PyObject *value)
+static int serialize_dict_AMF3(EncoderObj *context, PyObject *value)
 {
     // Check for idx
-    int return_value = encode_reference_AMF3(context, context->object_refs, value, 0);
-    if (return_value > -1) {
-        return return_value;
+    int result = encode_reference_AMF3(context, (RefObj*)context->obj_refs, value, 0);
+    if (result > -1) {
+        return result;
     }
 
     // Write ObjectProxy header
@@ -471,7 +472,7 @@ static int serialize_dict_AMF3(EncoderContext *context, PyObject *value)
 }
 
 /* Encode a dict. */
-static int encode_dict_AMF3(EncoderContext *context, PyObject *value)
+static int encode_dict_AMF3(EncoderObj *context, PyObject *value)
 {
     if (!serialize_class_def_AMF3(context, Py_None)) {
         return 0;
@@ -481,7 +482,7 @@ static int encode_dict_AMF3(EncoderContext *context, PyObject *value)
 }
 
 /* Encode the key/value pairs of a dict. */
-static int encode_dynamic_dict_AMF3(EncoderContext *context, PyObject *value)
+static int encode_dynamic_dict_AMF3(EncoderObj *context, PyObject *value)
 {
     PyObject *key;
     PyObject *val;
@@ -497,25 +498,25 @@ static int encode_dynamic_dict_AMF3(EncoderContext *context, PyObject *value)
     }
 
     // Terminate key/value pairs with empty string
-    if (!_amf_write_byte(context, EMPTY_STRING_TYPE))
+    if (!Encoder_writeByte(context, EMPTY_STRING_TYPE))
         return 0; 
 
     return 1;
 }
 
 /* Serialize a PyDate. */
-static int serialize_date_AMF3(EncoderContext *context, PyObject *value)
+static int serialize_date_AMF3(EncoderObj *context, PyObject *value)
 {
     // Check for idx
-    int return_value = encode_reference_AMF3(context, context->object_refs, value, 0);
-    if (return_value > -1)
-        return return_value;
+    int result = encode_reference_AMF3(context, (RefObj*)context->obj_refs, value, 0);
+    if (result > -1)
+        return result;
 
     return encode_date(context, value);
 }
 
 /* Encode a PyDate. */
-static int encode_date(EncoderContext *context, PyObject *value)
+static int encode_date(EncoderObj *context, PyObject *value)
 {
     // Reference header
     if (!_encode_int_AMF3(context, REFERENCE_BIT))
@@ -553,24 +554,23 @@ static int encode_date(EncoderContext *context, PyObject *value)
  * 1 if reference was found
  * 0 if error.
  */
-static int encode_reference_AMF3(EncoderContext *context, ObjectContext *object_context, PyObject *value, int bit)
+static int encode_reference_AMF3(EncoderObj *context, RefObj *ref_context,
+    PyObject *value, int bit)
 {
     // Using references is an option set in the context
-    if (context->use_refs != Py_True) {
-        return -1;
-    }
-
-    int idx = get_idx_from_ref(object_context, value);
-    if (idx > -1) {
-       if (idx < MAX_INT) {// Max reference count
-           if (!_encode_int_AMF3(context, (idx << (bit + 1)) | (0x00 + bit)))
-               return 0;
-           return 1;
-       }
+    if (context->use_refs == Py_True) {
+        int idx = Ref_ret(ref_context, value);
+        if (idx > -1) {
+            if (idx < MAX_INT) {// Max reference count
+                if (!_encode_int_AMF3(context, (idx << (bit + 1)) | (0x00 + bit)))
+                   return 0;
+               return 1;
+           }
+        }
     }
 
     // Object is not indexed, add index
-    if (!map_next_object_ref(object_context, value))
+    if (Ref_map(ref_context, value) == -1)
         return 0;
 
     return -1;
@@ -583,39 +583,38 @@ static int encode_reference_AMF3(EncoderContext *context, ObjectContext *object_
  * 1 if reference was found
  * 0 if error.
  */
-static int write_reference_AMF0(EncoderContext *context, PyObject *value)
+static int write_reference_AMF0(EncoderObj *context, PyObject *value)
 {
     // Using references is an option set in the context
-    if (context->use_refs != Py_True)
-        return -1;
+    if (context->use_refs == Py_True) {
+        int idx = Ref_ret((RefObj*)context->obj_refs, value);
+        if (idx > -1) {
+            if (idx < MAX_USHORT) {
+                if (!Encoder_writeByte(context, REF_AMF0))
+                    return 0;
 
-    int idx = get_idx_from_ref(context->object_refs, value);
-    if (idx > -1) {
-        if (idx < MAX_USHORT) {
-            if (!_amf_write_byte(context, REF_AMF0))
-                return 0;
+                if (!encode_ushort(context, (unsigned short)idx))
+                    return 0;
 
-            if (!encode_ushort(context, (unsigned short)idx))
-                return 0;
-
-            return 1;
+                return 1;
+            }
         }
     }
 
     // Object is not indexed, add index
-    if (!map_next_object_ref(context->object_refs, value))
+    if (Ref_map((RefObj*)context->obj_refs, value) == -1)
         return 0;
 
     return -1;
 }
 
 /* Serializes a PyByteArray or a PyString. */
-static int serialize_byte_array_AMF3(EncoderContext *context, PyObject *value)
+static int serialize_byte_array_AMF3(EncoderObj *context, PyObject *value)
 {
     // Check for idx
-    int return_value = encode_reference_AMF3(context, context->object_refs, value, 0);
-    if (return_value > -1)
-        return return_value;
+    int result = encode_reference_AMF3(context, (RefObj*)context->obj_refs, value, 0);
+    if (result > -1)
+        return result;
 
     // Length prefix
     Py_ssize_t value_len;
@@ -654,14 +653,14 @@ static int serialize_byte_array_AMF3(EncoderContext *context, PyObject *value)
         return 0;
     }
 
-    return_value = encode_byte_array_AMF3(context, byte_string);
+    result = encode_byte_array_AMF3(context, byte_string);
     Py_DECREF(byte_string);
-    return return_value; 
+    return result; 
     #endif
 }
 
 /* Serializes a PyByteArray or a PyString. */
-static int encode_byte_array_AMF3(EncoderContext *context, PyObject *value)
+static int encode_byte_array_AMF3(EncoderObj *context, PyObject *value)
 {
     Py_ssize_t value_len;
     char *byte_value;
@@ -685,11 +684,11 @@ static int encode_byte_array_AMF3(EncoderContext *context, PyObject *value)
     if (!byte_value)
         return 0;
 
-    return _amf_write_string_size(context, byte_value, (size_t)value_len);
+    return Encoder_writeCStringLength(context, byte_value, (int)value_len);
 }
 
 /* Writes an xml.dom.Document object. */
-static int write_xml_AMF3(EncoderContext *context, PyObject *value)
+static int write_xml_AMF3(EncoderObj *context, PyObject *value)
 {
     int byte_marker;
 
@@ -699,7 +698,7 @@ static int write_xml_AMF3(EncoderContext *context, PyObject *value)
         byte_marker = XML_TYPE;
     }
 
-    if (!_amf_write_byte(context, byte_marker))
+    if (!Encoder_writeByte(context, byte_marker))
         return 0;
 
     return serialize_xml_AMF3(context, value);
@@ -709,20 +708,20 @@ static int write_xml_AMF3(EncoderContext *context, PyObject *value)
 
 
 /* Serializes an xml.dom.Document object. */
-static int serialize_xml_AMF3(EncoderContext *context, PyObject *value)
+static int serialize_xml_AMF3(EncoderObj *context, PyObject *value)
 {
     // Check for idx
-    int return_value = encode_reference_AMF3(context, context->object_refs, value, 0);
-    if (return_value > -1)
-        return return_value;
+    int result = encode_reference_AMF3(context, (RefObj*)context->obj_refs, value, 0);
+    if (result > -1)
+        return result;
 
     PyObject *unicode_value = PyObject_CallMethod(value, "toxml", NULL);
     if (!unicode_value)
         return 0;
 
-    return_value = encode_unicode_AMF3(context, unicode_value);
+    result = encode_unicode_AMF3(context, unicode_value);
     Py_DECREF(unicode_value);
-    return return_value;
+    return result;
 }
 
 /* Returns 1 if a PyObject is a xml.dom.Document object. */
@@ -739,9 +738,9 @@ static int check_xml(PyObject *value)
     if (!doc_class)
         return -1;
     
-    int return_value = PyObject_IsInstance(value, doc_class);
+    int result = PyObject_IsInstance(value, doc_class);
     Py_DECREF(doc_class);
-    return return_value;
+    return result;
 }
 
 /* Returns 1 if a PyObject is a amfast.class_def.as_types.AsByteArray object. */
@@ -758,24 +757,24 @@ static int check_byte_array(PyObject *value)
     if (!class)
         return -1;
 
-    int return_value = PyObject_IsInstance(value, class);
+    int result = PyObject_IsInstance(value, class);
     Py_DECREF(class);
-    return return_value;
+    return result;
 }
 
 /* Serialize a Python object. */
-static int serialize_object_AMF3(EncoderContext *context, PyObject *value)
+static int serialize_object_AMF3(EncoderObj *context, PyObject *value)
 {
     // Check for idx
-    int return_value = encode_reference_AMF3(context, context->object_refs, value, 0);
-    if (return_value > -1)
-        return return_value;
+    int result = encode_reference_AMF3(context, (RefObj*)context->obj_refs, value, 0);
+    if (result > -1)
+        return result;
 
     return encode_object_AMF3(context, value);
 }
 
 /* Encode a Python object. */
-static int encode_object_AMF3(EncoderContext *context, PyObject *value)
+static int encode_object_AMF3(EncoderObj *context, PyObject *value)
 {
 
     // Use object's class to get ClassDef
@@ -795,9 +794,9 @@ static int encode_object_AMF3(EncoderContext *context, PyObject *value)
         if (!dict)
             return 0;
 
-        int return_value = encode_dict_AMF3(context, dict);
+        int result = encode_dict_AMF3(context, dict);
         Py_DECREF(dict);
-        return return_value;
+        return result;
     }
 
     // Class has a ClassDef
@@ -821,9 +820,9 @@ static int encode_object_AMF3(EncoderContext *context, PyObject *value)
         if (!byte_array)
             return 0;
 
-        int return_value = encode_byte_array_AMF3(context, byte_array);
+        int result = encode_byte_array_AMF3(context, byte_array);
         Py_DECREF(byte_array);
-        return return_value; // We don't need to encode anything else.
+        return result; // We don't need to encode anything else.
     }
 
     // Encode static attrs
@@ -849,9 +848,9 @@ static int encode_object_AMF3(EncoderContext *context, PyObject *value)
             return 0;
         }
 
-        int return_value = encode_AMF3(context, static_attr);
+        int result = encode_AMF3(context, static_attr);
         Py_DECREF(static_attr);
-        if (!return_value) {
+        if (!result) {
             Py_DECREF(static_attrs);
             Py_DECREF(class_def);
             return 0;
@@ -867,9 +866,9 @@ static int encode_object_AMF3(EncoderContext *context, PyObject *value)
             return 0;
         }
 
-        int return_value = encode_dynamic_dict_AMF3(context, dynamic_attrs);
+        int result = encode_dynamic_dict_AMF3(context, dynamic_attrs);
         Py_DECREF(dynamic_attrs);
-        if (!return_value) {
+        if (!result) {
             Py_DECREF(class_def);
             return 0;
         }
@@ -880,26 +879,26 @@ static int encode_object_AMF3(EncoderContext *context, PyObject *value)
 }
 
 /* Serialize a class definition. */
-static int serialize_class_def_AMF3(EncoderContext *context, PyObject *value)
+static int serialize_class_def_AMF3(EncoderObj *context, PyObject *value)
 {
     // Check for idx
-    int return_value = encode_reference_AMF3(context, context->class_refs, value, 1);
-    if (return_value > -1)
-        return return_value;
+    int result = encode_reference_AMF3(context, (RefObj*)context->class_refs, value, 1);
+    if (result > -1)
+        return result;
 
     return encode_class_def_AMF3(context, value);
 }
 
 /* Encode a class definition. */
-static int encode_class_def_AMF3(EncoderContext *context, PyObject *value)
+static int encode_class_def_AMF3(EncoderObj *context, PyObject *value)
 {
     if (value == Py_None) {
         // Encode as anonymous object
-        if (!_amf_write_byte(context, DYNAMIC))
+        if (!Encoder_writeByte(context, DYNAMIC))
             return 0;
 
         // Anonymous object alias is an empty string
-        if (!_amf_write_byte(context, EMPTY_STRING_TYPE))
+        if (!Encoder_writeByte(context, EMPTY_STRING_TYPE))
             return 0;
         return 1;
     }
@@ -931,9 +930,9 @@ static int encode_class_def_AMF3(EncoderContext *context, PyObject *value)
            return 0;
        }
        
-       int return_value = serialize_object_as_string_AMF3(context, class_alias);
+       int result = serialize_object_as_string_AMF3(context, class_alias);
        Py_DECREF(class_alias);
-       return return_value;
+       return result;
     }
 
     // Encode number of static attrs in header.
@@ -964,9 +963,9 @@ static int encode_class_def_AMF3(EncoderContext *context, PyObject *value)
        return 0;
     }
 
-    int return_value = serialize_object_as_string_AMF3(context, class_alias);
+    int result = serialize_object_as_string_AMF3(context, class_alias);
     Py_DECREF(class_alias);
-    if (!return_value) {
+    if (!result) {
        Py_DECREF(static_attrs);
        return 0;
     }
@@ -980,9 +979,9 @@ static int encode_class_def_AMF3(EncoderContext *context, PyObject *value)
             return 0;
         }
         
-        int return_value = serialize_object_as_string_AMF3(context, attr_name);
+        int result = serialize_object_as_string_AMF3(context, attr_name);
         Py_DECREF(attr_name);
-        if (!return_value)
+        if (!result)
             return 0;
     }
 
@@ -991,45 +990,45 @@ static int encode_class_def_AMF3(EncoderContext *context, PyObject *value)
 }
 
 /* Encode a Python boolean in AMF0. */
-static int encode_bool_AMF0(EncoderContext *context, PyObject *value)
+static int encode_bool_AMF0(EncoderObj *context, PyObject *value)
 {
-    int return_value;
+    int result;
     if (value == Py_True) {
-        return_value = _amf_write_byte(context, TRUE_AMF0);
+        result = Encoder_writeByte(context, TRUE_AMF0);
     } else {
-        return_value = _amf_write_byte(context, FALSE_AMF0);
+        result = Encoder_writeByte(context, FALSE_AMF0);
     }
 
-    return return_value;
+    return result;
 }
 
 /* Encode a PyInt in AMF0. */
-static int encode_int_AMF0(EncoderContext *context, PyObject *value)
+static int encode_int_AMF0(EncoderObj *context, PyObject *value)
 {
     long long_val = PyInt_AsLong(value);
     PyObject *py_long_val = PyLong_FromLong(long_val);
     if (!py_long_val)
         return 0;
 
-    int return_value = encode_long_AMF0(context, py_long_val);
+    int result = encode_long_AMF0(context, py_long_val);
     Py_DECREF(py_long_val);
-    return return_value;
+    return result;
 }
 
 /* Encode a PyLong in AMF0. */
-static int encode_long_AMF0(EncoderContext *context, PyObject *value)
+static int encode_long_AMF0(EncoderObj *context, PyObject *value)
 {
     return _encode_double(context, PyLong_AsDouble(value));
 }
 
 /* Encode a PyFloat in AMF0. */
-static int encode_float_AMF0(EncoderContext *context, PyObject *value)
+static int encode_float_AMF0(EncoderObj *context, PyObject *value)
 {
     return _encode_double(context, PyFloat_AsDouble(value));
 }
 
 /* Encode a native C unsigned short. */
-static int encode_ushort(EncoderContext *context, unsigned short value)
+static int encode_ushort(EncoderObj *context, unsigned short value)
 {
    // Put bytes from short into byte array
    union aligned { // use the same memory for d_value and c_value
@@ -1041,16 +1040,16 @@ static int encode_ushort(EncoderContext *context, unsigned short value)
 
    // AMF numbers are encoded in big endianness
    if (big_endian) {
-       return _amf_write_string_size(context, char_value, 2);
+       return Encoder_writeCStringLength(context, char_value, 2);
    } else {
        // Flip endianness
        char flipped[2] = {char_value[1], char_value[0]};
-       return _amf_write_string_size(context, flipped, 2);
+       return Encoder_writeCStringLength(context, flipped, 2);
    }
 }
 
 /* Encode a native C unsigned int. */
-static int encode_ulong(EncoderContext *context, unsigned int value)
+static int encode_ulong(EncoderObj *context, unsigned int value)
 {
    // Put bytes from long into byte array
    union aligned { // use the same memory for d_value and c_value
@@ -1062,38 +1061,38 @@ static int encode_ulong(EncoderContext *context, unsigned int value)
 
    // AMF numbers are encoded in big endianness
    if (big_endian) {
-       return _amf_write_string_size(context, char_value, 4);
+       return Encoder_writeCStringLength(context, char_value, 4);
    } else {
        // Flip endianness
        char flipped[4] = {char_value[3], char_value[2], char_value[1], char_value[0]};
-       return _amf_write_string_size(context, flipped, 4);
+       return Encoder_writeCStringLength(context, flipped, 4);
    }
 }
 
 /* Write a PyString. */
-static int write_string_AMF0(EncoderContext *context, PyObject *value)
+static int write_string_AMF0(EncoderObj *context, PyObject *value)
 {
     PyObject *unicode_value = PyUnicode_FromObject(value);
     if (!unicode_value)
         return 0;
 
-    int return_value = write_unicode_AMF0(context, unicode_value);
+    int result = write_unicode_AMF0(context, unicode_value);
     Py_DECREF(unicode_value);
-    return return_value;
+    return result;
 }
 
 /* Write a PyUnicode in AMF0. */
-static int write_unicode_AMF0(EncoderContext *context, PyObject *value)
+static int write_unicode_AMF0(EncoderObj *context, PyObject *value)
 {
     Py_ssize_t string_len = PyUnicode_GET_SIZE(value);
 
     if (string_len > 65536) {
-        if (!_amf_write_byte(context, LONG_STRING_AMF0))
+        if (!Encoder_writeByte(context, LONG_STRING_AMF0))
             return 0;
         return encode_unicode_AMF0(context, value, 1);
     }
 
-    if (!_amf_write_byte(context, STRING_AMF0))
+    if (!Encoder_writeByte(context, STRING_AMF0))
         return 0;
 
     return encode_unicode_AMF0(context, value, 0);
@@ -1107,15 +1106,15 @@ static int write_unicode_AMF0(EncoderContext *context, PyObject *value)
  * 0 = don't allow long values
  * -1 = force long value
  */
-static int encode_unicode_AMF0(EncoderContext *context, PyObject *value, int allow_long)
+static int encode_unicode_AMF0(EncoderObj *context, PyObject *value, int allow_long)
 {
     PyObject *PyString_value = PyUnicode_AsUTF8String(value);
     if (!PyString_value)
         return 0;
 
-    int return_value = encode_string_AMF0(context, PyString_value, allow_long);
+    int result = encode_string_AMF0(context, PyString_value, allow_long);
     Py_DECREF(PyString_value);
-    return return_value;
+    return result;
 }
 
 /*
@@ -1126,17 +1125,17 @@ static int encode_unicode_AMF0(EncoderContext *context, PyObject *value, int all
  * 0 = don't allow long values
  * -1 = force long value
  */
-static int encode_string_AMF0(EncoderContext *context, PyObject *value, int allow_long)
+static int encode_string_AMF0(EncoderObj *context, PyObject *value, int allow_long)
 {
     char *char_value = PyString_AS_STRING(value);
     Py_ssize_t string_len = PyString_GET_SIZE(value);
     if (!char_value)
         return 0;
 
-    if (string_len > 65536 && allow_long == 0) {
+    if (string_len > MAX_USHORT && allow_long == 0) {
         PyErr_SetString(amfast_EncodeError, "Long string not allowed.");
         return 0;
-    } else if (string_len > 65536 || allow_long == -1) {
+    } else if (string_len > MAX_USHORT || allow_long == -1) {
         if (!encode_ulong(context, (unsigned int)string_len))
             return 0;
     } else {
@@ -1144,21 +1143,21 @@ static int encode_string_AMF0(EncoderContext *context, PyObject *value, int allo
             return 0;
     }
 
-    return _amf_write_string_size(context, char_value, (size_t)string_len);
+    return Encoder_writeCStringLength(context, char_value, (int)string_len);
 }
 
 /* Write a PyList to AMF0. */
-static int write_list_AMF0(EncoderContext *context, PyObject *value, int write_reference)
+static int write_list_AMF0(EncoderObj *context, PyObject *value, int write_reference)
 {
     if (write_reference) {
-        int return_value = write_reference_AMF0(context, value);
-        if (return_value == 0 || return_value == 1) {
-            return return_value;
+        int result = write_reference_AMF0(context, value);
+        if (result == 0 || result == 1) {
+            return result;
         }
     }
 
     // No reference
-    if (!_amf_write_byte(context, ARRAY_AMF0))
+    if (!Encoder_writeByte(context, ARRAY_AMF0))
         return 0;
 
     Py_ssize_t array_len = PySequence_Size(value);
@@ -1176,9 +1175,9 @@ static int write_list_AMF0(EncoderContext *context, PyObject *value, int write_r
         if (!list_item)
             return 0;
 
-        int return_value = encode_AMF0(context, list_item);
+        int result = encode_AMF0(context, list_item);
         Py_DECREF(list_item);
-        if (!return_value)
+        if (!result)
             return 0;
     }
 
@@ -1186,22 +1185,22 @@ static int write_list_AMF0(EncoderContext *context, PyObject *value, int write_r
 }
 
 /* Write a PyDict to AMF0. */
-static int write_dict_AMF0(EncoderContext *context, PyObject *value)
+static int write_dict_AMF0(EncoderObj *context, PyObject *value)
 {
-    int return_value = write_reference_AMF0(context, value);
-    if (return_value == 0 || return_value == 1) {
-        return return_value;
+    int result = write_reference_AMF0(context, value);
+    if (result == 0 || result == 1) {
+        return result;
     }
 
     // No reference
-    if (!_amf_write_byte(context, OBJECT_AMF0))
+    if (!Encoder_writeByte(context, OBJECT_AMF0))
         return 0;
 
     return encode_dynamic_dict_AMF0(context, value);
 }
 
 /* Write the contents of a Dict to AMF0. */
-static int encode_dynamic_dict_AMF0(EncoderContext *context, PyObject *value)
+static int encode_dynamic_dict_AMF0(EncoderObj *context, PyObject *value)
 {
     PyObject *key;
     PyObject *val;
@@ -1218,14 +1217,14 @@ static int encode_dynamic_dict_AMF0(EncoderContext *context, PyObject *value)
 
     // Terminate key/value pairs.
     char terminator[3] = {0x00, 0x00, 0x09};
-    if (!_amf_write_string_size(context, terminator, 3))
+    if (Encoder_writeCStringLength(context, terminator, 3) == 0)
         return 0;
 
     return 1;
 }
 
 /* Encode a Date object to AMF0 .*/
-static int write_date_AMF0(EncoderContext *context, PyObject *value)
+static int write_date_AMF0(EncoderObj *context, PyObject *value)
 {
     // Dates can use references
     /*int wrote_ref = write_reference_AMF0(context, value);
@@ -1233,7 +1232,7 @@ static int write_date_AMF0(EncoderContext *context, PyObject *value)
         return wrote_ref;
     }*/
 
-    if (!_amf_write_byte(context, DATE_AMF0))
+    if (!Encoder_writeByte(context, DATE_AMF0))
         return 0;
  
     // Call python function to get datetime
@@ -1264,22 +1263,22 @@ static int write_date_AMF0(EncoderContext *context, PyObject *value)
 }
 
 /* Write an XML object in AMF0. */
-static int write_xml_AMF0(EncoderContext *context, PyObject *value)
+static int write_xml_AMF0(EncoderObj *context, PyObject *value)
 {
-    if (!_amf_write_byte(context, XML_DOC_AMF0))
+    if (!Encoder_writeByte(context, XML_DOC_AMF0))
         return 0;
 
     PyObject *unicode_value = PyObject_CallMethod(value, "toxml", NULL);
     if (!unicode_value)
         return 0;
 
-    int return_value = encode_unicode_AMF0(context, unicode_value, -1);
+    int result = encode_unicode_AMF0(context, unicode_value, -1);
     Py_DECREF(unicode_value);
-    return return_value;
+    return result;
 }
 
 /* Encode a Python object that doesn't have a C API in AMF0. */
-static int encode_object_AMF0(EncoderContext *context, PyObject *value)
+static int encode_object_AMF0(EncoderObj *context, PyObject *value)
 {
     // Check for special object types
     int xml_value = check_xml(value);
@@ -1294,7 +1293,7 @@ static int encode_object_AMF0(EncoderContext *context, PyObject *value)
 }
 
 /* Get an object's class def. */
-static PyObject* class_def_from_class(EncoderContext *context, PyObject *value)
+static PyObject* class_def_from_class(EncoderObj *context, PyObject *value)
 {
     // Use object's class to get ClassDef
     PyObject *class_ = PyObject_GetAttrString(value, "__class__");
@@ -1302,37 +1301,37 @@ static PyObject* class_def_from_class(EncoderContext *context, PyObject *value)
         return NULL;
 
     // Create method name, if it does not exist already.
-    if (!context->get_class_def_method_name) {
-        context->get_class_def_method_name = PyString_FromString("getClassDefByClass");
-        if (!context->get_class_def_method_name) {
+    if (!context->class_def_name) {
+        context->class_def_name = PyString_FromString("getClassDefByClass");
+        if (!context->class_def_name) {
             Py_DECREF(class_);
             return NULL;
         }
     }
 
-    PyObject *class_def = PyObject_CallMethodObjArgs(context->class_def_mapper, context->get_class_def_method_name,
+    PyObject *class_def = PyObject_CallMethodObjArgs(context->class_mapper, context->class_def_name,
         class_, NULL);
     Py_DECREF(class_);
     return class_def;
 }
 
 /* Write an anonymous object in AMF0. */
-static int write_anonymous_object_AMF0(EncoderContext *context, PyObject *value)
+static int write_anonymous_object_AMF0(EncoderObj *context, PyObject *value)
 {
-    if (!_amf_write_byte(context, OBJECT_AMF0))
+    if (!Encoder_writeByte(context, OBJECT_AMF0))
         return 0;
 
     PyObject *dict = attributes_from_object(context, value);
     if (!dict)
         return 0;
 
-    int return_value = encode_dynamic_dict_AMF0(context, dict);
+    int result = encode_dynamic_dict_AMF0(context, dict);
     Py_DECREF(dict);
-    return return_value;
+    return result;
 }
 
 /* Get attributes from an anonymous object as a dict. */
-static PyObject* attributes_from_object(EncoderContext *context, PyObject *value)
+static PyObject* attributes_from_object(EncoderObj *context, PyObject *value)
 {
     if (!class_def_mod) {
         class_def_mod = PyImport_ImportModule("amfast.class_def");
@@ -1354,15 +1353,15 @@ static PyObject* attributes_from_object(EncoderContext *context, PyObject *value
 }
 
 /* Encode a ClassDef in AMF0. */
-static int encode_class_def_AMF0(EncoderContext *context, PyObject *value)
+static int encode_class_def_AMF0(EncoderObj *context, PyObject *value)
 {
     PyObject *alias = PyObject_GetAttrString(value, "alias");
     if (!alias)
         return 0;
 
-    int return_value = encode_object_as_string_AMF0(context, alias, 0);
+    int result = encode_object_as_string_AMF0(context, alias, 0);
     Py_DECREF(alias);
-    return return_value;
+    return result;
 }
 
 /* Get static attrs. */
@@ -1408,7 +1407,7 @@ static PyObject* dynamic_attrs_from_class_def(PyObject *class_def, PyObject *val
 }
 
 /* Write a Python object in AMF0. */
-static int write_object_AMF0(EncoderContext *context, PyObject *value)
+static int write_object_AMF0(EncoderObj *context, PyObject *value)
 {
     int wrote_ref = write_reference_AMF0(context, value);
     if (wrote_ref == 0 || wrote_ref == 1) {
@@ -1430,30 +1429,23 @@ static int write_object_AMF0(EncoderContext *context, PyObject *value)
         // Encode this object in AMF3
         Py_DECREF(amf3);
         Py_DECREF(class_def);
-        if (!_amf_write_byte(context, AMF3_AMF0))
+        if (Encoder_writeByte(context, AMF3_AMF0) == 0)
             return 0;
 
         // Create new context for AMF3 encoder
-        EncoderContext *new_context = _copy_encoder_context(context, 1);
-        int return_value = encode_AMF3(new_context, value);
-        if (!return_value) {
-            // AMF3 encode failed
-            _destroy_encoder_context(new_context);
-            return 0;
-        }
-
-        // Set context values = new context values
-        return_value = _amf_write_string_size(context, new_context->buf, new_context->buf_len);
-        if (!_destroy_encoder_context(new_context))
+        EncoderObj *new_context = (EncoderObj*)Encoder_copy(context, 1);
+        if (new_context == NULL)
             return 0;
 
-        return return_value;
+        int result = encode_AMF3(new_context, value);
+        Py_DECREF(new_context);
+        return result;
     } else {
         Py_DECREF(amf3);
     }
 
     // Write marker byte
-    if (!_amf_write_byte(context, TYPED_OBJ_AMF0)) {
+    if (!Encoder_writeByte(context, TYPED_OBJ_AMF0)) {
         Py_DECREF(class_def);
         return 0;
     }
@@ -1516,10 +1508,10 @@ static int write_object_AMF0(EncoderContext *context, PyObject *value)
             return 0;
         }
 
-        int return_value = PyDict_SetItem(attrs, static_attr_name, static_attr);
+        int result = PyDict_SetItem(attrs, static_attr_name, static_attr);
         Py_DECREF(static_attr_name);
         Py_DECREF(static_attr);
-        if (return_value == -1) {
+        if (result == -1) {
             Py_DECREF(class_def);
             Py_DECREF(attrs);
             Py_DECREF(static_attrs);
@@ -1538,9 +1530,9 @@ static int write_object_AMF0(EncoderContext *context, PyObject *value)
             return 0;
         }
 
-        int return_value = PyDict_Merge(attrs, dynamic_attrs, 0);
+        int result = PyDict_Merge(attrs, dynamic_attrs, 0);
         Py_DECREF(dynamic_attrs);
-        if (return_value == -1) {
+        if (result == -1) {
             Py_DECREF(class_def);
             Py_DECREF(attrs);
             return 0;
@@ -1548,13 +1540,13 @@ static int write_object_AMF0(EncoderContext *context, PyObject *value)
     }
     Py_DECREF(class_def);
 
-    int return_value = encode_dynamic_dict_AMF0(context, attrs);
+    int result = encode_dynamic_dict_AMF0(context, attrs);
     Py_DECREF(attrs);
-    return return_value;
+    return result;
 }
 
 /* Encode an AMF packet. */
-static int _encode_packet(EncoderContext *context, PyObject *value)
+static int _encode_packet(EncoderObj *context, PyObject *value)
 {
     // write flash version
     PyObject *client_type = PyObject_GetAttrString(value, "version");
@@ -1673,24 +1665,24 @@ static int _encode_packet(EncoderContext *context, PyObject *value)
 }
 
 /* Encode a Packet header in AMF0. */
-static int encode_packet_header_AMF0(EncoderContext *context, PyObject *value)
+static int encode_packet_header_AMF0(EncoderObj *context, PyObject *value)
 {
     PyObject *header_name = PyObject_GetAttrString(value, "name");
     if (!header_name)
         return 0;
 
-    int return_value = encode_object_as_string_AMF0(context, header_name, 0);
+    int result = encode_object_as_string_AMF0(context, header_name, 0);
     Py_DECREF(header_name);
-    if (!return_value)
+    if (!result)
         return 0;
 
     PyObject *required = PyObject_GetAttrString(value, "required");
     if (!required)
         return 0;
 
-    return_value = encode_bool_AMF0(context, required);
+    result = encode_bool_AMF0(context, required);
     Py_DECREF(required);
-    if (!return_value)
+    if (!result)
         return 0;
 
     PyObject *body = PyObject_GetAttrString(value, "value");
@@ -1698,10 +1690,15 @@ static int encode_packet_header_AMF0(EncoderContext *context, PyObject *value)
         return 0;
 
     // Encode header value with a new context, so references are reset
-    EncoderContext *new_context = _copy_encoder_context(context, 0);
-    return_value = encode_AMF0(new_context, body);
+    !!!TODO!!! 
+    !!!HERE!!!
+    We have to create a context with a new buffer,
+    !!!Because we have to encode the byte length before the bytes!!!
+
+    EncoderObj *new_context = (EncoderObj*)Encoder_copy(context, 0);
+    result = encode_AMF0(new_context, body);
     Py_DECREF(body);
-    if (!return_value) {
+    if (!result) {
         _destroy_encoder_context(new_context);
         return 0;
     }
@@ -1711,29 +1708,29 @@ static int encode_packet_header_AMF0(EncoderContext *context, PyObject *value)
         return 0;
     }
 
-    return_value = _amf_write_string_size(context, new_context->buf, new_context->buf_len);
+    result = Encoder_writeCStringLength(context, new_context->buf, new_context->buf_len);
     _destroy_encoder_context(new_context);
-    return return_value;
+    return result;
 }
 
 /* Encode a Packet message in AMF0. */
-static int encode_packet_message_AMF0(EncoderContext *context, PyObject *value)
+static int encode_packet_message_AMF0(EncoderObj *context, PyObject *value)
 {
     PyObject *target = PyObject_GetAttrString(value, "target");
     if (!target)
         return 0;
 
-    int return_value = encode_object_as_string_AMF0(context, target, 0);
+    int result = encode_object_as_string_AMF0(context, target, 0);
     Py_DECREF(target);
-    if (!return_value)
+    if (!result)
         return 0;
 
     PyObject *response = PyObject_GetAttrString(value, "response");
     if (!response)
         return 0;
 
-    return_value = encode_object_as_string_AMF0(context, response, 0);
-    if (!return_value) {
+    result = encode_object_as_string_AMF0(context, response, 0);
+    if (!result) {
         Py_DECREF(response);
         return 0;
     }
@@ -1745,25 +1742,32 @@ static int encode_packet_message_AMF0(EncoderContext *context, PyObject *value)
     }
 
     // Encode message body with a new context, so references are reset
-    EncoderContext *new_context = _copy_encoder_context(context, context->use_amf3);
+    //
+    
+    !!!TODO!!!
+    Copy with new buffer so that 
+    We can create encode the message length 1st
+    !!!!!
+
+    EncoderObj *new_context = _copy_encoder_context(context, context->use_amf3);
 
     if (PySequence_Size(response) > 0 && (PyList_Check(body) || PyTuple_Check(body))) {
         // We're encoding a request,
         // Don't count argument list 
         // in reference count.
-        return_value = write_list_AMF0(new_context, body, 0);
+        result = write_list_AMF0(new_context, body, 0);
     } else {
         if (context->amf3 == Py_True) {
-            if (!_amf_write_byte(new_context, AMF3_AMF0))
+            if (!Encoder_writeByte(new_context, AMF3_AMF0))
                 return 0;
-            return_value = encode_AMF3(new_context, body);
+            result = encode_AMF3(new_context, body);
         } else {
-            return_value = encode_AMF0(new_context, body);
+            result = encode_AMF0(new_context, body);
         }
     }
     Py_DECREF(response);
     Py_DECREF(body);
-    if (!return_value) {
+    if (!result) {
         _destroy_encoder_context(new_context);
         return 0;
     }
@@ -1773,13 +1777,13 @@ static int encode_packet_message_AMF0(EncoderContext *context, PyObject *value)
         return 0;
     }
 
-    return_value = _amf_write_string_size(context, new_context->buf, new_context->buf_len);
+    result = Encoder_writeCStringLength(context, new_context->buf, new_context->buf_len);
     _destroy_encoder_context(new_context);
-    return return_value;
+    return result;
 }
 
 /* Encode a Python object that doesn't have a C API in AMF3. */
-static int encode_unknown_object_AMF3(EncoderContext *context, PyObject *value)
+static int encode_unknown_object_AMF3(EncoderObj *context, PyObject *value)
 {
     // Check for special object types
     int xml_value = check_xml(value);
@@ -1794,39 +1798,39 @@ static int encode_unknown_object_AMF3(EncoderContext *context, PyObject *value)
     if (byte_array_value == -1) {
         return 0;
     } else if (byte_array_value == 1) {
-        if (!_amf_write_byte(context, BYTE_ARRAY_TYPE))
+        if (!Encoder_writeByte(context, BYTE_ARRAY_TYPE))
             return 0;
         return serialize_byte_array_AMF3(context, value);
     }
     #endif
 
     // Generic object
-    if (!_amf_write_byte(context, OBJECT_TYPE))
+    if (!Encoder_writeByte(context, OBJECT_TYPE))
             return 0;
 
     return serialize_object_AMF3(context, value);
 }
 
 /* Encoding function map for AMF0. */
-static int encode_AMF0(EncoderContext *context, PyObject *value)
+static int encode_AMF0(EncoderObj *context, PyObject *value)
 {
     // Determine object type
     if (value == Py_None) {
-        return _amf_write_byte(context, NULL_AMF0);
+        return Encoder_writeByte(context, NULL_AMF0);
     } else if (PyBool_Check(value)) {
-        if (!_amf_write_byte(context, BOOL_AMF0))
+        if (!Encoder_writeByte(context, BOOL_AMF0))
             return 0;
         return encode_bool_AMF0(context, value);
     } else if (PyInt_Check(value)) {
-        if (!_amf_write_byte(context, NUMBER_AMF0))
+        if (!Encoder_writeByte(context, NUMBER_AMF0))
             return 0;
         return encode_int_AMF0(context, value);
     } else if (PyLong_Check(value)) {
-        if (!_amf_write_byte(context, NUMBER_AMF0))
+        if (!Encoder_writeByte(context, NUMBER_AMF0))
             return 0;
         return encode_long_AMF0(context, value);
     } else if (PyFloat_Check(value)) {
-        if (!_amf_write_byte(context, NUMBER_AMF0))
+        if (!Encoder_writeByte(context, NUMBER_AMF0))
             return 0;
         return encode_float_AMF0(context, value);
     } else if (PyString_Check(value)) {
@@ -1845,7 +1849,7 @@ static int encode_AMF0(EncoderContext *context, PyObject *value)
 }
 
 /* Encoding function map. */
-static int encode_AMF3(EncoderContext *context, PyObject *value)
+static int encode_AMF3(EncoderObj *context, PyObject *value)
 {
     // Determine object type
     if (value == Py_None) {
@@ -1855,29 +1859,29 @@ static int encode_AMF3(EncoderContext *context, PyObject *value)
     } else if (PyInt_Check(value)) {
         return write_int_AMF3(context, value);
     } else if (PyString_Check(value)) {
-        if (!_amf_write_byte(context, STRING_TYPE))
+        if (!Encoder_writeByte(context, STRING_TYPE))
             return 0;
         return serialize_string_AMF3(context, value);
     } else if (PyUnicode_Check(value)) {
-        if (!_amf_write_byte(context, STRING_TYPE))
+        if (!Encoder_writeByte(context, STRING_TYPE))
             return 0;
         return serialize_unicode_AMF3(context, value);
     } else if (PyFloat_Check(value)) {
-        if (!_amf_write_byte(context, DOUBLE_TYPE))
+        if (!Encoder_writeByte(context, DOUBLE_TYPE))
             return 0;
         return encode_float(context, value);
     } else if (PyLong_Check(value)) {
-        if (!_amf_write_byte(context, DOUBLE_TYPE))
+        if (!Encoder_writeByte(context, DOUBLE_TYPE))
             return 0;
         return encode_long_AMF3(context, value);
     } else if (PyList_Check(value) || PyTuple_Check(value)) {
         return write_list_AMF3(context, value);
     } else if (PyDict_Check(value)) {
-        if (!_amf_write_byte(context, OBJECT_TYPE))
+        if (!Encoder_writeByte(context, OBJECT_TYPE))
             return 0;
         return serialize_dict_AMF3(context, value);
     } else if (PyDateTime_Check(value) || PyDate_Check(value)) {
-        if (!_amf_write_byte(context, DATE_TYPE))
+        if (!Encoder_writeByte(context, DATE_TYPE))
             return 0;
         return serialize_date_AMF3(context, value);
     }
@@ -1885,7 +1889,7 @@ static int encode_AMF3(EncoderContext *context, PyObject *value)
     #ifdef Py_BYTEARRAYOBJECT_H
     // ByteArray encoding is only available in 2.6+
     else if (PyByteArray_Check(value)) {
-        if (!_amf_write_byte(context, BYTE_ARRAY_TYPE))
+        if (!Encoder_writeByte(context, BYTE_ARRAY_TYPE))
             return 0;
         return serialize_byte_array_AMF3(context, value);
     } 
@@ -1897,7 +1901,7 @@ static int encode_AMF3(EncoderContext *context, PyObject *value)
 }
 
 /* Encode a Python object in AMF. */
-static PyObject* pyencode_AMF3(PyObject *self, PyObject *args, PyObject *kwargs)
+static PyObject* py_encode(PyObject *self, PyObject *args, PyObject *kwargs)
 {
     PyObject *value;
     EncoderObj *context;
@@ -1906,7 +1910,7 @@ static PyObject* pyencode_AMF3(PyObject *self, PyObject *args, PyObject *kwargs)
         return NULL;
 
     if (Encoder_check((PyObject*)context) != 1) {
-        PyErr_SetString(amfast_EncodeError, "Argument must be of type amfast.context.EncoderContext");
+        PyErr_SetString(amfast_EncodeError, "Argument must be of type amfast.context.EncoderObj");
         return NULL;
     }
 
@@ -1928,7 +1932,7 @@ static PyObject* py_encode_packet(PyObject *self, PyObject *args, PyObject *kwar
         return NULL;
 
     if (Encoder_check((PyObject*)context) != 1) {
-        PyErr_SetString(amfast_EncodeError, "Argument must be of type amfast.context.EncoderContext");
+        PyErr_SetString(amfast_EncodeError, "Argument must be of type amfast.context.EncoderObj");
         return NULL;
     }
 
@@ -1947,7 +1951,7 @@ static PyMethodDef encoder_methods[] = {
     "arguments:\n"
     "===========\n"
     " * value = object, Object to encode.\n"
-    " * contest - amfast.context.EncoderContext, Holds options valid for a single encode session.\n"},
+    " * contest - amfast.context.EncoderObj, Holds options valid for a single encode session.\n"},
     {"encode_packet", (PyCFunction)py_encode_packet, METH_VARARGS | METH_KEYWORDS,
     "Description:\n"
     "=============\n"
@@ -1958,7 +1962,7 @@ static PyMethodDef encoder_methods[] = {
     "arguments:\n"
     "===========\n"
     " * packet - amfast.remoting.Packet, The AMF packet to encode.\n"
-    " * contest - amfast.context.EncoderContext, Holds options valid for a single encode session.\n"},
+    " * contest - amfast.context.EncoderObj, Holds options valid for a single encode session.\n"},
 
     {NULL, NULL, 0, NULL}   /* sentinel */
 };
