@@ -82,18 +82,3 @@ typedef int Py_ssize_t;
 #define PY_SSIZE_T_MAX INT_MAX
 #define PY_SSIZE_T_MIN INT_MIN
 #endif
-
-/* A dynamic array of ObjectRefs. */
-typedef struct {
-    PyObject **data;
-    PyObject *references; // Map pointers to indexes
-    size_t data_len;
-    size_t data_size;
-} ObjectContext;
-
-ObjectContext* create_object_context(size_t size);
-PyObject* get_ref_from_idx(ObjectContext *context, int idx);
-int destroy_object_context(ObjectContext *context);
-int map_next_object_ref(ObjectContext *context, PyObject *ref);
-int map_next_object_idx(ObjectContext *context, PyObject *ref);
-int get_idx_from_ref(ObjectContext *context, PyObject *ref);

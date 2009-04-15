@@ -112,12 +112,14 @@ class ExternClassDef(ClassDef):
     def __init__(self, class_, alias=None, static_attrs=None, _built_in=False):
         ClassDef.__init__(self, class_, alias, static_attrs, amf3=True, _built_in=_built_in)
  
-    def writeByteString(self, obj):
-        """Returns a byte string representation of the object.
-
+    def writeExternal(self, obj, context):
+        """
         This method must be overridden in a sub-class.
 
-        The return value can be a string or a ByteArray.
+        arguments
+        ==========
+         * obj - object, The object that is being encoded.
+         * context - amfast.decoder.EncoderContext, holds encoding related properties.
         """
         raise ClassDefError("This method must be implemented by a sub-class.")
 

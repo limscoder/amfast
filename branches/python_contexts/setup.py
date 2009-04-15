@@ -5,11 +5,11 @@ from distutils.core import setup, Extension
 
 extensions = [
     Extension('amfast.encoder',
-        sources = [os.path.join('amfast', 'ext_src', 'encoder.c'),
-            os.path.join('amfast', 'ext_src', 'amf_common.c'), ]),
+        sources = [os.path.join('amfast', 'ext_src', 'encoder.c')),
+            os.path.join('amfast', 'ext_src', 'buffer.c'),
+            os.path.join('amfast', 'ext_src', 'context.c')]),
     Extension('amfast.decoder',
         sources = [os.path.join('amfast', 'ext_src', 'decoder.c'),
-            os.path.join('amfast', 'ext_src', 'amf_common.c'),
             os.path.join('amfast', 'ext_src', 'buffer.c'),
             os.path.join('amfast', 'ext_src', 'context.c')]),
     Extension('amfast.buffer',
