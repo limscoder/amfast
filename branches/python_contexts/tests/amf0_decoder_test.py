@@ -4,7 +4,7 @@ import unittest
 from StringIO import StringIO
 
 from amfast.context import DecoderContext
-import amfast.decoder as decoder
+import amfast.decode as decode
 import amfast.class_def as class_def
 
 class Amf0DecoderTestCase(unittest.TestCase):
@@ -16,13 +16,13 @@ class Amf0DecoderTestCase(unittest.TestCase):
         self.class_mapper = class_def.ClassDefMapper()
 
     def testFalse(self):
-        self.assertEquals(False, decoder.decode(DecoderContext('\x01\x00')))
+        self.assertEquals(False, decode.decode(DecoderContext('\x01\x00')))
 
     def testStringInput(self):
-        self.assertEquals(False, decoder.decode('\x01\x00'))
+        self.assertEquals(False, decode.decode('\x01\x00'))
 
     def testTrue(self):
-        self.assertEquals(True, decoder.decode(DecoderContext('\x01\x01')))
+        self.assertEquals(True, decode.decode(DecoderContext('\x01\x01')))
 
     def testNumber(self):
         tests = {
@@ -35,7 +35,7 @@ class Amf0DecoderTestCase(unittest.TestCase):
         }
 
         for number, encoding in tests.iteritems():
-            self.assertEquals(number, decoder.decode(DecoderContext(encoding)))
+            self.assertEquals(number, decode.decode(DecoderContext(encoding)))
 
     def testString(self):
         tests = {
@@ -44,28 +44,28 @@ class Amf0DecoderTestCase(unittest.TestCase):
         }
 
         for string, encoding in tests.iteritems():
-            self.assertEquals(string, decoder.decode(DecoderContext(encoding)))
+            self.assertEquals(string, decode.decode(DecoderContext(encoding)))
 
     def testLongString(self):
         decoded = 's' * 65537
         encoded = '\x0C\x00\x01\x00\x01' + decoded
   
-        self.assertEquals(decoded, decoder.decode(DecoderContext(encoded)))
+        self.assertEquals(decoded, decode.decode(DecoderContext(encoded)))
 
     def testNull(self):
-        self.assertEquals(None, decoder.decode(DecoderContext('\x05')))
+        self.assertEquals(None, decode.decode(DecoderContext('\x05')))
 
     def testUndefined(self):
-        self.assertEquals(None, decoder.decode(DecoderContext('\x06')))
+        self.assertEquals(None, decode.decode(DecoderContext('\x06')))
 
     def testAnonObj(self):
         encoded = '\x03' #header
         encoded += '\x00\x04spam\x02\x00\x04eggs' #values
         encoded += '\x00\x00\t' # terminator
-        result = decoder.decode(DecoderContext(encoded))
+        result = decode.decode(DecoderContext(encoded))
         self.assertEquals('eggs', result['spam'])
 
-        result = decoder.decode(DecoderContext(StringIO(encoded)))
+        result = decode.decode(DecoderContext(StringIO(encoded)))
         self.assertEquals('eggs', result['spam'])
 
     def testMixedArray(self):
@@ -73,10 +73,10 @@ class Amf0DecoderTestCase(unittest.TestCase):
         encoded += '\x00\x04spam\x02\x00\x04eggs' #values
         encoded += '\x00\x00\t' # terminator
 
-        result = decoder.decode(DecoderContext(encoded))
+        result = decode.decode(DecoderContext(encoded))
         self.assertEquals('eggs', result['spam'])
 
-        result = decoder.decode(DecoderContext(StringIO(encoded)))
+        result = decode.decode(DecoderContext(StringIO(encoded)))
         self.assertEquals('eggs', result['spam'])
 
     def testArray(self):
@@ -86,18 +86,18 @@ class Amf0DecoderTestCase(unittest.TestCase):
         encoded += '\x00\x3f\xf0\x00\x00\x00\x00\x00\x00' #element 2
         encoded += '\x00\x3f\xf3\xc0\xca\x42\x83\xde\x1b' #element 3
 
-        result = decoder.decode(DecoderContext(encoded))
+        result = decode.decode(DecoderContext(encoded))
         for i, obj in enumerate(decoded):
             self.assertEquals(obj, result[i])
 
-        result = decoder.decode(DecoderContext(StringIO(encoded)))
+        result = decode.decode(DecoderContext(StringIO(encoded)))
         for i, obj in enumerate(decoded):
             self.assertEquals(obj, result[i])
 
     def testDate(self):
         import datetime
         encoded = '\x0BBp+6!\x15\x80\x00\x00\x00'
-        result = decoder.decode(DecoderContext(encoded))
+        result = decode.decode(DecoderContext(encoded))
         self.assertEquals(2005, result.year)
         self.assertEquals(3, result.month)
         self.assertEquals(18, result.day)
@@ -112,7 +112,7 @@ class Amf0DecoderTestCase(unittest.TestCase):
         encoded += '\x00\x00\x00\x55' # String header
         encoded += '<?xml version="1.0" ?><test>\n            <test_me>tester</test_me>\n           </test>' # encoded XML
 
-        result = decoder.decode(DecoderContext(encoded))
+        result = decode.decode(DecoderContext(encoded))
         self.assertEquals(xml.dom.minidom.Document, result.__class__)
 
     def testDynamicObj(self):
@@ -121,7 +121,7 @@ class Amf0DecoderTestCase(unittest.TestCase):
         encoded = '\x10\x00\x0Aalias.spam'
         encoded += '\x00\x04spam\x02\x00\x04eggs\x00\x00\x09' # dynamic attrs
 
-        result = decoder.decode(DecoderContext(encoded, class_def_mapper=self.class_mapper))
+        result = decode.decode(DecoderContext(encoded, class_def_mapper=self.class_mapper))
         self.class_mapper.unmapClass(self.Spam)
 
         self.assertEquals('eggs', result.spam)
@@ -132,7 +132,7 @@ class Amf0DecoderTestCase(unittest.TestCase):
         encoded = '\x10\x00\x0Aalias.spam'
         encoded += '\x00\x04spam\x02\x00\x04eggs\x00\x00\x09' # dynamic attrs
 
-        result = decoder.decode(DecoderContext(encoded, class_def_mapper=self.class_mapper))
+        result = decode.decode(DecoderContext(encoded, class_def_mapper=self.class_mapper))
         self.class_mapper.unmapClass(self.Spam)
 
         self.assertEquals('eggs', result.spam)
@@ -143,7 +143,7 @@ class Amf0DecoderTestCase(unittest.TestCase):
         encoded += '\x07\x00\x01' # ref to obj 1
         encoded += '\x07\x00\x01' # ref to obj 1
         encoded += '\x07\x00\x00' # circular ref
-        result = decoder.decode(DecoderContext(encoded))
+        result = decode.decode(DecoderContext(encoded))
 
         self.assertEquals(4, len(result))
         self.assertEquals(result, result.pop(-1))
@@ -151,7 +151,7 @@ class Amf0DecoderTestCase(unittest.TestCase):
             self.assertEquals('eggs', obj['spam'])
 
     def testUnkownByteRaisesException(self):
-        self.assertRaises(decoder.DecodeError, decoder.decode, DecoderContext('\xFF'))
+        self.assertRaises(decode.DecodeError, decode.decode, DecoderContext('\xFF'))
 
 def suite():
     return unittest.TestLoader().loadTestsFromTestCase(Amf0DecoderTestCase)

@@ -234,8 +234,7 @@ static void Ref_dealloc(RefObj *self)
  */
 static int Ref_map(RefObj *self, PyObject *obj)
 {
-    Py_XDECREF(self->refs);
-    PyObject *key = PyLong_FromVoidPtr(obj);
+    PyObject *key = PyLong_FromVoidPtr((void*)obj);
     if (key == NULL)
         return -1;
 
@@ -282,13 +281,18 @@ static PyObject* PyRef_map(RefObj *self, PyObject *args, PyObject *kwargs)
  */
 static int Ref_ret(RefObj *self, PyObject *obj)
 {
-    PyObject *key = PyLong_FromVoidPtr(obj);
+    PyObject *key = PyLong_FromVoidPtr((void*)obj);
     if (key == NULL)
         return -1;
 
+    if (PyDict_Contains(self->refs, key) == 0) {
+        Py_DECREF(key);
+        return -1;
+    }
+
     PyObject *val = PyDict_GetItem(self->refs, key);
     Py_DECREF(key);
-    if (!val)
+    if (val == NULL)
         return -1;
 
     long idx = PyInt_AsLong(val);

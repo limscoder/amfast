@@ -4,9 +4,9 @@ from setuptools import setup, find_packages
 from distutils.core import setup, Extension
 
 extensions = [
-    Extension('amfast.encoder',
+    Extension('amfast.encode',
         sources = [os.path.join('amfast', 'ext_src', 'encoder.c')]),
-    Extension('amfast.decoder',
+    Extension('amfast.decode',
         sources = [os.path.join('amfast', 'ext_src', 'decoder.c')]),
     Extension('amfast.buffer',
         sources = [os.path.join('amfast', 'ext_src', 'buffer.c')]),

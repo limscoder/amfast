@@ -1543,7 +1543,7 @@ static PyObject* py_decode_packet(PyObject *self, PyObject *args, PyObject *kwar
 // ---- Module init
 
 /* Expose functions as Python module functions. */
-static PyMethodDef decoder_methods[] = {
+static PyMethodDef decode_methods[] = {
     {"decode", (PyCFunction)py_decode, METH_VARARGS | METH_KEYWORDS,
     "Description:\n"
     "=============\n"
@@ -1568,12 +1568,12 @@ static PyMethodDef decoder_methods[] = {
 };
 
 PyMODINIT_FUNC
-initdecoder(void)
+initdecode(void)
 {
     PyObject *m;
 
     // Create module
-    m = Py_InitModule3("decoder", decoder_methods,
+    m = Py_InitModule3("decode", decode_methods,
         "Tools for decoding AMF streams.");
     if (m == NULL)
         return;
@@ -1609,7 +1609,7 @@ initdecoder(void)
         return;
     }
 
-    amfast_DecodeError = PyErr_NewException("amfast.decoder.DecodeError", amfast_Error, NULL);
+    amfast_DecodeError = PyErr_NewException("amfast.decode.DecodeError", amfast_Error, NULL);
     if (amfast_DecodeError == NULL) {
         return;
     }

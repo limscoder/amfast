@@ -698,9 +698,6 @@ static int write_xml_AMF3(EncoderObj *context, PyObject *value)
     return serialize_xml_AMF3(context, value);
 }
 
-
-
-
 /* Serializes an xml.dom.Document object. */
 static int serialize_xml_AMF3(EncoderObj *context, PyObject *value)
 {
@@ -710,7 +707,7 @@ static int serialize_xml_AMF3(EncoderObj *context, PyObject *value)
         return result;
 
     PyObject *unicode_value = PyObject_CallMethod(value, "toxml", NULL);
-    if (!unicode_value)
+    if (unicode_value == NULL)
         return 0;
 
     result = encode_unicode_AMF3(context, unicode_value);
@@ -786,23 +783,17 @@ static int encode_object_AMF3(EncoderObj *context, PyObject *value)
         return 0;
     }
 
-    // Encode externizeable
-    if (PyObject_HasAttrString(class_def, "EXTERNIZEABLE_CLASS_DEF")) {
-        PyObject *method_name = PyString_FromString("writeByteString");
-        if (!method_name) {
-            Py_DECREF(class_def);
-            return 0;
-        }
-
-        PyObject *byte_array = PyObject_CallMethodObjArgs(class_def, method_name, value, NULL);
-        Py_DECREF(method_name);
+    if (PyObject_HasAttrString(class_def, "EXTERNALIZABLE_CLASS_DEF")) {
+        // Let custom Python function handle the encoding
+        // of Externalizeable objects.
+        PyObject *result = PyObject_CallMethodObjArgs(class_def,
+            context->extern_name, value, (PyObject*)context, NULL);
         Py_DECREF(class_def);
-        if (!byte_array)
+        if (result == NULL)
             return 0;
 
-        int result = encode_byte_array_AMF3(context, byte_array);
-        Py_DECREF(byte_array);
-        return result; // We don't need to encode anything else.
+        Py_DECREF(result);
+        return 1;
     }
 
     // Encode static attrs
@@ -891,8 +882,8 @@ static int encode_class_def_AMF3(EncoderObj *context, PyObject *value)
 
     // Determine header type
     int header;
-    if (PyObject_HasAttrString(value, "EXTERNIZEABLE_CLASS_DEF")) {
-        header = EXTERNIZEABLE;
+    if (PyObject_HasAttrString(value, "EXTERNALIZABLE_CLASS_DEF")) {
+        header = EXTERNALIZABLE;
     } else if (PyObject_HasAttrString(value, "DYNAMIC_CLASS_DEF")) {
         header = DYNAMIC;
     } else {
@@ -903,8 +894,8 @@ static int encode_class_def_AMF3(EncoderObj *context, PyObject *value)
     if (!class_alias)
        return 0;
 
-    // Don't need to encode static attrs of externizeable.
-    if (header == EXTERNIZEABLE) {
+    // Don't need to encode static attrs of externalizeable.
+    if (header == EXTERNALIZABLE) {
        if (!_encode_int_AMF3(context, header)) {
            Py_DECREF(class_alias);
            return 0;
@@ -1398,7 +1389,7 @@ static int write_object_AMF0(EncoderObj *context, PyObject *value)
         if (Encoder_writeByte(context, AMF3_AMF0) == 0)
             return 0;
 
-        // Create new context for AMF3 encoder
+        // Create new context for AMF3 encode
         EncoderObj *new_context = (EncoderObj*)Encoder_copy(context, 1, 0);
         if (new_context == NULL)
             return 0;
@@ -1963,7 +1954,7 @@ static PyObject* py_encode_packet(PyObject *self, PyObject *args, PyObject *kwar
 }
 
 /* Expose functions as Python module functions. */
-static PyMethodDef encoder_methods[] = {
+static PyMethodDef encode_methods[] = {
     {"encode", (PyCFunction)py_encode, METH_VARARGS | METH_KEYWORDS,
     "Description:\n"
     "=============\n"
@@ -1991,11 +1982,11 @@ static PyMethodDef encoder_methods[] = {
 };
 
 PyMODINIT_FUNC
-initencoder(void)
+initencode(void)
 {
     PyObject *m;
 
-    m = Py_InitModule("encoder", encoder_methods);
+    m = Py_InitModule("encode", encode_methods);
     if (m == NULL)
         return;
 
@@ -2035,7 +2026,7 @@ initencoder(void)
         return;
     }
 
-    amfast_EncodeError = PyErr_NewException("amfast.encoder.EncodeError", amfast_Error, NULL);
+    amfast_EncodeError = PyErr_NewException("amfast.encode.EncodeError", amfast_Error, NULL);
     if (amfast_EncodeError == NULL) {
         return;
     }

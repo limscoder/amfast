@@ -26,9 +26,6 @@
 #define DYNAMIC 0x0B
 #define EXTERNALIZABLE 0x07
 
-// TODO: GET rid of this
-#define EXTERNIZEABLE 0x07
-
 // Type markers
 #define UNDEFINED_TYPE 0x00
 #define NULL_TYPE 0x01
