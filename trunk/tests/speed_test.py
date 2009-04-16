@@ -4,9 +4,9 @@ import pyamf
 from pyamf import amf3, amf0
 from pyamf.util import BufferedByteStream
 
-from amfast.context import DecoderContext
-import amfast.encoder as encoder
-import amfast.decoder as decoder
+from amfast.context import DecoderContext, EncoderContext
+import amfast.encode as encode
+import amfast.decode as decode
 import amfast.class_def as class_def
 
 class SpeedTestCase(unittest.TestCase):
@@ -62,10 +62,13 @@ class SpeedTestCase(unittest.TestCase):
 
     def speedTestComplexDict(self, amf3=False):
         complex = {'element': 'ignore', 'objects': self.buildComplex()}
-        encoded = encoder.encode(complex, use_array_collections=True,
-            use_object_proxies=True, class_def_mapper=self.class_mapper,
-            amf3=amf3)
-        decoded = decoder.decode(DecoderContext(encoded,
+ 
+        enc_context = EncoderContext(use_collections=True, use_proxies=True,
+            class_def_mapper=self.class_mapper, amf3=amf3)
+
+        encoded = encode.encode(complex, enc_context)
+
+        decoded = decode.decode(DecoderContext(encoded,
             class_def_mapper=self.class_mapper, amf3=amf3))
 
     def testPyamfComplexDict(self, amf3=False):

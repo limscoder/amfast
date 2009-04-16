@@ -5,6 +5,7 @@ from StringIO import StringIO
 
 from amfast.context import DecoderContext
 import amfast.decode as decode
+from amfast.decoder import Decoder
 import amfast.class_def as class_def
 
 class Amf0DecoderTestCase(unittest.TestCase):
@@ -14,6 +15,7 @@ class Amf0DecoderTestCase(unittest.TestCase):
 
     def setUp(self):
         self.class_mapper = class_def.ClassDefMapper()
+        self.decoder = Decoder()
 
     def testFalse(self):
         self.assertEquals(False, decode.decode(DecoderContext('\x01\x00')))
@@ -21,8 +23,11 @@ class Amf0DecoderTestCase(unittest.TestCase):
     def testStringInput(self):
         self.assertEquals(False, decode.decode('\x01\x00'))
 
+    def testDecoderObj(self):
+        self.assertEquals(False, decode.decode('\x01\x00'))
+
     def testTrue(self):
-        self.assertEquals(True, decode.decode(DecoderContext('\x01\x01')))
+        self.assertEquals(True, self.decoder.decode('\x01\x01'))
 
     def testNumber(self):
         tests = {
