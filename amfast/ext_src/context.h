@@ -4,6 +4,15 @@
 extern "C" {
 #endif
 
+// For 2.4 support
+#if PY_VERSION_HEX < 0x02050000
+#ifndef PY_SSIZE_T_MAX
+typedef int Py_ssize_t;
+#define PY_SSIZE_T_MAX INT_MAX
+#define PY_SSIZE_T_MIN INT_MIN
+#endif
+#endif
+
 /*
  * Contexts are used to keep track of data relevant
  * to a single run through the encoder/decoder.
