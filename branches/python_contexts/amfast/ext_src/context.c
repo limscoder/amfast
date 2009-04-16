@@ -435,7 +435,6 @@ static int Decoder_init(PyObject *self_raw, PyObject *args, PyObject *kwargs)
 
     DecoderObj *self = (DecoderObj*)self_raw;
 
-
     static char *kwlist[] = {"buffer", "class_def_mapper", "amf3", NULL};
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|OO", kwlist,
         &self->buf, &self->class_mapper, &self->amf3))
@@ -862,9 +861,11 @@ static int Encoder_init(PyObject *self_raw, PyObject *args, PyObject *kwargs)
 
     EncoderObj *self = (EncoderObj*)self_raw;
 
-    static char *kwlist[] = {"buffer", "class_def_mapper", "amf3", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|OOO", kwlist,
-        &self->buf, &self->class_mapper, &self->amf3))
+    static char *kwlist[] = {"buffer", "class_def_mapper", "amf3", "use_collections",
+        "use_proxies", "use_references", "use_legacy_xml", "include_private", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|OOOOOOOO", kwlist,
+        &self->buf, &self->class_mapper, &self->amf3, &self->use_collections,
+        &self->use_proxies, &self->use_refs, &self->use_legacy_xml, &self->include_private))
         return -1;
 
     if (self->buf == NULL) {
@@ -881,6 +882,36 @@ static int Encoder_init(PyObject *self_raw, PyObject *args, PyObject *kwargs)
         self->int_buf = 1;
     } else {
         Py_INCREF(self->buf);
+    }
+
+    if (self->amf3 == NULL) {
+        self->amf3 = Py_False;
+        Py_INCREF(self->amf3);
+    }
+
+    if (self->use_collections == NULL) {
+        self->use_collections = Py_False;
+        Py_INCREF(self->use_collections);
+    }
+
+    if (self->use_proxies == NULL) {
+        self->use_proxies = Py_False;
+        Py_INCREF(self->use_proxies);
+    }
+
+    if (self->use_refs == NULL) {
+        self->use_refs = Py_True;
+        Py_INCREF(self->use_refs);
+    }
+
+    if (self->use_legacy_xml == NULL) {
+        self->use_legacy_xml = Py_False;
+        Py_INCREF(self->use_legacy_xml);
+    }
+
+    if (self->include_private == NULL) {
+        self->include_private = Py_False;
+        Py_INCREF(self->include_private);
     }
 
     if (self->class_mapper == NULL) {
@@ -1022,20 +1053,12 @@ static PyObject* Encoder_copy(EncoderObj *self, int amf3, int new_buf)
  */
 static int Encoder_check(PyObject *self)
 {
-    printf("CHECKING ENCODER TYPE\n");
-    printf("context: %p\n", context_mod);
-    printf("amfast: %p\n", amfast_mod);
-    PyModule_Check(context_mod);
-    printf("Getting class\n");
     PyObject *class = PyObject_GetAttrString(context_mod, "EncoderContext");
     if (class == NULL)
         return 0;
 
-    printf("CHECKing instance\n");
     int result = PyObject_IsInstance(self, class);
-    //Py_DECREF(class);
-    printf("CHECKED ENCODER TYPE\n");
-    printf("context -- 2: %p\n", context_mod);
+    Py_DECREF(class);
     return result;
 }
 
@@ -1157,7 +1180,7 @@ static int Encoder_writeByte(EncoderObj *self, char byte)
 static PyObject* Encoder_getReturnVal(EncoderObj *self)
 {
     if (self->int_buf == 1) {
-        return PyObject_CallMethod(self->buf, "getval", NULL); 
+        return PyObject_CallMethod(self->buf, "getvalue", NULL); 
     } else {
         Py_INCREF(self->buf);
         return self->buf;
@@ -1379,7 +1402,7 @@ initcontext(void)
     PyEncoder_API[Encoder_write_NUM] = (void*)Encoder_write;
     PyEncoder_API[Encoder_writeByte_NUM] = (void*)Encoder_writeByte;
     PyEncoder_API[Encoder_tell_NUM] = (void*)Encoder_tell;
-    PyEncoder_API[Encoder_write_NUM] = (void*)Encoder_write;
+    PyEncoder_API[Encoder_read_NUM] = (void*)Encoder_read;
     PyEncoder_API[Encoder_copy_NUM] = (void*)Encoder_copy;
     PyEncoder_API[Encoder_getReturnVal_NUM] = (void*)Encoder_getReturnVal;
 

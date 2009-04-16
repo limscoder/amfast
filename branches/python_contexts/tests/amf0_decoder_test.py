@@ -18,6 +18,9 @@ class Amf0DecoderTestCase(unittest.TestCase):
     def testFalse(self):
         self.assertEquals(False, decoder.decode(DecoderContext('\x01\x00')))
 
+    def testStringInput(self):
+        self.assertEquals(False, decoder.decode('\x01\x00'))
+
     def testTrue(self):
         self.assertEquals(True, decoder.decode(DecoderContext('\x01\x01')))
 

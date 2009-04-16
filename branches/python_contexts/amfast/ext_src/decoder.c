@@ -8,6 +8,7 @@
 // ---- GLOBALS
 static PyObject *xml_dom_mod;
 static PyObject *amfast_mod;
+static PyObject *context_mod;
 static PyObject *remoting_mod;
 static PyObject *as_types_mod;
 static PyObject *amfast_Error;
@@ -1472,40 +1473,71 @@ static PyObject* decode_AMF3(DecoderObj *context)
 /* Decode an AMF stream to a Python obj. */
 static PyObject* py_decode(PyObject *self, PyObject *args, PyObject *kwargs)
 {
-    DecoderObj *context;
+    PyObject *context;
+    DecoderObj *dec_context;
 
     if (!PyArg_ParseTuple(args, "O", &context))
         return NULL;
 
-    if (Decoder_check((PyObject*)context) != 1) {
-        PyErr_SetString(amfast_DecodeError, "Argument must be of type amfast.context.DecoderContext");
+    // If input is a string, create a context object.
+    if (PyString_Check(context) == 1) {
+        PyObject *class = PyObject_GetAttrString(context_mod, "DecoderContext");
+        if (class == NULL)
+            return NULL;
+
+        dec_context = (DecoderObj*)PyObject_CallFunctionObjArgs(class, context, NULL);
+        Py_DECREF(class);
+        if (dec_context == NULL)
+            return NULL;
+    } else if (Decoder_check(context) == 1) {
+        dec_context = (DecoderObj*)context;
+        Py_INCREF(dec_context);
+    } else {
+        PyErr_SetString(amfast_DecodeError, "Argument must be a string or type amfast.context.DecoderContext");
         return NULL;
     }
 
     PyObject *result;
-    if (context->amf3 == Py_True) {
-        result = decode_AMF3(context);
+    if (dec_context->amf3 == Py_True) {
+        result = decode_AMF3(dec_context);
     } else {
-        result = decode_AMF0(context);
+        result = decode_AMF0(dec_context);
     }
-
+ 
+    Py_DECREF(dec_context);
     return result;
 }
 
 /* Decode an AMF Packet from a stream. */
 static PyObject* py_decode_packet(PyObject *self, PyObject *args, PyObject *kwargs)
 {
-    DecoderObj *context;
+    PyObject *context;
+    DecoderObj *dec_context;
 
     if (!PyArg_ParseTuple(args, "O", &context))
         return NULL;
 
-    if (Decoder_check((PyObject*)context) != 1) {
-        PyErr_SetString(amfast_DecodeError, "Argument must be of type amfast.context.DecoderContext");
+    // If input is a string, create a context object.
+    if (PyString_Check(context) == 1) {
+        PyObject *class = PyObject_GetAttrString(context_mod, "DecoderContext");
+        if (class == NULL)
+            return NULL;
+
+        dec_context = (DecoderObj*)PyObject_CallFunctionObjArgs(class, context, NULL);
+        Py_DECREF(class);
+        if (dec_context == NULL)
+            return NULL;
+    } else if (Decoder_check(context) == 1) {
+        dec_context = (DecoderObj*)context;
+        Py_INCREF(dec_context);
+    } else {
+        PyErr_SetString(amfast_DecodeError, "Argument must be a string or type amfast.context.DecoderContext");
         return NULL;
     }
 
-    return decode_packet(context);
+    PyObject *result = decode_packet(dec_context);
+    Py_DECREF(dec_context);
+    return result;
 }
 
 // ---- Module init
@@ -1553,7 +1585,11 @@ initdecoder(void)
             return;
     }
 
-    PyObject *context_mod = import_context_mod();
+    if (context_mod == NULL) {
+        context_mod = import_context_mod();
+        if (context_mod == NULL)
+            return;
+    }
 
     if (!xml_dom_mod) {
         xml_dom_mod = PyImport_ImportModule("xml.dom.minidom");

@@ -1675,7 +1675,6 @@ static int encode_packet_header_AMF0(EncoderObj *context, PyObject *value)
         Py_DECREF(new_context);
         return 0;
     }
-    printf("GOT LEN: %d\n", new_len);
 
     if (!encode_ulong(context, (unsigned int)new_len)) {
         Py_DECREF(new_context);
@@ -1744,7 +1743,6 @@ static int encode_packet_message_AMF0(EncoderObj *context, PyObject *value)
         Py_DECREF(new_context);
         return 0;
     }
-    printf("GOT LEN 2: %d\n", new_len);
 
     if (!encode_ulong(context, (unsigned int)new_len)) {
         Py_DECREF(new_context);
@@ -1894,10 +1892,13 @@ static PyObject* py_encode(PyObject *self, PyObject *args, PyObject *kwargs)
         Py_DECREF(class);
         if (context == NULL)
             return NULL;
+    } else {
+        Py_INCREF(context);
     }
 
     if (Encoder_check(context) != 1) {
         PyErr_SetString(amfast_EncodeError, "Argument must be of type amfast.context.EncoderContext");
+        Py_DECREF(context);
         return NULL;
     }
     EncoderObj *enc_context = (EncoderObj*)context;
@@ -1910,32 +1911,55 @@ static PyObject* py_encode(PyObject *self, PyObject *args, PyObject *kwargs)
     }
 
     if (result == 0) {
+        Py_DECREF(context);
         return NULL;
     }
 
-    return Encoder_getReturnVal(context);
+    PyObject *return_val = Encoder_getReturnVal(enc_context);
+    Py_DECREF(context);
+    return return_val;
 }
 
 /* Encode an AMF Packet object in AMF. */
 static PyObject* py_encode_packet(PyObject *self, PyObject *args, PyObject *kwargs)
 {
-    PyObject *value;
-    EncoderObj *context;
+    PyObject *value = NULL;
+    PyObject *context = NULL;
 
-    if (!PyArg_ParseTuple(args, "OO", &value, &context))
+    static char *kwlist[] = {"value", "context", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|O", kwlist, &value, &context))
         return NULL;
 
-    if (Encoder_check((PyObject*)context) != 1) {
+    // Create default context.
+    if (context == NULL) {
+        PyObject *class = PyObject_GetAttrString(context_mod, "EncoderContext");
+        if (class == NULL)
+            return NULL;
+
+        context = PyObject_CallObject(class, NULL);
+        Py_DECREF(class);
+        if (context == NULL)
+            return NULL;
+    } else {
+        Py_INCREF(context);
+    }
+
+    if (Encoder_check(context) != 1) {
         PyErr_SetString(amfast_EncodeError, "Argument must be of type amfast.context.EncoderContext");
+        Py_DECREF(context);
         return NULL;
     }
+    EncoderObj *enc_context = (EncoderObj*)context;
 
-    int result = encode_packet(context, value);
+    int result = encode_packet(enc_context, value);
     if (result == 0) {
+        Py_DECREF(context);
         return NULL;
     }
 
-    return PyObject_GetAttrString((PyObject*)context, "buffer");
+    PyObject *return_val = Encoder_getReturnVal(enc_context);
+    Py_DECREF(context);
+    return return_val;
 }
 
 /* Expose functions as Python module functions. */
