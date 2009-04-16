@@ -1,9 +1,10 @@
 import unittest
 
 import pyamf
-from pyamf import amf3
+from pyamf import amf3, amf0
 from pyamf.util import BufferedByteStream
 
+from amfast.context import DecoderContext
 import amfast.encoder as encoder
 import amfast.decoder as decoder
 import amfast.class_def as class_def
@@ -11,9 +12,8 @@ import amfast.class_def as class_def
 class SpeedTestCase(unittest.TestCase):
     class TestObject(object):
         def __init__(self):
-            self.number = None
-            self.test_list = ['test']
-            self.sub_obj = None
+            self.null = None
+            self.test_list = ['test', 'tester']
             self.test_dict = {'test': 'ignore'}
 
     class TestSubObject(object):
@@ -21,10 +21,13 @@ class SpeedTestCase(unittest.TestCase):
             self.number = None
 
     def setUp(self):
+        self.test_nu = 10000
         self.class_mapper = class_def.ClassDefMapper()
 
-        self.class_mapper.mapClass(class_def.DynamicClassDef(self.TestObject, 'test_complex.test', ()))
-        self.class_mapper.mapClass(class_def.DynamicClassDef(self.TestSubObject, 'test_complex.sub', ()))
+        self.class_mapper.mapClass(class_def.DynamicClassDef(self.TestObject,
+            'test_complex.test', (), amf3=False))
+        self.class_mapper.mapClass(class_def.DynamicClassDef(self.TestSubObject,
+            'test_complex.sub', (), amf3=False))
 
         pyamf.register_class(self.TestObject, 'test_complex.test')
         pyamf.register_class(self.TestSubObject, 'test_complex.sub')
@@ -42,8 +45,12 @@ class SpeedTestCase(unittest.TestCase):
         for i in range(0, max):
             test_obj = self.TestObject()
             test_obj.number = i
+            test_obj.float = 3.14
+            test_obj.unicode = u'spam'
+            test_obj.str = 'a l' + 'o' * 500 + 'ng string'
             test_obj.sub_obj = self.TestSubObject()
             test_obj.sub_obj.number = i
+            test_obj.ref = test_obj.sub_obj
             test_objects.append(test_obj)
 
         return test_objects
@@ -53,37 +60,49 @@ class SpeedTestCase(unittest.TestCase):
             self.assertEquals(self.TestObject, obj.__class__)
             self.assertEquals(self.TestSubObject, obj.sub_obj.__class__)
 
-    def testComplexDict(self):
+    def speedTestComplexDict(self, amf3=False):
         complex = {'element': 'ignore', 'objects': self.buildComplex()}
-        encoded = encoder.encode(complex, use_array_collections=False, use_object_proxies=False, class_def_mapper=self.class_mapper, amf3=True)
-        decoded = decoder.decode(encoded, class_def_mapper=self.class_mapper, amf3=True)
-        self.resultTest(decoded['objects'])
+        encoded = encoder.encode(complex, use_array_collections=True,
+            use_object_proxies=True, class_def_mapper=self.class_mapper,
+            amf3=amf3)
+        decoded = decoder.decode(DecoderContext(encoded,
+            class_def_mapper=self.class_mapper, amf3=amf3))
 
-    def testPyamfComplexDict(self):
-        return
+    def testPyamfComplexDict(self, amf3=False):
         complex = {'element': 'ignore', 'objects': self.buildComplex()}
-        self.context = pyamf.get_context(pyamf.AMF3)
+        self.context = pyamf.get_context(pyamf.AMF0)
         self.stream = BufferedByteStream()
-        self.pyamf_encoder = pyamf.get_encoder(pyamf.AMF3, data=self.stream, context=self.context)
+        self.pyamf_encoder = pyamf.get_encoder(pyamf.AMF0, data=self.stream, context=self.context)
 
         self.pyamf_encoder.writeElement(complex)
         encoded = self.pyamf_encoder.stream.getvalue()
-        context = amf3.Context()
-        decoded = amf3.Decoder(encoded, context).readElement()
+        context = amf0.Context()
+        decoded = amf0.Decoder(encoded, context).readElement()
 
         self.resultTest(decoded['objects'])
 
-    def testSpeed(self):
+    def testSpeedAmf0(self):
         return
-        for i in range(10000):
-            print "%s ..." % i
-            self.testComplexDict()
+        for i in xrange(self.test_nu):
+            print i
+            self.speedTestComplexDict(amf3=False)
 
-    def testPyamfSpeed(self):
+    def testPyamfSpeedAmf0(self):
         return
-        for i in range(10000):
-            print "%s ..." % i
-            self.testPyamfComplexDict()
+        for i in xrange(self.test_nu):
+            print i
+            self.speedTestPyamfComplexDict(amf3=False)
+
+    def testSpeedAmf3(self):
+        for i in xrange(self.test_nu):
+            print i
+            self.speedTestComplexDict(amf3=True)
+
+    def testPyamfSpeedAmf3(self):
+        return
+        for i in xrange(self.test_nu):
+            print i
+            self.testPyamfComplexDict(amf3=True)
 
 def suite():
     return unittest.TestLoader().loadTestsFromTestCase(SpeedTestCase)

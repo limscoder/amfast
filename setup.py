@@ -4,15 +4,18 @@ from setuptools import setup, find_packages
 from distutils.core import setup, Extension
 
 extensions = [
-    Extension('amfast.encoder',
-        sources = [os.path.join('amfast', 'ext_src', 'encoder.c'),
-            os.path.join('amfast', 'ext_src', 'amf_common.c'), ]),
-    Extension('amfast.decoder',
-        sources = [os.path.join('amfast', 'ext_src', 'decoder.c'),
-            os.path.join('amfast', 'ext_src', 'amf_common.c'), ])]
+    Extension('amfast.encode',
+        sources = [os.path.join('amfast', 'ext_src', 'encoder.c')]),
+    Extension('amfast.decode',
+        sources = [os.path.join('amfast', 'ext_src', 'decoder.c')]),
+    Extension('amfast.buffer',
+        sources = [os.path.join('amfast', 'ext_src', 'buffer.c')]),
+    Extension('amfast.context',
+        sources = [os.path.join('amfast', 'ext_src', 'context.c')])
+    ]
 
 setup(name="AmFast",
-    version = "0.2.3",
+    version = "0.3.0",
     description = "A C extension to encode/decode Python objects with AMF0 and AMF3. Includes support for NetConnection, RemoteObject, IExternizeable, and custom type serialization.",
     url = "http://code.google.com/p/amfast/",
     author = "Dave Thompson",
