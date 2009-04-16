@@ -101,38 +101,40 @@ class DynamicClassDef(ClassDef):
         """
         return get_dynamic_attr_vals(obj, self.static_attrs, include_private=False);
 
-class ExternizeableClassDef(ClassDef):
-    """A ClassDef where the byte string encoding/decoding is customized."""
+class ExternClassDef(ClassDef):
+    """A ClassDef where the byte string encoding/decoding is customized.
+   
+    The Actionscript version of the class must implement IExternalizeable.
+    """
     
-    EXTERNIZEABLE_CLASS_DEF = True
+    EXTERNALIZABLE_CLASS_DEF = True
     
     def __init__(self, class_, alias=None, static_attrs=None, _built_in=False):
         ClassDef.__init__(self, class_, alias, static_attrs, amf3=True, _built_in=_built_in)
  
-    def writeByteString(self, obj):
-        """Returns a byte string representation of the object.
-
+    def writeExternal(self, obj, context):
+        """
         This method must be overridden in a sub-class.
 
-        The return value can be a string or a ByteArray.
+        arguments
+        ==========
+         * obj - object, The object that is being encoded.
+         * context - amfast.decoder.EncoderContext, holds encoding related properties.
         """
         raise ClassDefError("This method must be implemented by a sub-class.")
 
-    def readByteString(self, obj, buf):
-        """Returns an integer specifying the
-        0-indexed position of the last decoded
-        byte in the byte array.
-
+    def readExternal(self, obj, context):
+        """
         This method must be overridden in a sub-class.
 
         arguments
         ==========
          * obj - object, The object that the byte string is being applied to.
-         * buf - string in 2.4 and 2.5, ByteArray in 2.6+, The bytes to be read.
+         * context - amfast.decoder.DecoderContext, holds decoding related properties.
         """
         raise ClassDefError("This method must be implemented by a sub-class.")
 
-class _ProxyClassDef(ExternizeableClassDef):
+class _ProxyClassDef(ExternClassDef):
     """A special class used internally to encode/decode Proxied objects."""
 
     PROXY_CLASS_DEF = True
@@ -143,7 +145,7 @@ class _ProxyClassDef(ExternizeableClassDef):
         pass
 
     def __init__(self):
-        ExternizeableClassDef.__init__(self, self._ProxyObject, self.PROXY_ALIAS,
+        ExternClassDef.__init__(self, self._ProxyObject, self.PROXY_ALIAS,
             None, _built_in=True)
 
 class _ArrayCollectionClassDef(_ProxyClassDef):
