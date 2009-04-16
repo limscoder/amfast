@@ -1,3 +1,4 @@
+#include <Python.h>
 #include "context.h"
 #include "buffer.h"
 
@@ -1019,12 +1020,20 @@ PyObject* Encoder_copy(EncoderObj *self, int amf3, int new_buf)
  */
 int Encoder_check(PyObject *self)
 {
+    printf("CHECKING ENCODER TYPE\n");
+    printf("context: %p\n", context_mod);
+    printf("amfast: %p\n", amfast_mod);
+    PyModule_Check(context_mod);
+    printf("Getting class\n");
     PyObject *class = PyObject_GetAttrString(context_mod, "EncoderContext");
     if (class == NULL)
         return 0;
 
+    printf("CHECKing instance\n");
     int result = PyObject_IsInstance(self, class);
-    Py_DECREF(class);
+    //Py_DECREF(class);
+    printf("CHECKED ENCODER TYPE\n");
+    printf("context -- 2: %p\n", context_mod);
     return result;
 }
 
@@ -1244,9 +1253,18 @@ static PyMethodDef context_methods[] = {
 PyMODINIT_FUNC
 initcontext(void)
 {
-    context_mod = Py_InitModule3("context", context_methods,
+    printf("Initing mod\n");
+/*    PyObject *m = Py_InitModule3("context", context_methods,
         "Tools to manage information relevant to a single run "
-        "through the encoder or decoder.");
+        "through the encoder or decoder.");*/
+    PyObject *m = Py_InitModule("context", context_methods);
+
+    if (m == NULL)
+        return;
+    
+    printf("Still Initing mod\n");
+
+    context_mod = m;
 
     // Import modules
     if (!amfast_mod) {
@@ -1255,11 +1273,9 @@ initcontext(void)
             return;
     }
 
-    if (!buffer_mod) {
-        buffer_mod = PyImport_ImportModule("amfast.buffer");
-        if (!buffer_mod)
-            return;
-    }
+    buffer_mod = import_buffer_mod();
+    if (buffer_mod == NULL)
+        return;
 
     if (!class_def_mod) {
         class_def_mod = PyImport_ImportModule("amfast.class_def");

@@ -1,3 +1,6 @@
+#include <Python.h>
+
+#define BUFFER_MODULE
 #include "buffer.h"
 
 // ------------------------ DECLARATIONS --------------------------------- //
@@ -96,7 +99,7 @@ static PyObject* PyBuffer_seek(BufferObj *self, PyObject *args, PyObject *kwargs
  * Returns a pointer to the current buffer position
  * and increments the position by the given length.
  */
-char* Buffer_read(BufferObj *self, int len)
+static char* Buffer_read(BufferObj *self, int len)
 {
     if ((self->pos + len) < 0) {
         PyErr_SetString(amfast_BufferError, "Attempted to read before start of buffer.");
@@ -315,18 +318,26 @@ static PyMethodDef buffer_methods[] = {
 PyMODINIT_FUNC
 initbuffer(void) 
 {
-    PyObject* m;
-
-    m = Py_InitModule3("buffer", buffer_methods,
+    PyObject *m = Py_InitModule3("buffer", buffer_methods,
         "Tools for encoding and decoding AMF strings.");
 
-    // Setup exceptions
+    // Export C API
+    static void *PyBuffer_API[PyBuffer_API_pointers];
+
+    PyBuffer_API[Buffer_read_NUM] = (void*)Buffer_read;
+
+    PyObject *c_api = PyCObject_FromVoidPtr((void*)PyBuffer_API, NULL);
+    if (c_api != NULL)
+        PyModule_AddObject(m, "_C_API", c_api);
+
+    // Import modules
     if (!amfast_mod) {
         amfast_mod = PyImport_ImportModule("amfast");
         if(!amfast_mod)
             return;
     }
 
+    // Setup exceptions
     amfast_Error = PyObject_GetAttrString(amfast_mod, "AmFastError");
     if (amfast_Error == NULL)
         return;

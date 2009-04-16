@@ -10,6 +10,7 @@
 // ---- GLOBALS
 static PyObject *xml_dom_mod;
 static PyObject *amfast_mod;
+static PyObject *context_mod;
 static PyObject *class_def_mod;
 static PyObject *as_types_mod;
 static PyObject *amfast_Error;
@@ -523,13 +524,6 @@ static int encode_date(EncoderObj *context, PyObject *value)
         return 0;
 
     // Call python function to get datetime
-    if (!amfast_mod) {
-        amfast_mod = PyImport_ImportModule("amfast");
-        if(!amfast_mod) {
-            return 0;
-        }
-    }
-
     PyObject *epoch_func = PyObject_GetAttrString(amfast_mod, "epoch_from_date");
     if (!epoch_func)
         return 0;
@@ -727,13 +721,6 @@ static int serialize_xml_AMF3(EncoderObj *context, PyObject *value)
 /* Returns 1 if a PyObject is a xml.dom.Document object. */
 static int check_xml(PyObject *value)
 {
-    if (!xml_dom_mod) {
-        // Import xml.dom
-        xml_dom_mod = PyImport_ImportModule("xml.dom.minidom");
-        if (!xml_dom_mod)
-            return -1;
-    }
-
     PyObject *doc_class = PyObject_GetAttrString(xml_dom_mod, "Document");
     if (!doc_class)
         return -1;
@@ -746,13 +733,6 @@ static int check_xml(PyObject *value)
 /* Returns 1 if a PyObject is a amfast.class_def.as_types.AsByteArray object. */
 static int check_byte_array(PyObject *value)
 {
-    if (!as_types_mod) {
-        // Import amfast.class_def.as_types
-        as_types_mod = PyImport_ImportModule("amfast.class_def.as_types");
-        if (!as_types_mod)
-            return -1;
-    }
-
     PyObject *class = PyObject_GetAttrString(as_types_mod, "AsByteArray");
     if (!class)
         return -1;
@@ -1236,13 +1216,6 @@ static int write_date_AMF0(EncoderObj *context, PyObject *value)
         return 0;
  
     // Call python function to get datetime
-    if (!amfast_mod) {
-        amfast_mod = PyImport_ImportModule("amfast");
-        if(!amfast_mod) {
-            return 0;
-        }
-    }
-
     PyObject *epoch_func = PyObject_GetAttrString(amfast_mod, "epoch_from_date");
     if (!epoch_func)
         return 0;
@@ -1333,13 +1306,6 @@ static int write_anonymous_object_AMF0(EncoderObj *context, PyObject *value)
 /* Get attributes from an anonymous object as a dict. */
 static PyObject* attributes_from_object(EncoderObj *context, PyObject *value)
 {
-    if (!class_def_mod) {
-        class_def_mod = PyImport_ImportModule("amfast.class_def");
-        if(!class_def_mod) {
-            return NULL;
-        }
-    }
-
     PyObject *attr_func = PyObject_GetAttrString(class_def_mod, "get_dynamic_attr_vals");
     if (!attr_func)
         return NULL;
@@ -1911,22 +1877,41 @@ static int encode_AMF3(EncoderObj *context, PyObject *value)
 /* Encode a Python object in AMF. */
 static PyObject* py_encode(PyObject *self, PyObject *args, PyObject *kwargs)
 {
-    PyObject *value;
-    EncoderObj *context;
+    PyObject *value = NULL;
+    PyObject *context = NULL;
 
-    if (!PyArg_ParseTuple(args, "OO", &value, &context))
+    static char *kwlist[] = {"value", "context", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|O", kwlist, &value, &context))
         return NULL;
 
-    if (Encoder_check((PyObject*)context) != 1) {
-        PyErr_SetString(amfast_EncodeError, "Argument must be of type amfast.context.EncoderObj");
+    // Create default context.
+    /*if (context == NULL) {
+        printf("CREATING default context\n");
+        PyObject *class = PyObject_GetAttrString(context_mod, "EncoderContext");
+        if (class == NULL)
+            return NULL;
+
+        context = PyObject_CallObject(class, NULL);
+        //Py_DECREF(class);
+        if (context == NULL)
+            return NULL;
+    }*/
+
+    printf("created default context\n");
+    printf("encoder's context: %p\n", context_mod);
+    if (Encoder_check(context) != 1) {
+        PyErr_SetString(amfast_EncodeError, "Argument must be of type amfast.context.EncoderContext");
         return NULL;
     }
+    printf("checked context\n");
+    EncoderObj *enc_context = (EncoderObj*)context;
 
     int result;
-    if (context->amf3 == Py_True) {
-        result = encode_AMF3(context, value);
+    printf("encoding\n");
+    if (enc_context->amf3 == Py_True) {
+        result = encode_AMF3(enc_context, value);
     } else {
-        result = encode_AMF0(context, value);
+        result = encode_AMF0(enc_context, value);
     }
 
     if (result == 0) {
@@ -1946,7 +1931,7 @@ static PyObject* py_encode_packet(PyObject *self, PyObject *args, PyObject *kwar
         return NULL;
 
     if (Encoder_check((PyObject*)context) != 1) {
-        PyErr_SetString(amfast_EncodeError, "Argument must be of type amfast.context.EncoderObj");
+        PyErr_SetString(amfast_EncodeError, "Argument must be of type amfast.context.EncoderContext");
         return NULL;
     }
 
@@ -1999,6 +1984,32 @@ initencoder(void)
     if (!amfast_mod) {
         amfast_mod = PyImport_ImportModule("amfast");
         if(!amfast_mod) {
+            return;
+        }
+    }
+
+    if (!context_mod) {
+        context_mod = PyImport_ImportModule("amfast.context");
+        if(!context_mod) {
+            return;
+        }
+    }
+
+    if (!xml_dom_mod) {
+        xml_dom_mod = PyImport_ImportModule("xml.dom.minidom");
+        if (!xml_dom_mod)
+            return;
+    }
+
+    if (!as_types_mod) {
+        as_types_mod = PyImport_ImportModule("amfast.class_def.as_types");
+        if (!as_types_mod)
+            return;
+    }
+
+    if (!class_def_mod) {
+        class_def_mod = PyImport_ImportModule("amfast.class_def");
+        if(!class_def_mod) {
             return;
         }
     }
