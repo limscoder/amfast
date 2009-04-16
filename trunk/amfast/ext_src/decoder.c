@@ -1,6 +1,6 @@
 #include <Python.h>
 
-#include "amf_common.h"
+#include "amf.h"
 #include "context.h"
 
 // ------------------------ DECLARATIONS --------------------------------- //

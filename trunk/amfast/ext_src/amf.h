@@ -1,5 +1,4 @@
 /* Things used by both the encoder and the decoder. */
-#include <Python.h>
 
 // Python date handling API
 #ifndef DATETIME_H
@@ -75,7 +74,9 @@
 
 // For 2.4 support
 #if PY_VERSION_HEX < 0x02050000
+#ifndef PY_SSIZE_T_MAX
 typedef int Py_ssize_t;
 #define PY_SSIZE_T_MAX INT_MAX
 #define PY_SSIZE_T_MIN INT_MIN
+#endif
 #endif
