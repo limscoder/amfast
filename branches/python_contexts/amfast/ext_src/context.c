@@ -1,6 +1,8 @@
 #include <Python.h>
-#include "context.h"
 #include "buffer.h"
+
+#define CONTEXT_MODULE
+#include "context.h"
 
 #include "structmember.h"
 
@@ -51,7 +53,7 @@ static void Idx_dealloc(IdxObj *self)
  * Maps a PyObject to the next index.
  * Returns mapped index, or -1 on failure.
  */
-int Idx_map(IdxObj *self, PyObject *obj)
+static int Idx_map(IdxObj *self, PyObject *obj)
 {
    // Dynamically expand array if needed.
    int new_len = self->pos;
@@ -98,7 +100,7 @@ static PyObject* PyIdx_map(IdxObj *self, PyObject *args, PyObject *kwargs)
  * Retrieves an indexed object.
  * Returns new ref.
  */
-PyObject* Idx_ret(IdxObj *self, int idx)
+static PyObject* Idx_ret(IdxObj *self, int idx)
 {
     if (idx >= self->pos) {
         PyErr_SetString(amfast_ContextError, "Index is out of range.");
@@ -230,7 +232,7 @@ static void Ref_dealloc(RefObj *self)
  * Maps a PyObject to the next index.
  * Returns mapped index, or -1 on failure.
  */
-int Ref_map(RefObj *self, PyObject *obj)
+static int Ref_map(RefObj *self, PyObject *obj)
 {
     Py_XDECREF(self->refs);
     PyObject *key = PyLong_FromVoidPtr(obj);
@@ -278,7 +280,7 @@ static PyObject* PyRef_map(RefObj *self, PyObject *args, PyObject *kwargs)
  * Retrieves an indexed object.
  * Returns index, or -1.
  */
-int Ref_ret(RefObj *self, PyObject *obj)
+static int Ref_ret(RefObj *self, PyObject *obj)
 {
     PyObject *key = PyLong_FromVoidPtr(obj);
     if (key == NULL)
@@ -523,7 +525,7 @@ static void Decoder_dealloc(DecoderObj *self)
  * Copy a Decoder with all the same settings, but
  * reset the index references.
  */
-PyObject* Decoder_copy(DecoderObj *self, int amf3)
+static PyObject* Decoder_copy(DecoderObj *self, int amf3)
 {
     PyObject *decoder_class = PyObject_GetAttrString(context_mod, "DecoderContext");
     if (decoder_class == NULL)
@@ -574,7 +576,7 @@ PyObject* Decoder_copy(DecoderObj *self, int amf3)
 /*
  * Returns 1 if object is a DecoderContext.
  */
-int Decoder_check(PyObject *self)
+static int Decoder_check(PyObject *self)
 {
     PyObject *class = PyObject_GetAttrString(context_mod, "DecoderContext");
     if (class == NULL)
@@ -588,7 +590,7 @@ int Decoder_check(PyObject *self)
 /* 
  * Returns position in stream.
  */
-int Decoder_tell(DecoderObj *self)
+static int Decoder_tell(DecoderObj *self)
 {
     if (self->int_buf == 1) {
         return Buffer_tell((BufferObj*)self->buf);
@@ -608,7 +610,7 @@ int Decoder_tell(DecoderObj *self)
  *
  * Returns a borrowed reference.
  */
-PyObject* Decoder_readPyString(DecoderObj *self, int len)
+static PyObject* Decoder_readPyString(DecoderObj *self, int len)
 {
     if (self->int_buf) {
        return Buffer_readPyString((BufferObj*)self->buf, len); 
@@ -644,7 +646,7 @@ static PyObject* PyDecoder_readPyString(DecoderObj *self, PyObject *args, PyObje
  * returning a string. Can be more efficient than
  * Decoder_readPyString.
  */
-int Decoder_skipBytes(DecoderObj *self, int len)
+static int Decoder_skipBytes(DecoderObj *self, int len)
 {
     if (self->int_buf) {
         int pos = Buffer_tell((BufferObj*)self->buf);
@@ -671,7 +673,7 @@ int Decoder_skipBytes(DecoderObj *self, int len)
 /*
  * Read a C string from the buffer.
  */
-char* Decoder_readCString(DecoderObj *self, int len)
+static char* Decoder_read(DecoderObj *self, int len)
 {
     if (self->int_buf) {
         return Buffer_read((BufferObj*)self->buf, len); 
@@ -684,9 +686,9 @@ char* Decoder_readCString(DecoderObj *self, int len)
 }
 
 /* Reads a single byte from the context. */
-char Decoder_readByte(DecoderObj *self)
+static char Decoder_readByte(DecoderObj *self)
 {
-    char *str = Decoder_readCString(self, 1);
+    char *str = Decoder_read(self, 1);
     return str[0];
 }
 
@@ -940,7 +942,7 @@ static void Encoder_dealloc(EncoderObj *self)
  * Copy an Encoder with all the same settings, but
  * reset the index references.
  */
-PyObject* Encoder_copy(EncoderObj *self, int amf3, int new_buf)
+static PyObject* Encoder_copy(EncoderObj *self, int amf3, int new_buf)
 {
     PyObject *encoder_class = PyObject_GetAttrString(context_mod, "EncoderContext");
     if (encoder_class == NULL)
@@ -1018,7 +1020,7 @@ PyObject* Encoder_copy(EncoderObj *self, int amf3, int new_buf)
 /*
  * Returns 1 if object is a EncoderContext.
  */
-int Encoder_check(PyObject *self)
+static int Encoder_check(PyObject *self)
 {
     printf("CHECKING ENCODER TYPE\n");
     printf("context: %p\n", context_mod);
@@ -1040,7 +1042,7 @@ int Encoder_check(PyObject *self)
 /* 
  * Returns position in stream.
  */
-int Encoder_tell(EncoderObj *self)
+static int Encoder_tell(EncoderObj *self)
 {
     if (self->int_buf == 1) {
         return Buffer_tell((BufferObj*)self->buf);
@@ -1058,7 +1060,7 @@ int Encoder_tell(EncoderObj *self)
 /*
  * Returns the current string.
  */
-char* Encoder_read(EncoderObj *self)
+static char* Encoder_read(EncoderObj *self)
 {
     if (self->int_buf == 1) {
         BufferObj *buf = (BufferObj*)self->buf;
@@ -1089,7 +1091,7 @@ static PyObject* PyEncoder_copy(EncoderObj *self, PyObject *args, PyObject *kwar
 /*
  * Writes a PyString to the buffer.
  */
-int Encoder_writePyString(EncoderObj *self, PyObject *py_str)
+static int Encoder_writePyString(EncoderObj *self, PyObject *py_str)
 {
     if (self->int_buf == 1) {
         return Buffer_writePyString((BufferObj*)self->buf, py_str);
@@ -1123,10 +1125,10 @@ static PyObject* PyEncoder_writePyString(EncoderObj *self, PyObject *args, PyObj
 /*
  * Writes a CString to the buffer.
  */
-int Encoder_writeCStringLength(EncoderObj *self, char *str, int len)
+static int Encoder_write(EncoderObj *self, char *str, int len)
 {
     if (self->int_buf == 1) {
-        return Buffer_writeCStringLength((BufferObj*)self->buf, str, len);
+        return Buffer_write((BufferObj*)self->buf, str, len);
     }
 
     PyObject *py_str = PyString_FromStringAndSize(str, (Py_ssize_t)len);
@@ -1141,12 +1143,25 @@ int Encoder_writeCStringLength(EncoderObj *self, char *str, int len)
 /*
  * Writes a byte to the buffer.
  */
-int Encoder_writeByte(EncoderObj *self, char byte)
+static int Encoder_writeByte(EncoderObj *self, char byte)
 {
     char bytes[1];
     bytes[0] = byte;
 
-    return Encoder_writeCStringLength(self, bytes, 1);
+    return Encoder_write(self, bytes, 1);
+}
+
+/*
+ * Gets value to return when encoding is completed.
+ */
+static PyObject* Encoder_getReturnVal(EncoderObj *self)
+{
+    if (self->int_buf == 1) {
+        return PyObject_CallMethod(self->buf, "getval", NULL); 
+    } else {
+        Py_INCREF(self->buf);
+        return self->buf;
+    }
 }
 
 static PyMethodDef Encoder_methods[] = {
@@ -1253,18 +1268,11 @@ static PyMethodDef context_methods[] = {
 PyMODINIT_FUNC
 initcontext(void)
 {
-    printf("Initing mod\n");
-/*    PyObject *m = Py_InitModule3("context", context_methods,
-        "Tools to manage information relevant to a single run "
-        "through the encoder or decoder.");*/
-    PyObject *m = Py_InitModule("context", context_methods);
+    context_mod = Py_InitModule3("context", context_methods,
+        "Tools for managing encode/decode sessions.");
 
-    if (m == NULL)
+    if (context_mod == NULL)
         return;
-    
-    printf("Still Initing mod\n");
-
-    context_mod = m;
 
     // Import modules
     if (!amfast_mod) {
@@ -1296,6 +1304,7 @@ initcontext(void)
     if (PyModule_AddObject(context_mod, "ContextError", amfast_ContextError) == -1)
         return;
 
+    // Idx
     IdxType.tp_new = Idx_new;
     if (PyType_Ready(&IdxType) < 0)
         return;
@@ -1303,6 +1312,17 @@ initcontext(void)
     Py_INCREF(&IdxType);
     PyModule_AddObject(context_mod, "Idx", (PyObject *)&IdxType);
 
+    // Idx C API
+    static void *PyIdx_API[PyIdx_API_pointers];
+
+    PyIdx_API[Idx_map_NUM] = (void*)Idx_map;
+    PyIdx_API[Idx_ret_NUM] = (void*)Idx_ret;
+
+    PyObject *idx_c_api = PyCObject_FromVoidPtr((void*)PyIdx_API, NULL);
+    if (idx_c_api != NULL)
+        PyModule_AddObject(context_mod, "_IDX_C_API", idx_c_api);
+
+    // Decoder
     DecoderType.tp_new = Decoder_new;
     if (PyType_Ready(&DecoderType) < 0)
         return;
@@ -1310,6 +1330,22 @@ initcontext(void)
     Py_INCREF(&DecoderType);
     PyModule_AddObject(context_mod, "DecoderContext", (PyObject *)&DecoderType);
 
+    // Decoder C API
+    static void *PyDecoder_API[PyDecoder_API_pointers];
+
+    PyDecoder_API[Decoder_check_NUM] = (void*)Decoder_check;
+    PyDecoder_API[Decoder_copy_NUM] = (void*)Decoder_copy;
+    PyDecoder_API[Decoder_tell_NUM] = (void*)Decoder_tell;
+    PyDecoder_API[Decoder_readPyString_NUM] = (void*)Decoder_readPyString;
+    PyDecoder_API[Decoder_skipBytes_NUM] = (void*)Decoder_skipBytes;
+    PyDecoder_API[Decoder_read_NUM] = (void*)Decoder_read;
+    PyDecoder_API[Decoder_readByte_NUM] = (void*)Decoder_readByte;
+
+    PyObject *decoder_c_api = PyCObject_FromVoidPtr((void*)PyDecoder_API, NULL);
+    if (decoder_c_api != NULL)
+        PyModule_AddObject(context_mod, "_DECODER_C_API", decoder_c_api);
+
+    // Ref
     RefType.tp_new = Ref_new;
     if (PyType_Ready(&RefType) < 0)
         return;
@@ -1317,10 +1353,37 @@ initcontext(void)
     Py_INCREF(&RefType);
     PyModule_AddObject(context_mod, "Ref", (PyObject *)&RefType);
 
+    // Ref C API
+    static void *PyRef_API[PyRef_API_pointers];
+
+    PyRef_API[Ref_map_NUM] = (void*)Ref_map;
+    PyRef_API[Ref_ret_NUM] = (void*)Ref_ret;
+
+    PyObject *ref_c_api = PyCObject_FromVoidPtr((void*)PyRef_API, NULL);
+    if (ref_c_api != NULL)
+        PyModule_AddObject(context_mod, "_REF_C_API", ref_c_api);
+
+    // Encoder
     EncoderType.tp_new = Encoder_new;
     if (PyType_Ready(&EncoderType) < 0)
         return;
 
     Py_INCREF(&EncoderType);
     PyModule_AddObject(context_mod, "EncoderContext", (PyObject *)&EncoderType);
+
+    // Encoder C API
+    static void *PyEncoder_API[PyEncoder_API_pointers];
+
+    PyEncoder_API[Encoder_check_NUM] = (void*)Encoder_check;
+    PyEncoder_API[Encoder_writePyString_NUM] = (void*)Encoder_writePyString;
+    PyEncoder_API[Encoder_write_NUM] = (void*)Encoder_write;
+    PyEncoder_API[Encoder_writeByte_NUM] = (void*)Encoder_writeByte;
+    PyEncoder_API[Encoder_tell_NUM] = (void*)Encoder_tell;
+    PyEncoder_API[Encoder_write_NUM] = (void*)Encoder_write;
+    PyEncoder_API[Encoder_copy_NUM] = (void*)Encoder_copy;
+    PyEncoder_API[Encoder_getReturnVal_NUM] = (void*)Encoder_getReturnVal;
+
+    PyObject *encoder_c_api = PyCObject_FromVoidPtr((void*)PyEncoder_API, NULL);
+    if (encoder_c_api != NULL)
+        PyModule_AddObject(context_mod, "_ENCODER_C_API", encoder_c_api);
 }

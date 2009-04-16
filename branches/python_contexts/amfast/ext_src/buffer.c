@@ -54,7 +54,7 @@ static void Buffer_dealloc(BufferObj *self)
 /*
  * Returns the current position in the buffer.
  */
-int Buffer_tell(BufferObj *self)
+static int Buffer_tell(BufferObj *self)
 {
     return self->pos;
 }
@@ -72,7 +72,7 @@ static PyObject* PyBuffer_tell(BufferObj *self)
  *
  * Returns position or -1 on error.
  */
-int Buffer_seek(BufferObj *self, int pos)
+static int Buffer_seek(BufferObj *self, int pos)
 {
     self->pos = pos;
     return pos;
@@ -119,7 +119,7 @@ static char* Buffer_read(BufferObj *self, int len)
 /*
  * Returns a PyString.
  */
-PyObject* Buffer_readPyString(BufferObj *self, int len)
+static PyObject* Buffer_readPyString(BufferObj *self, int len)
 {
     char *str = Buffer_read(self, len);
     if (str == NULL)
@@ -182,7 +182,7 @@ static int Buffer_grow(BufferObj *self, int len)
  *
  * Returns 1 on success, 0 on failure.
  */
-int Buffer_writeCStringLength(BufferObj *self, char *str, int len)
+static int Buffer_write(BufferObj *self, char *str, int len)
 {
     if (Buffer_grow(self, len) == -1)
         return 0;
@@ -195,12 +195,12 @@ int Buffer_writeCStringLength(BufferObj *self, char *str, int len)
 /*
  * Writes a Python string.
  */
-int Buffer_writePyString(BufferObj *self, PyObject* py_str)
+static int Buffer_writePyString(BufferObj *self, PyObject* py_str)
 {
     char *c_str = PyString_AS_STRING(py_str);
     int len = PyString_GET_SIZE(py_str);
 
-    return Buffer_writeCStringLength(self, c_str, len);
+    return Buffer_write(self, c_str, len);
 }
 
 /*
@@ -321,15 +321,6 @@ initbuffer(void)
     PyObject *m = Py_InitModule3("buffer", buffer_methods,
         "Tools for encoding and decoding AMF strings.");
 
-    // Export C API
-    static void *PyBuffer_API[PyBuffer_API_pointers];
-
-    PyBuffer_API[Buffer_read_NUM] = (void*)Buffer_read;
-
-    PyObject *c_api = PyCObject_FromVoidPtr((void*)PyBuffer_API, NULL);
-    if (c_api != NULL)
-        PyModule_AddObject(m, "_C_API", c_api);
-
     // Import modules
     if (!amfast_mod) {
         amfast_mod = PyImport_ImportModule("amfast");
@@ -349,10 +340,25 @@ initbuffer(void)
     if (PyModule_AddObject(m, "BufferError", amfast_BufferError) == -1)
         return;
 
+    // Setup types
     BufferType.tp_new = Buffer_new;
     if (PyType_Ready(&BufferType) < 0)
         return;
 
     Py_INCREF(&BufferType);
     PyModule_AddObject(m, "Buffer", (PyObject *)&BufferType);
+
+    // Export Buffer C API
+    static void *PyBuffer_API[PyBuffer_API_pointers];
+
+    PyBuffer_API[Buffer_read_NUM] = (void*)Buffer_read;
+    PyBuffer_API[Buffer_readPyString_NUM] = (void*)Buffer_readPyString;
+    PyBuffer_API[Buffer_tell_NUM] = (void*)Buffer_tell;
+    PyBuffer_API[Buffer_seek_NUM] = (void*)Buffer_seek;
+    PyBuffer_API[Buffer_write_NUM] = (void*)Buffer_write;
+    PyBuffer_API[Buffer_writePyString_NUM] = (void*)Buffer_writePyString;
+
+    PyObject *c_api = PyCObject_FromVoidPtr((void*)PyBuffer_API, NULL);
+    if (c_api != NULL)
+        PyModule_AddObject(m, "_C_API", c_api);
 }

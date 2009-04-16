@@ -113,11 +113,11 @@ static int _encode_double(EncoderObj *context, double value)
 
    // AMF numbers are encoded in big endianness
    if (big_endian) {
-       return Encoder_writeCStringLength(context, char_value, 8);
+       return Encoder_write(context, char_value, 8);
    } else {
        // Flip endianness
        char flipped[8] = {char_value[7], char_value[6], char_value[5], char_value[4], char_value[3], char_value[2], char_value[1], char_value[0]};
-       return Encoder_writeCStringLength(context, flipped, 8);
+       return Encoder_write(context, flipped, 8);
    }
 }
 
@@ -179,7 +179,7 @@ static int _encode_int_AMF3(EncoderObj *context, int value)
         return 0;        
     }
 
-    return Encoder_writeCStringLength(context, tmp, tmp_size);
+    return Encoder_write(context, tmp, tmp_size);
 }
 
 /* Writes a PyInt. */
@@ -276,7 +276,7 @@ static int encode_string(EncoderObj *context, PyObject *value)
         return 0;
 
     // Write string.
-    return Encoder_writeCStringLength(context, char_value, (int)string_len);
+    return Encoder_write(context, char_value, (int)string_len);
 }
 
 /* Encode a PyString or a PyUnicode. */
@@ -678,7 +678,7 @@ static int encode_byte_array_AMF3(EncoderObj *context, PyObject *value)
     if (!byte_value)
         return 0;
 
-    return Encoder_writeCStringLength(context, byte_value, (int)value_len);
+    return Encoder_write(context, byte_value, (int)value_len);
 }
 
 /* Writes an xml.dom.Document object. */
@@ -1020,11 +1020,11 @@ static int encode_ushort(EncoderObj *context, unsigned short value)
 
    // AMF numbers are encoded in big endianness
    if (big_endian) {
-       return Encoder_writeCStringLength(context, char_value, 2);
+       return Encoder_write(context, char_value, 2);
    } else {
        // Flip endianness
        char flipped[2] = {char_value[1], char_value[0]};
-       return Encoder_writeCStringLength(context, flipped, 2);
+       return Encoder_write(context, flipped, 2);
    }
 }
 
@@ -1041,11 +1041,11 @@ static int encode_ulong(EncoderObj *context, unsigned int value)
 
    // AMF numbers are encoded in big endianness
    if (big_endian) {
-       return Encoder_writeCStringLength(context, char_value, 4);
+       return Encoder_write(context, char_value, 4);
    } else {
        // Flip endianness
        char flipped[4] = {char_value[3], char_value[2], char_value[1], char_value[0]};
-       return Encoder_writeCStringLength(context, flipped, 4);
+       return Encoder_write(context, flipped, 4);
    }
 }
 
@@ -1123,7 +1123,7 @@ static int encode_string_AMF0(EncoderObj *context, PyObject *value, int allow_lo
             return 0;
     }
 
-    return Encoder_writeCStringLength(context, char_value, (int)string_len);
+    return Encoder_write(context, char_value, (int)string_len);
 }
 
 /* Write a PyList to AMF0. */
@@ -1197,7 +1197,7 @@ static int encode_dynamic_dict_AMF0(EncoderObj *context, PyObject *value)
 
     // Terminate key/value pairs.
     char terminator[3] = {0x00, 0x00, 0x09};
-    if (Encoder_writeCStringLength(context, terminator, 3) == 0)
+    if (Encoder_write(context, terminator, 3) == 0)
         return 0;
 
     return 1;
@@ -1682,7 +1682,7 @@ static int encode_packet_header_AMF0(EncoderObj *context, PyObject *value)
         return 0;
     }
 
-    result = Encoder_writeCStringLength(context, new_buf, new_len);
+    result = Encoder_write(context, new_buf, new_len);
     Py_DECREF(new_context);
     return result;
 }
@@ -1751,7 +1751,7 @@ static int encode_packet_message_AMF0(EncoderObj *context, PyObject *value)
         return 0;
     }
 
-    result = Encoder_writeCStringLength(context, new_buf, new_len);
+    result = Encoder_write(context, new_buf, new_len);
     Py_DECREF(new_context);
     return result;
 }
@@ -1885,29 +1885,24 @@ static PyObject* py_encode(PyObject *self, PyObject *args, PyObject *kwargs)
         return NULL;
 
     // Create default context.
-    /*if (context == NULL) {
-        printf("CREATING default context\n");
+    if (context == NULL) {
         PyObject *class = PyObject_GetAttrString(context_mod, "EncoderContext");
         if (class == NULL)
             return NULL;
 
         context = PyObject_CallObject(class, NULL);
-        //Py_DECREF(class);
+        Py_DECREF(class);
         if (context == NULL)
             return NULL;
-    }*/
+    }
 
-    printf("created default context\n");
-    printf("encoder's context: %p\n", context_mod);
     if (Encoder_check(context) != 1) {
         PyErr_SetString(amfast_EncodeError, "Argument must be of type amfast.context.EncoderContext");
         return NULL;
     }
-    printf("checked context\n");
     EncoderObj *enc_context = (EncoderObj*)context;
 
     int result;
-    printf("encoding\n");
     if (enc_context->amf3 == Py_True) {
         result = encode_AMF3(enc_context, value);
     } else {
@@ -1918,7 +1913,7 @@ static PyObject* py_encode(PyObject *self, PyObject *args, PyObject *kwargs)
         return NULL;
     }
 
-    return PyObject_GetAttrString((PyObject*)context, "buffer");
+    return Encoder_getReturnVal(context);
 }
 
 /* Encode an AMF Packet object in AMF. */
@@ -1974,10 +1969,10 @@ static PyMethodDef encoder_methods[] = {
 PyMODINIT_FUNC
 initencoder(void)
 {
-    PyObject *module;
+    PyObject *m;
 
-    module = Py_InitModule("encoder", encoder_methods);
-    if (module == NULL)
+    m = Py_InitModule("encoder", encoder_methods);
+    if (m == NULL)
         return;
 
     // Setup exceptions
@@ -1988,12 +1983,9 @@ initencoder(void)
         }
     }
 
-    if (!context_mod) {
-        context_mod = PyImport_ImportModule("amfast.context");
-        if(!context_mod) {
-            return;
-        }
-    }
+    context_mod = import_context_mod();
+    if (context_mod == NULL)
+        return;
 
     if (!xml_dom_mod) {
         xml_dom_mod = PyImport_ImportModule("xml.dom.minidom");
@@ -2024,7 +2016,7 @@ initencoder(void)
         return;
     }
 
-    if (PyModule_AddObject(module, "EncodeError", amfast_EncodeError) == -1) {
+    if (PyModule_AddObject(m, "EncodeError", amfast_EncodeError) == -1) {
         return;
     }
 

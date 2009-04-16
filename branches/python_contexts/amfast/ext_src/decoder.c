@@ -797,7 +797,7 @@ static PyObject* deserialize_string_AMF3(DecoderObj *context)
 /* Decode a string. */
 static PyObject* decode_string(DecoderObj *context, unsigned int string_size)
 {
-    const char *str = Decoder_readCString(context, (long)string_size);
+    const char *str = Decoder_read(context, (long)string_size);
     PyObject *unicode_val = PyUnicode_DecodeUTF8(str, (Py_ssize_t)string_size, NULL);
     if (!unicode_val)
         return NULL;
@@ -825,7 +825,7 @@ static PyObject* decode_reference_AMF3(DecoderObj *context, PyObject *obj_contex
 /* Decode a double to a native C double. */
 static double _decode_double(DecoderObj *context)
 {
-    const char *bytes = Decoder_readCString(context, 8);
+    const char *bytes = Decoder_read(context, 8);
 
     // Put bytes from byte array into double
     union aligned {
@@ -853,7 +853,7 @@ static double _decode_double(DecoderObj *context)
 /* Decode a native C unsigned short. */
 static unsigned short _decode_ushort(DecoderObj *context)
 {
-    const char *bytes = Decoder_readCString(context, 2);
+    const char *bytes = Decoder_read(context, 2);
 
     // Put bytes from byte array into short
     union aligned {
@@ -875,7 +875,7 @@ static unsigned short _decode_ushort(DecoderObj *context)
 /* Decode a native C unsigned int. */
 static unsigned int _decode_ulong(DecoderObj *context)
 {
-    const char *bytes = Decoder_readCString(context, 4);
+    const char *bytes = Decoder_read(context, 4);
 
     // Put bytes from byte array into short
     union aligned {
@@ -1538,12 +1538,12 @@ static PyMethodDef decoder_methods[] = {
 PyMODINIT_FUNC
 initdecoder(void)
 {
-    PyObject *mod;
+    PyObject *m;
 
     // Create module
-    mod = Py_InitModule3("decoder", decoder_methods,
+    m = Py_InitModule3("decoder", decoder_methods,
         "Tools for decoding AMF streams.");
-    if (mod == NULL)
+    if (m == NULL)
         return;
 
     // import all required external modules
@@ -1552,6 +1552,8 @@ initdecoder(void)
         if(!amfast_mod)
             return;
     }
+
+    PyObject *context_mod = import_context_mod();
 
     if (!xml_dom_mod) {
         xml_dom_mod = PyImport_ImportModule("xml.dom.minidom");
@@ -1577,7 +1579,7 @@ initdecoder(void)
     }
 
     Py_INCREF(amfast_DecodeError);
-    if (PyModule_AddObject(mod, "DecodeError", amfast_DecodeError) == -1) {
+    if (PyModule_AddObject(m, "DecodeError", amfast_DecodeError) == -1) {
         return;
     }
 
