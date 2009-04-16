@@ -3,6 +3,7 @@ import unittest
 
 from amfast.context import EncoderContext
 import amfast.encode as encode
+from amfast.encoder import Encoder
 import amfast.class_def as class_def
 
 class Amf0EncoderTestCase(unittest.TestCase):
@@ -12,12 +13,16 @@ class Amf0EncoderTestCase(unittest.TestCase):
 
     def setUp(self):
         self.class_mapper = class_def.ClassDefMapper()
+        self.encoder = Encoder()
 
     def testFalse(self):
         self.assertEquals('\x01\x00', encode.encode(False))
 
-    def testEncoderObj(self):
+    def testEncoderContext(self):
         self.assertEquals('\x01\x00', encode.encode(False, EncoderContext()))
+
+    def testEncoderObj(self):
+        self.assertEquals('\x01\x00', self.encoder.encode(False))
 
     def testTrue(self):
         self.assertEquals('\x01\x01', encode.encode(True))

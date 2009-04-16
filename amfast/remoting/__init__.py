@@ -1,6 +1,6 @@
 """Provides an interface for performing remoting calls."""
 import amfast
-from amfast import AmFastError, class_def, decoder, encoder
+from amfast import AmFastError, class_def, decode, encode
 
 class RemotingError(AmFastError):
     """Remoting related errors."""
@@ -380,11 +380,11 @@ class Gateway(object):
             amfast.logger.debug("<rawRequestPacket>%s</rawRequestPacket>" %
                 amfast.format_byte_string(raw_packet))
 
-        return decoder.decode(raw_packet, packet=True,
+        return decode.decode(raw_packet, packet=True,
             class_def_mapper=self.class_def_mapper)
 
     def encode_packet(self, packet, amf3=False):
-        raw_packet = encoder.encode(packet, packet=True, 
+        raw_packet = encode.encode(packet, packet=True, 
             class_def_mapper=self.class_def_mapper,
             use_array_collections=self.use_array_collections,
             use_object_proxies=self.use_object_proxies,
