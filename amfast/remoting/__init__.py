@@ -39,6 +39,9 @@ class Service(object):
         self._lock = threading.RLock()
         self._targets = {} # Keeps track of targets internally
 
+    def __iter__(self):
+        return self._targets.itervalues()
+
     def mapTarget(self, target):
         """Add a target to the service."""
         self._lock.acquire()
@@ -258,6 +261,7 @@ class Packet(object):
         self.messages = messages
 
     def _getAmf3(self):
+        print "VERSIONS IS: %s" % self.version
         if self.version == self.FLASH_9:
             return True
         return False
@@ -346,6 +350,9 @@ class ServiceMapper(object):
         self._lock = threading.RLock()
         self._services = {} # used internally to keep track of Service objects.
         self._mapBuiltIns()
+
+    def __iter__(self):
+        return self._services.itervalues()
 
     def _mapBuiltIns(self):
         import amfast.remoting.flex_messages as messaging

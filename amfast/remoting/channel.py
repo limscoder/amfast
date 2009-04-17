@@ -146,6 +146,9 @@ class ChannelSet(object):
         self._lock = threading.RLock()
         self._channels = {}
 
+    def __iter__(self):
+        return self._channels.itervalues()
+
     def mapChannel(self, channel):
         self._lock.acquire()
         try:

@@ -4,7 +4,7 @@ from persistent import Schema
 class SAObject(object):
     """Handles common operations for persistent objects."""
     def getClassDefByAlias(self, alias):
-        return self.gateway.class_def_mapper.getClassDefByAlias(alias)
+        return self.class_def_mapper.getClassDefByAlias(alias)
 
     def load(self, class_alias, key):
         class_def = self.getClassDefByAlias(class_alias)

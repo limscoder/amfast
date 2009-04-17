@@ -1203,6 +1203,7 @@ static PyObject* decode_packet(DecoderObj *context)
     Py_DECREF(client_type);
     Py_DECREF(headers);
     Py_DECREF(messages);
+
     return packet;
 }
 

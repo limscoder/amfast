@@ -5,7 +5,7 @@ import uuid
 # --- CommandMessage Operations --- #
 def client_ping(packet, msg, *args):
     """Respond to a ping request."""
-    response = msg.response_msg.value
+    response = msg.response_msg.body
     if response.headers is None:
         response.headers = {}
 
@@ -16,7 +16,7 @@ def client_ping(packet, msg, *args):
 
 def subscribe_operation(packet, msg, *args):
     """Respond to a subscribe operation."""
-    command = msg.value[0]
+    command = msg.body[0]
     headers = command.headers
     channel = packet.gateway.getChannelByName(headers['DSEndpoint'])
     packet.gateway.message_publisher.subscribe(headers['DSId'],
