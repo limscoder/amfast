@@ -475,6 +475,10 @@ static int Decoder_init(PyObject *self_raw, PyObject *args, PyObject *kwargs)
         Py_INCREF(self->class_mapper);
     }
 
+    if (self->amf3 == NULL)
+        self->amf3 = Py_False;
+    Py_INCREF(self->amf3);
+
     // Init object reference indexes.
     if (Decoder_initIdx(self) == -1)
         return -1;
@@ -888,35 +892,29 @@ static int Encoder_init(PyObject *self_raw, PyObject *args, PyObject *kwargs)
         Py_INCREF(self->buf);
     }
 
-    if (self->amf3 == NULL) {
+    if (self->amf3 == NULL)
         self->amf3 = Py_False;
-        Py_INCREF(self->amf3);
-    }
+    Py_INCREF(self->amf3);
 
-    if (self->use_collections == NULL) {
+    if (self->use_collections == NULL)
         self->use_collections = Py_False;
-        Py_INCREF(self->use_collections);
-    }
+    Py_INCREF(self->use_collections);
 
-    if (self->use_proxies == NULL) {
+    if (self->use_proxies == NULL)
         self->use_proxies = Py_False;
-        Py_INCREF(self->use_proxies);
-    }
+    Py_INCREF(self->use_proxies);
 
-    if (self->use_refs == NULL) {
+    if (self->use_refs == NULL)
         self->use_refs = Py_True;
-        Py_INCREF(self->use_refs);
-    }
+    Py_INCREF(self->use_refs);
 
-    if (self->use_legacy_xml == NULL) {
+    if (self->use_legacy_xml == NULL)
         self->use_legacy_xml = Py_False;
-        Py_INCREF(self->use_legacy_xml);
-    }
+    Py_INCREF(self->use_legacy_xml);
 
-    if (self->include_private == NULL) {
+    if (self->include_private == NULL)
         self->include_private = Py_False;
-        Py_INCREF(self->include_private);
-    }
+    Py_INCREF(self->include_private);
 
     if (self->class_mapper == NULL) {
         // Create anon class mapper
