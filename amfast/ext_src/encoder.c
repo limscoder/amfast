@@ -1699,7 +1699,7 @@ static int encode_packet_message_AMF0(EncoderObj *context, PyObject *value)
         return 0;
     }
 
-    PyObject *body = PyObject_GetAttrString(value, "value");
+    PyObject *body = PyObject_GetAttrString(value, "body");
     if (!body) {
         Py_DECREF(response);
         return 0;

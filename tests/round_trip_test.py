@@ -1,7 +1,8 @@
 import unittest
 
-import amfast.encoder as encoder
-import amfast.decoder as decoder
+from amfast.encode import encode
+from amfast.decode import decode
+from amfast.context import EncoderContext, DecoderContext
 import amfast.class_def as class_def
 
 class RoundTripTestCase(unittest.TestCase):
@@ -45,8 +46,8 @@ class RoundTripTestCase(unittest.TestCase):
 
     def testLongStringAmf3(self):
         decoded = 's' * 65537
-	encoded = encoder.encode(decoded, amf3=True)
-        result = decoder.decode(encoded, amf3=True)
+	encoded = encode(decoded, EncoderContext(amf3=True))
+        result = decode(DecoderContext(encoded, amf3=True))
 
         self.assertEquals(len(decoded), len(result))
         for char in result:
@@ -54,8 +55,8 @@ class RoundTripTestCase(unittest.TestCase):
 
     def testLongListAmf3(self):
         decoded = [None] * 65537
-        encoded = encoder.encode(decoded, amf3=True)
-        result = decoder.decode(encoded, amf3=True)
+        encoded = encode(decoded, EncoderContext(amf3=True))
+        result = decode(DecoderContext(encoded, amf3=True))
 
         self.assertEquals(len(decoded), len(result))
         for val in result:
@@ -63,15 +64,15 @@ class RoundTripTestCase(unittest.TestCase):
 
     def testDictAmf3(self):
         decoded = {'spam': 'eggs'}
-        encoded = encoder.encode(decoded, amf3=True)
-        result = decoder.decode(encoded, amf3=True)
+        encoded = encode(decoded, EncoderContext(amf3=True))
+        result = decode(DecoderContext(encoded, amf3=True))
 
         self.assertEquals(decoded['spam'], result['spam'])
 
     def testLongStringAmf0(self):
         decoded = 's' * 65537
-        encoded = encoder.encode(decoded)
-        result = decoder.decode(encoded)
+        encoded = encode(decoded)
+        result = decode(encoded)
 
         self.assertEquals(len(decoded), len(result))
         for char in result:
@@ -79,8 +80,8 @@ class RoundTripTestCase(unittest.TestCase):
 
     def testLongListAmf0(self):
         decoded = [None] * 65537
-        encoded = encoder.encode(decoded)
-        result = decoder.decode(encoded)
+        encoded = encode(decoded)
+        result = decode(encoded)
 
         self.assertEquals(len(decoded), len(result))
         for val in result:
@@ -88,21 +89,25 @@ class RoundTripTestCase(unittest.TestCase):
 
     def testDictAmf0(self):
         decoded = {'spam': 'eggs'}
-        encoded = encoder.encode(decoded)
-        result = decoder.decode(encoded)
+        encoded = encode(decoded)
+        result = decode(encoded)
 
         self.assertEquals(decoded['spam'], result['spam'])
 
     def testComplexDictProxies(self):
         complex = {'element': 'ignore', 'objects': self.buildComplex()}
-        encoded = encoder.encode(complex, use_array_collections=True, use_object_proxies=True, class_def_mapper=self.class_mapper, amf3=True)
-        decoded = decoder.decode(encoded, class_def_mapper=self.class_mapper, amf3=True)
+        enc_context = EncoderContext(use_collections=True, use_proxies=True,
+            class_def_mapper=self.class_mapper, amf3=True)
+        encoded = encode(complex, enc_context)
+        decoded = decode(DecoderContext(encoded, class_def_mapper=self.class_mapper, amf3=True))
         self.resultTest(decoded['objects'])
 
     def testComplexDict(self):
         complex = {'element': 'ignore', 'objects': self.buildComplex()}
-        encoded = encoder.encode(complex, use_array_collections=False, use_object_proxies=False, class_def_mapper=self.class_mapper, amf3=True)
-        decoded = decoder.decode(encoded, class_def_mapper=self.class_mapper, amf3=True)
+        enc_context = EncoderContext(use_collections=False, use_proxies=False,
+            class_def_mapper=self.class_mapper, amf3=True)
+        encoded = encode(complex, enc_context)
+        decoded = decode(DecoderContext(encoded, class_def_mapper=self.class_mapper, amf3=True))
         self.resultTest(decoded['objects'])
 
 def suite():
