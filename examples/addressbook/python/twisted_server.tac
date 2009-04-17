@@ -6,16 +6,16 @@ from twisted.application import service, strports
 from twisted.web import static, server, resource, vhost
 
 import amfast
+from amfast.remoting.gateway import Gateway, Channel
 
 import utils
 
-class AmfGateway(resource.Resource):
+class AmfChannel(resource.Resource):
     """Controller class that directs requests to the Gateway."""
 
-    def __init__(self):
+    def __init__(self, gateway):
         resource.Resource.__init__(self)
-        self.gateway = amfast.remoting.Gateway()
-        utils.setup_gateway(self.gateway)
+        self.channel = Channel('amfast-channel', gateway)
         
         # Set this to True to see AmFast
         # debugging info
@@ -23,7 +23,7 @@ class AmfGateway(resource.Resource):
 
     def render_POST(self, request):
         if request.content:
-            return self.gateway.process_packet(request.content.getvalue())
+            return self.channel.invoke(request.content.getvalue())
         else:
             raise Exception("No content")
 
@@ -33,8 +33,12 @@ root.default = static.File("../flex/deploy")
 domain = "localhost"
 root.addHost(domain, static.File("../flex/deploy"))
 
-# Mount urls
-root.putChild('amfGateway', AmfGateway())
+# Setup Gateway
+gateway = Gateway()
+utils.setup_gateway(gateway)
+
+# Setup channels
+root.putChild('amf', AmfChannel(gateway))
 
 # Setup server
 port = 8000
