@@ -65,7 +65,7 @@ class SpeedTestCase(unittest.TestCase):
  
         enc_context = EncoderContext(use_collections=True, use_proxies=True,
             class_def_mapper=self.class_mapper, amf3=amf3)
-
+        
         encoded = encode.encode(complex, enc_context)
 
         decoded = decode.decode(DecoderContext(encoded,
