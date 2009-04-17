@@ -1,4 +1,4 @@
-"""Equivalent to mx.messaging.messages package."""
+"""Equivalent to Flex mx.messaging.messages package."""
 import uuid
 import calendar
 import time
@@ -40,13 +40,14 @@ class AbstractMessage(object):
     def invoke(self, packet, msg):
         """Invoke all message headers."""
         if amfast.log_debug:
-            amfast.logger.debug("Invoking FlexMessage:\n%s" % self)
+            amfast.logger.debug("\nInvoking FlexMessage:\n%s" % self)
 
         if self.headers is not None:
+            service = packet.channel_set.service_mapper.message_header_service
             for name, val in self.headers.iteritems():
-                target = packet.gateway.service_mapper.message_header_service.getTargetByName(name)
+                target = service.getTarget(name)
                 if target is not None:
-                    return target.invoke(packet, msg, (val,))
+                    target.invoke(packet, msg, (val,))
 
     def fail(self, exc):
         """Return an error message."""
@@ -117,11 +118,11 @@ class RemotingMessage(AbstractMessage):
     def invoke(self, packet, msg):
         AbstractMessage.invoke(self, packet, msg)
 
-        target = packet.gateway.service_mapper.getTargetByName(self.destination, self.operation)
+        target = packet.channel_set.service_mapper.getTarget(self.destination, self.operation)
         if target is None:
             raise FlexMessageError("Operation '%s' not found." % \
                 remoting.Service.SEPARATOR.join((self.destination, self.operation)))
-        msg.response_msg.value.body = target.invoke(packet, msg, self.body)
+        msg.response_msg.body.body = target.invoke(packet, msg, self.body)
 
 class_def.assign_attrs(RemotingMessage, 'flex.messaging.messages.RemotingMessage',
     ('body', 'clientId', 'destination', 'headers',
@@ -133,16 +134,13 @@ class AsyncMessage(AbstractMessage):
         AbstractMessage.__init__(self)
         self.correlationId = None
 
-    def invoke(self, packet, msg):
-        AbstractMessage.invoke(self, packet, msg)
-        return True
-
 class_def.assign_attrs(AsyncMessage, 'flex.messaging.messages.AsyncMessage',
     ('body', 'clientId', 'destination', 'headers',
         'messageId', 'timestamp', 'timeToLive', 'correlationId'), True)
 
 class CommandMessage(AsyncMessage):
     """A Flex CommandMessage. Operations are integers instead of strings.
+
     See Flex API docs for list of possible commands.
     """
 
@@ -156,10 +154,10 @@ class CommandMessage(AsyncMessage):
     def invoke(self, packet, msg):
         AbstractMessage.invoke(self, packet, msg)
 
-        target = packet.gateway.service_mapper.command_service.getTargetByName(self.operation)
+        target = packet.channel_set.service_mapper.command_service.getTarget(self.operation)
         if target is None:
             raise FlexMessageError("Command '%s' not found." % self.operation)
-        msg.response_msg.value.body = target.invoke(packet, msg, self.body)
+        msg.response_msg.body.body = target.invoke(packet, msg, self.body)
 
 class_def.assign_attrs(CommandMessage, 'flex.messaging.messages.CommandMessage',
     ('body', 'clientId', 'destination', 'headers',

@@ -1158,13 +1158,6 @@ static PyObject* decode_typed_obj_AMF0(DecoderObj *context)
 /* Decode an AMF0 NetConnection packet. */
 static PyObject* decode_packet(DecoderObj *context)
 {
-    // TODO: MOVE THIS!
-    if (!remoting_mod) {
-        remoting_mod = PyImport_ImportModule("amfast.remoting");
-        if (!remoting_mod)
-            return NULL;
-    }
-
     PyObject *packet_class = PyObject_GetAttrString(remoting_mod, "Packet");
     if (!packet_class)
         return NULL;
@@ -1188,6 +1181,7 @@ static PyObject* decode_packet(DecoderObj *context)
         Py_DECREF(packet_class);
         return NULL;
     }
+
 
     PyObject *headers = decode_headers_AMF0(context);
     if (!headers) {
@@ -1222,6 +1216,7 @@ static PyObject* decode_headers_AMF0(DecoderObj *context)
 
     int i;
     for (i = 0; i < header_count; i++) {
+
         PyObject *header_name = decode_string_AMF0(context);
         if (!header_name) {
             Py_DECREF(header_list);
@@ -1307,6 +1302,7 @@ static PyObject* decode_messages_AMF0(DecoderObj *context)
         unsigned int byte_len = _decode_ulong(context); // Message byte length
 
         // We need a new context for each message
+        // so that reference indexes are reset
         DecoderObj *new_context = (DecoderObj*)Decoder_copy(context, 0);
         if (!new_context) {
             Py_DECREF(message_list);
@@ -1327,6 +1323,7 @@ static PyObject* decode_messages_AMF0(DecoderObj *context)
                 Py_DECREF(target);
                 Py_DECREF(response);
             }
+
             message_obj = decode_array_AMF0(new_context, 0);
         } else {
             message_obj = decode_AMF0(new_context);
@@ -1583,6 +1580,12 @@ initdecode(void)
         amfast_mod = PyImport_ImportModule("amfast");
         if(!amfast_mod)
             return;
+    }
+
+    if (!remoting_mod) {
+        remoting_mod = PyImport_ImportModule("amfast.remoting");
+        if (!remoting_mod)
+            return NULL;
     }
 
     if (context_mod == NULL) {

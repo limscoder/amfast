@@ -3,7 +3,7 @@
 import threading
 
 import amfast
-from amfast import AmFastError, class_def, decoder, encoder
+from amfast import AmFastError, class_def
 from amfast.class_def.as_types import AsError
 
 class RemotingError(AmFastError):
@@ -12,7 +12,7 @@ class RemotingError(AmFastError):
 
 class Service(object):
     """A remoting service is a service that is exposed 
-    by a Gateway to AMF clients. 
+    by an amfast.remoting.channel.Channel to AMF clients. 
 
     attributes:
     ============
@@ -56,7 +56,7 @@ class Service(object):
         finally:
             self._lock.release()
 
-    def getTargetByName(self, target_name):
+    def getTarget(self, target_name):
         """Get a target from the service by name."""
         self._lock.acquire()
         try:
@@ -66,7 +66,7 @@ class Service(object):
         return target
 
 class Target(object):
-    """A remoting target can be invoked by a message.
+    """A remoting target can be invoked by an RPC message received from a client.
 
     attributes:
     ============
@@ -141,7 +141,7 @@ class Header(object):
 
     def invoke(self, request):
         """Invoke an action on this header if one has been mapped."""
-        target = request.gateway.service_mapper.packet_header_service.getTargetByName(self.name)
+        target = request.channel_set.service_mapper.packet_header_service.getTarget(self.name)
         if target is not None:
             return target.invoke(request, None, (self.value,))
         return False
@@ -153,17 +153,17 @@ class Message(object):
     ============
      * target - Target, the target to be invoked.
      * response - string, message id.
-     * value - object, message value.
+     * body - object, message body.
     """
 
     SUCCESS_TARGET = '/onResult'
     FAILED_TARGET = '/onStatus'
     DEBUG_TARGET = '/onDebugEvents'
 
-    def __init__(self, target=None, response=None, value=None):
+    def __init__(self, target=None, response=None, body=None):
         self.target = target
         self.response = response
-        self.value = value
+        self.body = body
 
     def _isInvokable(self):
         """If True, the message's body can invoke itself."""
@@ -173,11 +173,11 @@ class Message(object):
     is_invokable = property(_isInvokable)
 
     def invoke(self, request):
-        """Invoke an action on this message and return a response message."""
+        """Invoke an action on an RPC message and return a response message."""
         try:
             self.response_msg = self.acknowledge()
             if self.is_invokable:
-                self.value[0].invoke(request, self)
+                self.body[0].invoke(request, self)
             elif self.target is not None and self.target != '':
                 self._invoke(request)
             else:
@@ -189,7 +189,7 @@ class Message(object):
         return self.response_msg
 
     def _invoke(self, request):
-        """Invoke an action on an AMF0 style message."""
+        """Invoke an action on an AMF0 style RPC message."""
         qualified_name = self.target.split(Service.SEPARATOR)
         if len(qualified_name) < 2:
             target_name = self.target
@@ -198,11 +198,11 @@ class Message(object):
             target_name = qualified_name.pop()
             service_name = Service.SEPARATOR.join(qualified_name)
 
-        target = request.gateway.service_mapper.getTargetByName(service_name, target_name)
+        target = request.channel_set.service_mapper.getTarget(service_name, target_name)
         if target is None:
             raise RemotingError("Target '%s' not found." % self.target)
 
-        self.response_msg.value = target.invoke(request, self, self.value)
+        self.response_msg.body = target.invoke(request, self, self.body)
 
     def fail(self, exc):
         """Return an error response message."""
@@ -210,25 +210,25 @@ class Message(object):
         response_message = Message(target=response_target, response='')
         
         if self.is_invokable:
-            error_val = self.value[0].fail(exc)
+            error_val = self.body[0].fail(exc)
         else:
             error_val = AsError(exc=exc)
 
-        response_message.value = error_val
+        response_message.body = error_val
         return response_message
 
     def acknowledge(self):
-        """Return a successful response message."""
+        """Return a successful response message to acknowledge an RPC message."""
         response_target = self.response + self.SUCCESS_TARGET
         response_message = Message(target=response_target, response='')
         
         if self.is_invokable:
-            response_message.value = self.value[0].acknowledge()
+            response_message.body = self.body[0].acknowledge()
 
         return response_message
 
     def __str__(self):
-        return "<message> <target>%s</target> <response>%s</response> <value>%s</value></message>" % (self.target, self.response, self.value)
+        return "<message> <target>%s</target> <response>%s</response> <body>%s</body></message>" % (self.target, self.response, self.body)
 
 class Packet(object):
     """An AMF NetConnection packet that can be passed from client->server or server->client.
@@ -264,7 +264,7 @@ class Packet(object):
     is_amf3 = property(_getAmf3)
 
     def invoke(self):
-        """Process this packet and return a response packet."""
+        """Process an RPC packet and return a response packet."""
         if amfast.log_debug:
             amfast.logger.debug("<requestPacket>%s</requestPacket>" % self)
 
@@ -394,7 +394,7 @@ class ServiceMapper(object):
         finally:
             self._lock.release()
 
-    def getTargetByName(self, service_name, target_name):
+    def getTarget(self, service_name, target_name):
         """Get a Target
 
         Returns None in Target is not found.
@@ -406,17 +406,17 @@ class ServiceMapper(object):
         """
         self._lock.acquire()
         try:
-            service = self.getServiceByName(service_name)
+            service = self.getService(service_name)
             if service is None:
                 target = None
             else:
-                target = service.getTargetByName(target_name)
+                target = service.getTarget(target_name)
         finally:
             self._lock.release()
 
         return target
 
-    def getServiceByName(self, service_name):
+    def getService(self, service_name):
         """Get a Service
 
         Returns None in Service is not found.
