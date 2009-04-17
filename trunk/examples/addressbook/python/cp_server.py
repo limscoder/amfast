@@ -4,7 +4,8 @@ import optparse
 
 import cherrypy
 
-import amfast.remoting
+import amfast
+from amfast.remoting.gateway import Gateway, Channel
 
 import utils
 
@@ -25,10 +26,17 @@ class App(object):
 
     @cherrypy.expose
     @cherrypy.tools.amfhook()
-    def amfGateway(self):
+    def amf(self):
         c_len = int(cherrypy.request.headers['Content-Length'])
         raw_request = cherrypy.request.rfile.read(c_len)
-        return self.gateway.process_packet(raw_request)
+        return self.remoting_channel.invoke(raw_request)
+
+    @cherrypy.expose
+    @cherrypy.tools.amfhook()
+    def amfPolling(self):
+        c_len = int(cherrypy.request.headers['Content-Length'])
+        raw_request = cherrypy.request.rfile.read(c_len)
+        return self.polling_channel.invoke(raw_request)
 
 if __name__ == '__main__':
     usage = """usage: %s [options]""" % __file__
@@ -43,7 +51,7 @@ if __name__ == '__main__':
 
     amfast.log_debug = options.log_debug
 
-    gateway = amfast.remoting.Gateway()
+    gateway = Gateway()
     utils.setup_gateway(gateway)
 
     # Start server
@@ -61,7 +69,8 @@ if __name__ == '__main__':
     }
 
     app = App()
-    app.gateway = gateway
+    app.remoting_channel = Channel('amfast-channel', gateway)
+    app.polling_channel = Channel('amf-polling-channel', gateway)
     cherrypy.quickstart(app, '/', config=cp_options)
 
     print "Serving on %s:%s" % (options.domain, options.port)
