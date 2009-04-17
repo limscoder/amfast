@@ -612,6 +612,7 @@ static int serialize_byte_array_AMF3(EncoderObj *context, PyObject *value)
 
     // Length prefix
     Py_ssize_t value_len;
+    
     #ifdef Py_BYTEARRAYOBJECT_H
     // ByteArray encoding is only available in 2.6+
     if (PyByteArray_Check(value)) {
@@ -1252,6 +1253,23 @@ static int encode_object_AMF0(EncoderObj *context, PyObject *value)
         return write_xml_AMF0(context, value);
     }
 
+    int byte_value = check_byte_array(value);
+    if (byte_value == -1) {
+        return 0;
+    } else if (byte_value == 1) {
+        if (Encoder_writeByte(context, AMF3_AMF0) == 0)
+            return 0;
+
+        // Create new context for AMF3 encode
+        EncoderObj *new_context = (EncoderObj*)Encoder_copy(context, 1, 0);
+        if (new_context == NULL)
+            return 0;
+
+        int result = encode_AMF3(new_context, value);
+        Py_DECREF(new_context);
+        return result;
+    }
+
     // Generic object
     return write_object_AMF0(context, value);
 }
@@ -1706,10 +1724,7 @@ static int encode_packet_message_AMF0(EncoderObj *context, PyObject *value)
     }
 
     // Encode message body with a new context, so references are reset
-    int amf3 = 0;
-    if (context->amf3 == Py_True)
-        amf3 = 1;
-    EncoderObj *new_context = (EncoderObj*)Encoder_copy(context, amf3, 1);
+    EncoderObj *new_context = (EncoderObj*)Encoder_copy(context, 0, 1);
 
     if (PySequence_Size(response) > 0 && (PyList_Check(body) || PyTuple_Check(body))) {
         // We're encoding a request,
@@ -1727,6 +1742,11 @@ static int encode_packet_message_AMF0(EncoderObj *context, PyObject *value)
     }
     Py_DECREF(response);
     Py_DECREF(body);
+
+    if (!result) {
+        Py_DECREF(new_context);
+        return 0;
+    }
 
     int new_len = Encoder_tell(new_context);
     char *new_buf = Encoder_read(new_context); // Don't decref new_context until we've used new_buf

@@ -5,38 +5,15 @@ import optparse
 import cherrypy
 
 import amfast
-from amfast.remoting.gateway import Gateway, Channel
-
+from amfast.remoting.channel import ChannelSet
+from amfast.remoting.cherrypy_channel import CherryPyChannel
 import utils
 
-def amfhook():
-    """Checks for POST, and stops cherrypy from processing the body."""
-    cherrypy.request.process_request_body = False
-    cherrypy.request.show_tracebacks = False
-
-    if cherrypy.request.method != 'POST':
-        raise cherrypy.HTTPError(405, "AMF request must use 'POST' method.");
-cherrypy.tools.amfhook = cherrypy.Tool('before_request_body', amfhook, priority=0)
-
 class App(object):
-    """Controller class that directs requests to the Gateway."""
+    """Base web app."""
     @cherrypy.expose
     def index(self):
         raise cherrypy.HTTPRedirect('/addressbook.html')
-
-    @cherrypy.expose
-    @cherrypy.tools.amfhook()
-    def amf(self):
-        c_len = int(cherrypy.request.headers['Content-Length'])
-        raw_request = cherrypy.request.rfile.read(c_len)
-        return self.remoting_channel.invoke(raw_request)
-
-    @cherrypy.expose
-    @cherrypy.tools.amfhook()
-    def amfPolling(self):
-        c_len = int(cherrypy.request.headers['Content-Length'])
-        raw_request = cherrypy.request.rfile.read(c_len)
-        return self.polling_channel.invoke(raw_request)
 
 if __name__ == '__main__':
     usage = """usage: %s [options]""" % __file__
@@ -51,10 +28,6 @@ if __name__ == '__main__':
 
     amfast.log_debug = options.log_debug
 
-    gateway = Gateway()
-    utils.setup_gateway(gateway)
-
-    # Start server
     cp_options = {
         'global':
         {
@@ -68,9 +41,13 @@ if __name__ == '__main__':
         }
     }
 
+    channel_set = ChannelSet()
+    rpc_channel = CherryPyChannel('rpc-channel')
+    channel_set.mapChannel(rpc_channel)
+    utils.setup_channel_set(channel_set)
+
     app = App()
-    app.remoting_channel = Channel('amfast-channel', gateway)
-    app.polling_channel = Channel('amf-polling-channel', gateway)
+    app.amf = rpc_channel.invoke
     cherrypy.quickstart(app, '/', config=cp_options)
 
     print "Serving on %s:%s" % (options.domain, options.port)
