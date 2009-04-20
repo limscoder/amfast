@@ -30,6 +30,10 @@ class_def.assign_attrs(FaultError, 'mx.rpc.Fault',
 class AbstractMessage(object):
     """Base class for all flex messages."""
 
+    DESTINATION_CLIENT_ID_HEADER = 'DSDstClientId'
+    ENDPOINT_HEADER = 'DSEndpoint'
+    FLEX_CLIENT_ID_HEADER = 'DSId'
+
     def __init__(self):
         self.body = None
         self.clientId = None
@@ -265,6 +269,8 @@ class_def.assign_attrs(RemotingMessage, 'flex.messaging.messages.RemotingMessage
 
 class AsyncMessage(AbstractMessage):
 
+    SUBTOPIC_HEADER = 'DSSubtopic'
+
     def __init__(self):
         AbstractMessage.__init__(self)
         self.correlationId = None
@@ -307,6 +313,9 @@ class CommandMessage(AsyncMessage):
     POLL_OPERATION = 2
     CLIENT_PING_OPERATION = 5
     DISCONNECT_OPERATION = 12
+
+    SELECTOR_HEADER = 'DSSelector'
+    MESSAGING_VERSION = 'DSMessagingVersion'
 
     def __init__(self, operation=''):
         AsyncMessage.__init__(self)
