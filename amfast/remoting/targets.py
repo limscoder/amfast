@@ -30,4 +30,8 @@ def disconnect_operation(packet, msg, *args):
 def poll_operation(packet, msg, *args):
     """Respond to a poll operation."""
     command = msg.body[0]
-    return packet.channel_set.message_broker.poll(command.headers[command.FLEX_CLIENT_ID_HEADER])
+    messages = packet.channel_set.message_broker.poll(command.headers[command.FLEX_CLIENT_ID_HEADER])
+    print "GOT MESSAGES:"
+    for message in messages:
+        print message
+    return messages

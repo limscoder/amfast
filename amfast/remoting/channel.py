@@ -10,6 +10,7 @@ from amfast.encoder import Encoder
 from amfast.decoder import Decoder
 from amfast.class_def import ClassDefMapper
 from amfast.remoting import ServiceMapper, RemotingError
+import amfast.remoting.flex_messages as messaging
 
 class ChannelError(RemotingError):
     pass
@@ -20,9 +21,9 @@ class MessageBroker(object):
     SUBTOPIC_SEPARATOR = "_;_"
 
     def __init__(self):
-        self._lock = threading.RLock()
         self._topics = {} # Messages will be published by topic
         self._clients = {} # Messages will be retrieved by client
+        self.clientId = str(uuid.uuid4())
 
     def subscribe(self, client_id, channel, topic,
         sub_topic=None, selector=None):
@@ -31,7 +32,8 @@ class MessageBroker(object):
         if sub_topic is not None:
             topic = self.SUBTOPIC_SEPARATOR.join((topic, sub_topic))
 
-        self._lock.acquire()
+        lock = threading.RLock()
+        lock.acquire()
         try:
             subscription = self._clients.get(client_id, None)
             if subscription is None:
@@ -45,12 +47,13 @@ class MessageBroker(object):
 
             topic_map[client_id] = subscription
         finally:
-            self._lock.release()
+            lock.release()
 
     def disconnect(self, client_id):
         """Disconnect a client from a topic and channel."""
 
-        self._lock.acquire()
+        lock = threading.RLock()
+        lock.acquire()
         try:
             if client_id in self._clients:
                 self._clients[client_id].channel.disconnect(client_id)
@@ -67,48 +70,54 @@ class MessageBroker(object):
             for topic in del_topics:
                 del self._topics[topic]
         finally:
-            self._lock.release
+            lock.release()
 
     def poll(self, client_id):
-        self._lock.acquire()
+        lock = threading.RLock()
+        lock.acquire()
         try:
              if client_id not in self._clients:
                  raise ChannelError("Client is not subscribed.")
              return self._clients[client_id].poll()
         finally:
-            self._lock.release
+            lock.release()
 
     def publish(self, body, topic, sub_topic=None, client_id=None, ttl=600):
         """Publish a message."""
 
         current_time = time.time() * 1000
         ttl *= 1000
- 
-        self._lock.acquire()
-        try:
-            if client_id is not None:
+
+        print "PUBLISHING"
+        subscriptions = () 
+        print "INITED"
+        if client_id is not None:
+            if client_id in self._clients:
                 subscriptions = (self._clients[client_id], )
+        else:
+            print "PUBLISHING TOPIC %s" % topic 
+            if sub_topic is not None:
+                com_topic = self.SUBTOPIC_SEPARATOR.join((topic, sub_topic))
             else:
-                if sub_topic is not None:
-                    com_topic = self.SUBTOPIC_SEPARATOR.join((topic, sub_topic))
+                com_topic = topic
+               
+            print "PUBLISHING COM TOPIC %s" % com_topic 
+            if com_topic in self._topics:
+                subscriptions = self._topics[com_topic].values()
+                print "GOT SUBSCRIPTIONS: %s" % subscriptions
 
-                subscriptions = [subscription for subscription in self._topics[com_topic].values()]:
+        for subscription in subscriptions:
+            headers = {AsyncMessage.DESTINATION_CLIENT_ID_HEADER: subscription.client_id}
+            if sub_topic is not None:
+                headers[AsyncMessage.SUBTOPIC_HEADER] = sub_topic
 
-            for subscription in subscriptions:
-                msg = AsyncMessage()
 
-                headers = {msg.DESTINATION_CLIENT_ID_HEADER: subscription.client_id}
-                if sub_topic is not None:
-                    headers[msg.SUBTOPIC_HEADER] = sub_topic
+            msg = messaging.AsyncMessage(header=headers, body=body,
+                clientId=self.clientId, destination=topic, timestamp=current_time,
+                timeToLive=ttl)
 
-                msg.headers = headers
-                msg.body = body
-                msg.destination = topic
-                msg.timestamp = current_time
-                msg.timeToLive = ttl
-                subscription.publish(msg)
-        finally:
-            self._lock.release()
+            print "PUBLISHING TO CLIENT: %s" % subscription.client_id
+            subscription.publish(msg)
 
     def clean(self, timeout, current_time=None):
         if current_time is None:
@@ -134,22 +143,24 @@ class Subscription(object):
 
     def poll(self):
         """Returns all current messages and empties que."""
-        self._lock.acquire()
+        lock = threading.RLock()
+        lock.acquire()
         try:
              results = self._messages
              self._messages = []
              self.last_active = time.time()
         finally:
-            self._lock.release()
+            lock.release()
 
         return results
 
     def publish(self, msg):
-        self._lock.acquire()
+        lock = threading.RLock()
+        lock.acquire()
         try:
             self._messages.append(msg)
         finally:
-            self._lock.release()
+            lock.release()
 
         self.channel.publish(msg)
 
@@ -159,7 +170,8 @@ class Subscription(object):
             current_time = time.time()
 
         tmp = []
-        self._lock.acquire()
+        lock = threading.RLock()
+        lock.acquire()
         try:
              for msg in self._messages:
                  if msg.isExpired(current_time):
@@ -167,7 +179,7 @@ class Subscription(object):
                  tmp.append(msg)
              self._messages = tmp
         finally:
-            self._lock.release()
+            lock.release()
 
 class Channel(object):
     """An individual channel that AMF packets can be sent/recieved from/to."""
@@ -194,8 +206,9 @@ class Channel(object):
         Returns Subscription
         """
         subscription = Subscription(client_id, self)
-        
-        self._lock.acquire()
+       
+        lock = threading.RLock() 
+        lock.acquire()
         try:
             if self.max_subscriptions > -1:
                 # Check for maximum number of subscriptions
@@ -203,17 +216,18 @@ class Channel(object):
                     raise ChannelError("Channel '%s' is not accepting subscriptions." % self.name)
             self.current_subscriptions += 1
         finally:
-            self._lock.release()
+            lock.release()
 
         return subscription
 
     def disconnect(self, client_id):
         """Remove a client connection from this channel."""
-        self._lock.acquire()
+        lock = threading.RLock()
+        lock.acquire()
         try:
             self.current_subscriptions -= 1
         finally:
-            self._lock.release()
+            lock.release()
 
     def publish(self, msg):
         pass
@@ -272,33 +286,35 @@ class ChannelSet(object):
             message_broker = MessageBroker()
         self.message_broker = message_broker
 
-        self._lock = threading.RLock()
         self._channels = {}
 
     def __iter__(self):
         return self._channels.itervalues()
 
     def mapChannel(self, channel):
-        self._lock.acquire()
+        lock = threading.RLock()
+        lock.acquire()
         try:
             self._channels[channel.name] = channel
             channel._channel_set = self
         finally:
-            self._lock.release()
+            lock.release()
 
     def unMapChannel(self, channel):
-        self._lock.acquire()
+        lock = threading.RLock()
+        lock.acquire()
         try:
             if channel.name in self._channels:
                 channel._channel_set = None
                 del self._channels[channel.name]
         finally:
-            self._lock.release()
+            lock.release()
 
     def getChannel(self, name):
-        self._lock.acquire()
+        lock = threading.RLock()
+        lock.acquire()
         try:
             channel = self._channels[name]
         finally:
-            self._lock.release()
+            lock.release()
         return channel

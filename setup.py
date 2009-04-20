@@ -26,7 +26,6 @@ setup(name="AmFast",
     platforms = ["any"],
     test_suite = "tests.suite",
     packages = ['amfast', 'amfast.class_def', 'amfast.remoting'],
-    modules = ['encoder', 'decoder'],
     ext_modules = extensions,
     classifiers = [
         "Programming Language :: Python :: 2.4",
