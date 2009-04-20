@@ -34,14 +34,23 @@ class AbstractMessage(object):
     ENDPOINT_HEADER = 'DSEndpoint'
     FLEX_CLIENT_ID_HEADER = 'DSId'
 
-    def __init__(self):
-        self.body = None
-        self.clientId = None
-        self.destination = None
-        self.headers = None
-        self.messageId = None
-        self.timestamp = None
-        self.timeToLive = None
+    def __init__(self, body=None, clientId=None, destination=None,
+        headers=None, timeToLive=None, timestamp=None, messageId=None):
+        self.body = body
+        self.clientId = clientId
+        self.destination = destination
+        self.timeToLive = timeToLive
+
+        if headers is not None:
+            self.headers = headers
+
+        if timestamp is None:
+            timestamp = calendar.timegm(time.gmtime())
+        self.timestamp = timestamp
+   
+        if messageId is None:
+            messageId = self._getId()
+        self.messageId = messageId
 
     def isExpired(self, current_time=None):
         """Checks to see if message has expired."""
@@ -86,8 +95,6 @@ class AbstractMessage(object):
 
     def _matchAcknowledge(self, response):
         """Syncs values between this message and it's response acknowledgement."""
-        response.messageId = self._getId()
-        response.timestamp = calendar.timegm(time.gmtime())
         response.correlationId = self.messageId
 
     def _getId(self):
@@ -249,10 +256,16 @@ class AbstractSmallMsgDef(class_def.ExternClassDef):
 
 class RemotingMessage(AbstractMessage):
 
-    def __init__(self):
-        AbstractMessage.__init__(self)
-        self.operation = None
-        self.source = None
+    def __init__(self, body=None, clientId=None, destination=None,
+        headers=None, timeToLive=None, timestamp=None, messageId=None,
+        operation=None, source=None):
+
+        AbstractMessage.__init__(self, body=body, clientId=clientId,
+            destination=destination, headers=headers, timeToLive=timeToLive,
+            timestamp=timestamp, messageId=messageId)
+
+        self.operation = operation
+        self.source = source
 
     def invoke(self, packet, msg):
         AbstractMessage.invoke(self, packet, msg)
@@ -271,9 +284,17 @@ class AsyncMessage(AbstractMessage):
 
     SUBTOPIC_HEADER = 'DSSubtopic'
 
-    def __init__(self):
-        AbstractMessage.__init__(self)
-        self.correlationId = None
+    def __init__(self, body=None, clientId=None, destination=None,
+        headers=None, timeToLive=None, timestamp=None, messageId=None,
+        correlationId=None):
+ 
+               
+        AbstractMessage.__init__(self, body=body, clientId=clientId,
+            destination=destination, headers=headers, timeToLive=timeToLive,
+            timestamp=timestamp, messageId=messageId) 
+
+        if correlationId is not None:
+            self.correlationId = correlationId
 
 class_def.assign_attrs(AsyncMessage, 'flex.messaging.messages.AsyncMessage',
     ('body', 'clientId', 'destination', 'headers',
@@ -317,8 +338,14 @@ class CommandMessage(AsyncMessage):
     SELECTOR_HEADER = 'DSSelector'
     MESSAGING_VERSION = 'DSMessagingVersion'
 
-    def __init__(self, operation=''):
-        AsyncMessage.__init__(self)
+    def __init__(self,  body=None, clientId=None, destination=None,
+        headers=None, timeToLive=None, timestamp=None, messageId=None,
+        correlationId=None, operation=''):
+
+        AsyncMessage.__init__(self, body=body, clientId=clientId,
+            destination=destination, headers=headers, timeToLive=timeToLive,
+            timestamp=timestamp, messageId=messageId, correlationId=correlationId)
+
         self.operation = operation
 
     def invoke(self, packet, msg):
@@ -327,6 +354,7 @@ class CommandMessage(AsyncMessage):
         target = packet.channel_set.service_mapper.command_service.getTarget(self.operation)
         if target is None:
             raise FlexMessageError("Command '%s' not found." % self.operation)
+
         msg.response_msg.body.body = target.invoke(packet, msg, self.body)
 
 class_def.assign_attrs(CommandMessage, 'flex.messaging.messages.CommandMessage',
@@ -353,8 +381,8 @@ class CommandSmallMsgDef(AsyncSmallMsgDef):
 class AcknowledgeMessage(AsyncMessage):
     """A response message sent back to the client."""
 
-    def __init__(self):
-        AsyncMessage.__init__(self)
+    ERROR_HINT_HEADER = 'DSErrorHint'
+
 class_def.assign_attrs(AcknowledgeMessage, 'flex.messaging.messages.AcknowledgeMessage',
     ('body', 'clientId', 'destination', 'headers',
         'messageId', 'timestamp', 'timeToLive', 'correlationId'), True)

@@ -1,6 +1,8 @@
 """Utility functions."""
 import sys
 import logging
+from datetime import datetime
+from threading import Timer
 
 import amfast
 from amfast.encoder import Encoder
@@ -79,3 +81,16 @@ def setup_channel_set(channel_set):
     #coder = CodeGenerator()
     #coder.generateFilesFromMapper(gateway.class_def_mapper, use_accessors=False,
     #    packaged=True, constructor=False, bindable=True, extends='SAObject')
+
+    def publishTime(message_broker, interval=5):
+        """Publishes the current server time."""
+        print "PUBLISHING TIME!!"
+        current_time = '%s' % datetime.now()
+        print "GOT CURRENT TIME!!"
+        message_broker.publish(current_time, 'serverTime')
+        print "PUBLISHED TIME!!"
+        t = Timer(interval, publishTime, (message_broker, interval))
+        t.start()
+        print "STARTED TIMER!!"
+
+    publishTime(channel_set.message_broker, 5)

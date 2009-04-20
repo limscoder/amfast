@@ -1,4 +1,5 @@
 """Provides an interface for determining how Python objects are serialized and de-serialized."""
+import threading
 
 from amfast import AmFastError
 
@@ -211,8 +212,13 @@ class ClassDefMapper(object):
         if not hasattr(class_def, 'CLASS_DEF'):
             raise ClassDefError("class_def argument must be a ClassDef object.")
 
-        self._mapped_classes[id(class_def.class_)] = class_def
-        self._mapped_aliases[class_def.alias] = class_def
+        lock = threading.RLock()
+        lock.acquire()
+        try:
+            self._mapped_classes[id(class_def.class_)] = class_def
+            self._mapped_aliases[class_def.alias] = class_def
+        finally:
+            lock.release()
 
     def getClassDefByClass(self, class_):
         """Get a ClassDef.
@@ -223,7 +229,14 @@ class ClassDefMapper(object):
         ==========
          * class_ - class, the class to find a ClassDef for.
         """
-        return self._mapped_classes.get(id(class_), None)
+        lock = threading.RLock()
+        lock.acquire()
+        try:
+            result = self._mapped_classes.get(id(class_), None)
+        finally:
+            lock.release()
+
+        return result
 
     def getClassDefByAlias(self, alias):
         """Get a ClassDef.
@@ -234,7 +247,14 @@ class ClassDefMapper(object):
         ==========
          * alias - string, the alias to find a ClassDef for.
         """
-        return self._mapped_aliases.get(alias, None)
+        lock = threading.RLock()
+        lock.acquire()
+        try:
+            result = self._mapped_aliases.get(alias, None)
+        finally:
+            lock.release()
+
+        return result
 
     def unmapClass(self, class_):
         """Unmap a class definition.
@@ -243,13 +263,18 @@ class ClassDefMapper(object):
         ==========
          * class_ - class, the class to remove a ClassDef for.
         """
-        for alias, klass in self._mapped_aliases.iteritems():
-            if class_ == klass:
-                del self._mapped_aliases[alias]
+        lock = threading.RLock()
+        lock.acquire()
+        try:
+            for alias, klass in self._mapped_aliases.iteritems():
+                if class_ == klass:
+                    del self._mapped_aliases[alias]
 
-        class_id = id(class_)
-        if class_id in self._mapped_classes:
-            del self._mapped_classes[class_id]
+            class_id = id(class_)
+            if class_id in self._mapped_classes:
+                del self._mapped_classes[class_id]
+        finally:
+            lock.release()
 
 # ---- module attributes ---- #
 
