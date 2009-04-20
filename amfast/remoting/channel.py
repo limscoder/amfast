@@ -78,6 +78,38 @@ class MessageBroker(object):
         finally:
             self._lock.release
 
+    def publish(self, body, topic, sub_topic=None, client_id=None, ttl=600):
+        """Publish a message."""
+
+        current_time = time.time() * 1000
+        ttl *= 1000
+ 
+        self._lock.acquire()
+        try:
+            if client_id is not None:
+                subscriptions = (self._clients[client_id], )
+            else:
+                if sub_topic is not None:
+                    com_topic = self.SUBTOPIC_SEPARATOR.join((topic, sub_topic))
+
+                subscriptions = [subscription for subscription in self._topics[com_topic].values()]:
+
+            for subscription in subscriptions:
+                msg = AsyncMessage()
+
+                headers = {msg.DESTINATION_CLIENT_ID_HEADER: subscription.client_id}
+                if sub_topic is not None:
+                    headers[msg.SUBTOPIC_HEADER] = sub_topic
+
+                msg.headers = headers
+                msg.body = body
+                msg.destination = topic
+                msg.timestamp = current_time
+                msg.timeToLive = ttl
+                subscription.publish(msg)
+        finally:
+            self._lock.release()
+
     def clean(self, timeout, current_time=None):
         if current_time is None:
             current_time = time.time()
@@ -111,6 +143,15 @@ class Subscription(object):
             self._lock.release()
 
         return results
+
+    def publish(self, msg):
+        self._lock.acquire()
+        try:
+            self._messages.append(msg)
+        finally:
+            self._lock.release()
+
+        self.channel.publish(msg)
 
     def clean(self, current_time=None):
         """Remove all expired messages."""
@@ -173,6 +214,9 @@ class Channel(object):
             self.current_subscriptions -= 1
         finally:
             self._lock.release()
+
+    def publish(self, msg):
+        pass
 
     def invoke(self, raw_packet):
         """Invoke an incoming request packet."""
