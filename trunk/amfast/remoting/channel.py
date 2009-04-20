@@ -1,5 +1,5 @@
 """Send and receive AMF messages."""
-
+import time
 import uuid
 
 import threading
@@ -14,14 +14,15 @@ from amfast.remoting import ServiceMapper, RemotingError
 class ChannelError(RemotingError):
     pass
 
-class MessagePublisher(object):
+class MessageBroker(object):
     """Publishes messages."""
 
     SUBTOPIC_SEPARATOR = "_;_"
 
     def __init__(self):
         self._lock = threading.RLock()
-        self._subscriptions = {}
+        self._topics = {} # Messages will be published by topic
+        self._clients = {} # Messages will be retrieved by client
 
     def subscribe(self, client_id, channel, topic,
         sub_topic=None, selector=None):
@@ -32,28 +33,100 @@ class MessagePublisher(object):
 
         self._lock.acquire()
         try:
-            topic_map = self._subscriptions.get(topic, None)
+            subscription = self._clients.get(client_id, None)
+            if subscription is None:
+                subscription = channel.connect(client_id)
+                self._clients[client_id] = subscription
+
+            topic_map = self._topics.get(topic, None)
             if topic_map is None:
                 topic_map = {}
-                self._subscriptions[topic] = topic_map
+                self._topics[topic] = topic_map
 
-            topic_map[client_id] = channel.subscribe(client_id, topic, selector)
+            topic_map[client_id] = subscription
         finally:
             self._lock.release()
 
-class Subscription(object):
-    """A client subscription to a topic over a channel."""
+    def disconnect(self, client_id):
+        """Disconnect a client from a topic and channel."""
 
-    def __init__(self, client_id, channel, topic, selector=None):
+        self._lock.acquire()
+        try:
+            if client_id in self._clients:
+                self._clients[client_id].channel.disconnect(client_id)
+                del self._clients[client_id]
+
+            del_topics = [] # Empty topics to delete
+            for topic, topic_map in self._topics.iteritems():
+                if client_id in topic_map:
+                    del topic_map[client_id]
+
+                if len(topic_map) == 0:
+                    del_topics.append(topic)
+
+            for topic in del_topics:
+                del self._topics[topic]
+        finally:
+            self._lock.release
+
+    def poll(self, client_id):
+        self._lock.acquire()
+        try:
+             if client_id not in self._clients:
+                 raise ChannelError("Client is not subscribed.")
+             return self._clients[client_id].poll()
+        finally:
+            self._lock.release
+
+    def clean(self, timeout, current_time=None):
+        if current_time is None:
+            current_time = time.time()
+
+        for client_id, subscription in self._clients.iteritems():
+            if (current_time - subscription.last_active) > timeout:
+                self.disconnect(client_id)
+            else:
+                subscription.clean(current_time)
+
+class Subscription(object):
+    """A client subscription over a channel."""
+
+    def __init__(self, client_id, channel):
         self.client_id = client_id
         self.channel = channel
-        self.topic = topic
-        self.selector = selector
         
-        #self.last_active = now()
+        self.last_active = time.time()
 
-        #self._lock = threading.RLock()
-        #self._messages = []
+        self._lock = threading.RLock()
+        self._messages = []
+
+    def poll(self):
+        """Returns all current messages and empties que."""
+        self._lock.acquire()
+        try:
+             results = self._messages
+             self._messages = []
+             self.last_active = time.time()
+        finally:
+            self._lock.release()
+
+        return results
+
+    def clean(self, current_time=None):
+        """Remove all expired messages."""
+        if current_time is None:
+            current_time = time.time()
+
+        tmp = []
+        self._lock.acquire()
+        try:
+             for msg in self._messages:
+                 if msg.isExpired(current_time):
+                     continue
+                 tmp.append(msg)
+             self._messages = tmp
+        finally:
+            self._lock.release()
 
 class Channel(object):
     """An individual channel that AMF packets can be sent/recieved from/to."""
@@ -74,24 +147,32 @@ class Channel(object):
         self._lock = threading.RLock()
         self._channel_set = None
 
-    def subscribe(self, client_id, topic, selector=None):
+    def connect(self, client_id):
         """Add a client subscription to this channel.
 
         Returns Subscription
         """
-        subscription = Subscription(client_id, self, topic, selector)
+        subscription = Subscription(client_id, self)
         
         self._lock.acquire()
         try:
             if self.max_subscriptions > -1:
                 # Check for maximum number of subscriptions
                 if self.current_subscriptions >= self.max_subscriptions:
-                    raise ChannelSetException("Channel '%s' is not accepting subscriptions." % self.name)
+                    raise ChannelError("Channel '%s' is not accepting subscriptions." % self.name)
             self.current_subscriptions += 1
         finally:
             self._lock.release()
 
         return subscription
+
+    def disconnect(self, client_id):
+        """Remove a client connection from this channel."""
+        self._lock.acquire()
+        try:
+            self.current_subscriptions -= 1
+        finally:
+            self._lock.release()
 
     def invoke(self, raw_packet):
         """Invoke an incoming request packet."""
@@ -138,10 +219,14 @@ class ChannelSet(object):
     from any of the channels in the ChannelSet.
     """
 
-    def __init__(self, service_mapper=None):
+    def __init__(self, service_mapper=None, message_broker=None):
         if service_mapper is None:
             service_mapper = ServiceMapper()
         self.service_mapper = service_mapper
+
+        if message_broker is None:
+            message_broker = MessageBroker()
+        self.message_broker = message_broker
 
         self._lock = threading.RLock()
         self._channels = {}

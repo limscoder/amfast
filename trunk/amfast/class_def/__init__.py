@@ -168,7 +168,7 @@ class _ObjectProxyClassDef(_ProxyClassDef):
 
 class ClassDefMapper(object):
     """Map classes to ClassDefs, retrieve class_defs by class or alias name."""
-    def __init__(self, class_def_attr='_amf_alias'):
+    def __init__(self):
         """
         arguments
         ==========
@@ -176,7 +176,7 @@ class ClassDefMapper(object):
             mapped classes. Default = '_amf_alias'
         """
         self._mapped_classes = {}
-        self.class_def_attr = class_def_attr
+        self._mapped_aliases = {}
         self._mapBuiltIns()
 
     def _mapBuiltIns(self):
@@ -193,9 +193,10 @@ class ClassDefMapper(object):
         self.mapClass(ClassDef(messaging.FaultError, _built_in=True))
 
         # Flex remoting messages
-        self.mapClass(ClassDef(messaging.AbstractMessage, _built_in=True))
         self.mapClass(ClassDef(messaging.RemotingMessage, _built_in=True))
         self.mapClass(ClassDef(messaging.AsyncMessage, _built_in=True))
+        self.mapClass(messaging.CommandSmallMsgDef(messaging.CommandMessage,
+            alias="DSC", _built_in=True))
         self.mapClass(ClassDef(messaging.CommandMessage, _built_in=True))
         self.mapClass(ClassDef(messaging.AcknowledgeMessage, _built_in=True))
         self.mapClass(ClassDef(messaging.ErrorMessage, _built_in=True))
@@ -210,8 +211,8 @@ class ClassDefMapper(object):
         if not hasattr(class_def, 'CLASS_DEF'):
             raise ClassDefError("class_def argument must be a ClassDef object.")
 
-        setattr(class_def.class_, self.class_def_attr, class_def)
-        self._mapped_classes[class_def.alias] = class_def
+        self._mapped_classes[id(class_def.class_)] = class_def
+        self._mapped_aliases[class_def.alias] = class_def
 
     def getClassDefByClass(self, class_):
         """Get a ClassDef.
@@ -222,7 +223,7 @@ class ClassDefMapper(object):
         ==========
          * class_ - class, the class to find a ClassDef for.
         """
-        return getattr(class_, self.class_def_attr, None)
+        return self._mapped_classes.get(id(class_), None)
 
     def getClassDefByAlias(self, alias):
         """Get a ClassDef.
@@ -233,7 +234,7 @@ class ClassDefMapper(object):
         ==========
          * alias - string, the alias to find a ClassDef for.
         """
-        return self._mapped_classes.get(alias, None)
+        return self._mapped_aliases.get(alias, None)
 
     def unmapClass(self, class_):
         """Unmap a class definition.
@@ -242,18 +243,18 @@ class ClassDefMapper(object):
         ==========
          * class_ - class, the class to remove a ClassDef for.
         """
-        class_def = self.getClassDefByClass(class_)
-        if class_def is None:
-            raise ClassDefError("ClassDef not found.")
+        for alias, klass in self._mapped_aliases.iteritems():
+            if class_ == klass:
+                del self._mapped_aliases[alias]
 
-        class_def = getattr(class_, self.class_def_attr)
-        delattr(class_, self.class_def_attr)
-        del self._mapped_classes[class_def.alias]
+        class_id = id(class_)
+        if class_id in self._mapped_classes:
+            del self._mapped_classes[class_id]
 
 # ---- module attributes ---- #
 
 # These properties can be set on a class
-# to automatically map attributes
+# to map attributes within the class.
 ALIAS = '_AMFAST_ALIAS'
 STATIC_ATTRS = '_AMFAST_STATIC_ATTRS'
 AMF3 = '_AMFAST_AMF3'

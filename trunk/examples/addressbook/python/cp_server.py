@@ -42,12 +42,15 @@ if __name__ == '__main__':
     }
 
     channel_set = ChannelSet()
-    rpc_channel = CherryPyChannel('rpc-channel')
+    rpc_channel = CherryPyChannel('amf-channel')
     channel_set.mapChannel(rpc_channel)
+    polling_channel = CherryPyChannel('amf-polling-channel')
+    channel_set.mapChannel(polling_channel)
     utils.setup_channel_set(channel_set)
 
     app = App()
     app.amf = rpc_channel.invoke
+    app.amfPolling = polling_channel.invoke
     cherrypy.quickstart(app, '/', config=cp_options)
 
     print "Serving on %s:%s" % (options.domain, options.port)

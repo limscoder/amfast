@@ -4,6 +4,7 @@ import calendar
 import time
 
 import amfast
+from amfast.decode import decode
 from amfast import class_def, remoting
 from amfast.class_def.as_types import AsError
 
@@ -36,6 +37,23 @@ class AbstractMessage(object):
         self.headers = None
         self.messageId = None
         self.timestamp = None
+        self.timeToLive = None
+
+    def isExpired(self, current_time=None):
+        """Checks to see if message has expired."""
+        if self.timestamp is None or self.timeToLive is None:
+            return False
+
+        if current_time is None:
+            current_time = time.time() * 1000
+        else:
+            current_time *= 1000
+
+        expires = self.timestamp + self.timeToLive
+        if expires < current_time:
+            return True
+        else:
+            return False
 
     def invoke(self, packet, msg):
         """Invoke all message headers."""
@@ -108,6 +126,123 @@ class_def.assign_attrs(AbstractMessage, 'flex.messaging.messages.AbstractMessage
     ('body', 'clientId', 'destination', 'headers',
         'messageId', 'timestamp', 'timeToLive'), True)
 
+class AbstractSmallMsgDef(class_def.ExternClassDef):
+    """Encodes and decodes messages using ISmallMessage.
+
+    ISmallMessages use a more compact representation
+    of mx.messaging.messages.
+    """
+
+    HAS_NEXT_FLAG = 0x80
+    BODY_FLAG = 0x01
+    CLIENT_ID_FLAG = 0x02
+    DESTINATION_FLAG = 0x04
+    HEADERS_FLAG = 0x08
+    MESSAGE_ID_FLAG = 0x10
+    TIMESTAMP_FLAG = 0x20
+    TIME_TO_LIVE_FLAG = 0x40
+    CLIENT_ID_BYTES_FLAG = 0x01
+    MESSAGE_ID_BYTES_FLAG = 0x02
+
+    ALPHA_CHAR_CODES = (48, 49, 50, 51, 52, 53, 54, 
+        55, 56, 57, 65, 66, 67, 68, 69, 70)
+
+    def _readUid(self, bytes):
+        """Decode a 128bit byte array into a 36 char string representing an UID."""
+        if bytes is None:
+            return None
+
+        if hasattr(bytes, 'bytes'):
+            # amfast.class_def.as_types.ByteArray object
+            byte_str = bytes.bytes
+        else:
+            # Other type
+            byte_str = str(bytes)
+
+        if len(byte_str) != 16:
+           return None
+
+        uid_chars = [None] * 36
+        idx = 0
+        for i, byte in enumerate(byte_str):
+            if i == 4 or i == 6 or i == 8 or i == 10:
+                # hyphen
+                uid_chars[idx] = 45
+                idx += 1
+
+            char_code = ord(byte)
+            uid_chars[idx] = self.ALPHA_CHAR_CODES[(char_code & 0xF0) >> 4]
+            idx += 1
+            uid_chars[idx] = self.ALPHA_CHAR_CODES[(char_code & 0x0F)]
+            idx += 1
+        return ''.join([chr(byte) for byte in uid_chars])
+
+    def _readFlags(self, context):
+        """Reads flags."""
+        flags = []
+
+        flag = self.HAS_NEXT_FLAG
+        while (flag & self.HAS_NEXT_FLAG):
+            flag = ord(context.read(1))
+            flags.append(flag)
+
+        return flags
+
+    def readExternal(self, obj, context):
+        flags = self._readFlags(context)
+
+        for i, flag in enumerate(flags):
+            if i == 0:
+                if flag & self.BODY_FLAG:
+                    obj.body = decode(context)
+                else:
+                    obj.body = None
+
+                if flag & self.CLIENT_ID_FLAG:
+                    obj.clientId = decode(context)
+                else:
+                    obj.clientId = None
+
+                if flag & self.DESTINATION_FLAG:
+                    obj.destination = decode(context)
+                else:
+                   obj.destination = None
+
+                if flag & self.HEADERS_FLAG:
+                    obj.headers = decode(context)
+                else:
+                    obj.headers = None
+
+                if flag & self.MESSAGE_ID_FLAG:
+                    obj.messageId = decode(context)
+                else:
+                    obj.messageId = None
+
+                if flag & self.TIMESTAMP_FLAG:
+                    obj.timestamp = decode(context)
+                else:
+                    obj.timestamp = None
+
+                if flag & self.TIME_TO_LIVE_FLAG:
+                    obj.timeToLive = decode(context)
+                else:
+                    obj.timeToLive = None
+
+            if i == 1:
+                if flag & self.CLIENT_ID_BYTES_FLAG:
+                    clientIdBytes = decode(context)
+                    obj.clientId = self._readUid(clientIdBytes)
+                else:
+                    if not hasattr(obj, 'clientId'):
+                        obj.clientId = None
+
+                if flag & self.MESSAGE_ID_BYTES_FLAG:
+                    messageIdBytes = decode(context)
+                    obj.messageId = self._readUid(messageIdBytes)
+                else:
+                    if not hasattr(obj, 'messageId'):
+                        obj.messageId = None
+
 class RemotingMessage(AbstractMessage):
 
     def __init__(self):
@@ -138,6 +273,30 @@ class_def.assign_attrs(AsyncMessage, 'flex.messaging.messages.AsyncMessage',
     ('body', 'clientId', 'destination', 'headers',
         'messageId', 'timestamp', 'timeToLive', 'correlationId'), True)
 
+class AsyncSmallMsgDef(AbstractSmallMsgDef):
+    """Decodes messages that were encoded using ISmallMessage."""
+
+    CORRELATION_ID_FLAG = 0x01
+    CORRELATION_ID_BYTES_FLAG = 0x02
+
+    def readExternal(self, obj, context):
+        AbstractSmallMsgDef.readExternal(self, obj, context)
+
+        flags = self._readFlags(context)
+        for i, flag in enumerate(flags):
+            if i == 0:
+                if flag & self.CORRELATION_ID_FLAG:
+                    obj.correlationId = decode(context)
+                else:
+                    obj.correlationId = None
+
+                if flag & self.CORRELATION_ID_BYTES_FLAG:
+                    correlationIdBytes = decode(context)
+                    obj.correlationId = self._readUid(correlationIdBytes)
+                else:
+                    if not hasattr(obj, 'correlationId'):
+                        obj.correlationId = None
+
 class CommandMessage(AsyncMessage):
     """A Flex CommandMessage. Operations are integers instead of strings.
 
@@ -145,7 +304,9 @@ class CommandMessage(AsyncMessage):
     """
 
     SUBSCRIBE_OPERATION = 0
+    POLL_OPERATION = 2
     CLIENT_PING_OPERATION = 5
+    DISCONNECT_OPERATION = 12
 
     def __init__(self, operation=''):
         AsyncMessage.__init__(self)
@@ -163,6 +324,22 @@ class_def.assign_attrs(CommandMessage, 'flex.messaging.messages.CommandMessage',
     ('body', 'clientId', 'destination', 'headers',
         'messageId', 'timestamp', 'timeToLive', 'correlationId',
         'operation'), True)
+
+class CommandSmallMsgDef(AsyncSmallMsgDef):
+    """Decodes messages that were encoded using ISmallMessage."""
+
+    OPERATION_FLAG = 0x01
+
+    def readExternal(self, obj, context):
+        AsyncSmallMsgDef.readExternal(self, obj, context)
+
+        flags = self._readFlags(context)
+        for i, flag in enumerate(flags):
+            if i == 0:
+                if flag & self.OPERATION_FLAG:
+                    obj.operation = decode(context)
+                else:
+                    obj.operation = None
 
 class AcknowledgeMessage(AsyncMessage):
     """A response message sent back to the client."""
