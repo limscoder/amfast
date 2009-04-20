@@ -334,55 +334,49 @@ static PyObject* decode_class_def_AMF3(DecoderObj *context, int header)
         return NULL;
 
     PyObject *class_def = class_def_from_alias(context, alias);
-    Py_DECREF(alias);
-    if (!class_def) 
+    if (!class_def) {
+        Py_DECREF(alias);
         return NULL;
+    }
 
     // Create a dict with class def information
     // specific to this decode context.
     PyObject *class_def_dict = PyDict_New();
     if (!class_def_dict) {
+        Py_DECREF(alias);
         Py_DECREF(class_def);
         return NULL;
     }
 
     if (PyDict_SetItemString(class_def_dict, "class_def", class_def) == -1) {
-        Py_DECREF(class_def_dict);
+        Py_DECREF(alias);
         Py_DECREF(class_def);
+        Py_DECREF(class_def_dict);
         return NULL;
     }
 
-    // Check for or externalizable obj
     if (PyObject_HasAttrString(class_def, "EXTERNALIZABLE_CLASS_DEF") == 1) {
         // There is nothing else we need to do
-        // with this ClassDef
+        // with externalizable ClassDefs
+        Py_DECREF(alias);
         Py_DECREF(class_def); // class_def_dict has reference now.
         return class_def_dict;
     }
+    Py_DECREF(class_def); // class_def_dict has reference now.
 
-    // If the class is externalizable, but the ClassDef isn't,
-    // we have a big problem, because we don't know how to read
-    // the raw bytes.
     if ((header & 0x07FFFFFF) == EXTERNALIZABLE) {
-        // Get alias as C-String for error handling
-        PyObject *alias_str = PyObject_GetAttrString(class_def, "alias");
-        Py_DECREF(class_def);
+        // If the class is externalizable, but the ClassDef isn't,
+        // we have a big problem, because we don't know how to read
+        // the raw bytes.
         Py_DECREF(class_def_dict);
 
-        char *alias_char;
-        if (alias_str == NULL) {
-            alias_char = "unknown";
-        } else {
-            alias_char = PyString_AsString(alias_str);
-        }
-        Py_XDECREF(alias_str);
-
-        char error_str[512];
-        sprintf(error_str, "Encoded class '%s' is externalizable, but ClassDef is not.", alias_char);
+        char error_str[64 + PyString_Size(alias)];
+        sprintf(error_str, "Encoded class '%s' is externalizable, but ClassDef is not.", PyString_AsString(alias));
+        Py_DECREF(alias);        
         PyErr_SetString(amfast_DecodeError, error_str);
         return NULL;
     }
-    Py_DECREF(class_def); // class_def_dict has reference now.
+    Py_DECREF(alias); // We were only keeping this around to use in the externalizable error message.
 
     // Set dynamic flag
     if ((header & DYNAMIC) == DYNAMIC) {
@@ -1586,7 +1580,7 @@ initdecode(void)
     if (!remoting_mod) {
         remoting_mod = PyImport_ImportModule("amfast.remoting");
         if (!remoting_mod)
-            return NULL;
+            return;
     }
 
     if (context_mod == NULL) {
