@@ -85,7 +85,7 @@ class MessageBroker(object):
     def publish(self, body, topic, sub_topic=None, client_id=None, ttl=600):
         """Publish a message."""
 
-        current_time = time.time() * 1000
+        current_time = int(time.time() * 1000)
         ttl *= 1000
 
         print "PUBLISHING"
@@ -107,12 +107,12 @@ class MessageBroker(object):
                 print "GOT SUBSCRIPTIONS: %s" % subscriptions
 
         for subscription in subscriptions:
-            headers = {AsyncMessage.DESTINATION_CLIENT_ID_HEADER: subscription.client_id}
+            headers = {messaging.AsyncMessage.DESTINATION_CLIENT_ID_HEADER: subscription.client_id}
             if sub_topic is not None:
-                headers[AsyncMessage.SUBTOPIC_HEADER] = sub_topic
+                headers[messaging.AsyncMessage.SUBTOPIC_HEADER] = sub_topic
 
 
-            msg = messaging.AsyncMessage(header=headers, body=body,
+            msg = messaging.AsyncMessage(headers=headers, body=body,
                 clientId=self.clientId, destination=topic, timestamp=current_time,
                 timeToLive=ttl)
 
@@ -121,7 +121,7 @@ class MessageBroker(object):
 
     def clean(self, timeout, current_time=None):
         if current_time is None:
-            current_time = time.time()
+            current_time = int(time.time())
 
         for client_id, subscription in self._clients.iteritems():
             if (current_time - subscription.last_active) > timeout:
@@ -136,7 +136,7 @@ class Subscription(object):
         self.client_id = client_id
         self.channel = channel
         
-        self.last_active = time.time()
+        self.last_active = int(time.time())
 
         self._lock = threading.RLock()
         self._messages = []
@@ -148,7 +148,7 @@ class Subscription(object):
         try:
              results = self._messages
              self._messages = []
-             self.last_active = time.time()
+             self.last_active = int(time.time())
         finally:
             lock.release()
 
@@ -167,7 +167,7 @@ class Subscription(object):
     def clean(self, current_time=None):
         """Remove all expired messages."""
         if current_time is None:
-            current_time = time.time()
+            current_time = int(time.time())
 
         tmp = []
         lock = threading.RLock()

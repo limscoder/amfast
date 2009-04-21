@@ -12,6 +12,9 @@ class RoundTripTestCase(unittest.TestCase):
             self.test_list = ['test']
             self.sub_obj = None
             self.test_dict = {'test': 'ignore'}
+            self._float = float(1.234)
+            self._int = '1'
+            self._str = 123
 
     class TestSubObject(object):
         def __init__(self):
@@ -20,7 +23,8 @@ class RoundTripTestCase(unittest.TestCase):
     def setUp(self):
         self.class_mapper = class_def.ClassDefMapper()
 
-        self.class_mapper.mapClass(class_def.DynamicClassDef(self.TestObject, 'test_complex.test', ()))
+        self.class_mapper.mapClass(class_def.DynamicClassDef(self.TestObject,
+            'test_complex.test', static_attrs=()))
         self.class_mapper.mapClass(class_def.DynamicClassDef(self.TestSubObject, 'test_complex.sub', ()))
 
     def tearDown(self):
@@ -109,6 +113,22 @@ class RoundTripTestCase(unittest.TestCase):
         encoded = encode(complex, enc_context)
         decoded = decode(DecoderContext(encoded, class_def_mapper=self.class_mapper, amf3=True))
         self.resultTest(decoded['objects'])
+
+    def testEncodeTypes(self):
+        enc_mapper = class_def.ClassDefMapper()
+
+        enc_mapper.mapClass(class_def.DynamicClassDef(self.TestObject,
+            'test_complex.test', static_attrs=(), encode_types={
+                '_float': float, '_int': int, '_str': str}))
+        enc_mapper.mapClass(class_def.DynamicClassDef(self.TestSubObject, 'test_complex.sub', ()))
+
+        complex = self.buildComplex()
+        enc_context = EncoderContext(class_def_mapper=enc_mapper, amf3=True, include_private=True)
+        encoded = encode(complex, enc_context)
+        decoded = decode(DecoderContext(encoded, class_def_mapper=self.class_mapper, amf3=True))
+        self.assertEquals('float', decoded[0]._float.__class__.__name__)
+        self.assertEquals('int', decoded[0]._int.__class__.__name__)
+        self.assertEquals('unicode', decoded[0]._str.__class__.__name__)
 
 def suite():
     return unittest.TestLoader().loadTestsFromTestCase(RoundTripTestCase)

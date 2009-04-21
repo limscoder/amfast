@@ -813,6 +813,7 @@ static PyObject* Encoder_new(PyTypeObject *type, PyObject *args, PyObject *kwarg
         self->obj_refs = NULL;
         self->string_refs = NULL;
         self->class_refs = NULL;
+        self->type_map = NULL;
         self->array_collection_def = NULL;
         self->object_proxy_def = NULL;
         self->class_def_name = NULL;
@@ -935,6 +936,12 @@ static int Encoder_init(PyObject *self_raw, PyObject *args, PyObject *kwargs)
     if (Encoder_initRef(self) == -1)
         return -1;
 
+    if (self->type_map == NULL) {
+        self->type_map = PyDict_New();
+        if (self->type_map == NULL)
+            return -1;
+    }
+
     if (self->write_name == NULL) {
         self->write_name = PyString_InternFromString("write");
         if (self->write_name == NULL)
@@ -963,6 +970,7 @@ static void Encoder_dealloc(EncoderObj *self)
     Py_XDECREF(self->obj_refs);
     Py_XDECREF(self->string_refs);
     Py_XDECREF(self->class_refs);
+    Py_XDECREF(self->type_map);
     Py_XDECREF(self->array_collection_def);
     Py_XDECREF(self->object_proxy_def);
     Py_XDECREF(self->class_def_name);
@@ -1034,6 +1042,8 @@ static PyObject* Encoder_copy(EncoderObj *self, int amf3, int new_buf)
     Py_XINCREF(new_encoder->write_name);
     new_encoder->extern_name = self->extern_name;
     Py_XINCREF(new_encoder->extern_name);
+    new_encoder->type_map = self->type_map;
+    Py_XINCREF(new_encoder->type_map);
     if (amf3 == 1) {
         new_encoder->amf3 = Py_True;
     } else {

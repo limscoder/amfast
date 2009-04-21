@@ -17,19 +17,28 @@ class ClassDef(object):
      * alias - string, the amf alias name of the mapped class
      * static_attrs - tuple or list, a tuple of static attribute names,
           all values must be strings or unicode
-     * amf3 - bool, if True, this object will be encoded in AMF3. 
+     * amf3 - bool, if True, this object will be encoded in AMF3.
+     * encode_types - dict, keys = attribute names, values = callables.
+         Callables must accept a single parameter
+         (the object being encoded) and return a new object.
+     * decode_types - dict, keys = attribute names, values = callables.
+         Callables must accept a single parameter
+         (the object being decoded) and return a new object.
+
     """
 
     CLASS_DEF = True
 
     def __init__(self, class_, alias=None, static_attrs=None,
-        amf3=None, _built_in=False):
+        amf3=None, encode_types=None, decode_types=None, _built_in=False):
         """arguments
         =============
          * class_ - class, the class being mapped.
          * alias - string, specifies the amf class alias. Default = module.class
          * static_attrs - tuple or list, a tuple of static attribute strings. Default = empty tuple
          * amf3 - bool, if True, this object will be encoded in AMF3. Default = True
+         * encode_types - dict, keys = attribute names, values = callables. Default = empty dict
+         * decode_types - dict, keys = attribute names, values = callables. Default = empty dict
         """
         self.class_ = class_
         self._built_in = _built_in
@@ -54,6 +63,26 @@ class ClassDef(object):
             else:
                 amf3 = True
         self.amf3 = amf3
+
+        if encode_types is None:
+            encode_types = {}
+        self.encode_types = encode_types
+
+        if decode_types is None:
+            decode_types = {}
+        self.decode_types = decode_types
+
+    def getEncodeType(self, attr, val):
+        """Uses callable to perform a type conversion during encoding."""
+        if attr in self.encode_types:
+            return self.encode_types[attr](val)
+        return val
+
+    def getDecodeType(self, attr, val):
+        """Uses callable to perform a type conversion during decoding."""
+        if attr in self.decode_types:
+            return self.decode_types[attr](val)
+        return val
 
     def getStaticAttrVals(self, obj):
         """Returns a list of values of attributes defined in self.static_attrs
@@ -88,8 +117,12 @@ class DynamicClassDef(ClassDef):
 
     DYNAMIC_CLASS_DEF = True
 
-    def __init__(self, class_, alias=None, static_attrs=None, amf3=True, _built_in=False):
-        ClassDef.__init__(self, class_, alias, static_attrs, amf3, _built_in)
+    def __init__(self, class_, alias=None, static_attrs=None, amf3=True,
+        encode_types=None, decode_types=None, include_private=None, _built_in=False):
+        ClassDef.__init__(self, class_, alias, static_attrs, amf3,
+            encode_types, decode_types, _built_in)
+
+        self.include_private = include_private
 
     def getDynamicAttrVals(self, obj, include_private=False):
         """Returns a dict where keys are attribute names and values are attribute values.
@@ -100,7 +133,12 @@ class DynamicClassDef(ClassDef):
         include_private - bool, if False do not include attributes with
             names starting with '_'. Default = False.
         """
-        return get_dynamic_attr_vals(obj, self.static_attrs, include_private=False);
+        if self.include_private is None:
+            ip = include_private
+        else:
+            ip = self.include_private
+
+        return get_dynamic_attr_vals(obj, self.static_attrs, ip);
 
 class ExternClassDef(ClassDef):
     """A ClassDef where the byte string encoding/decoding is customized.
@@ -111,7 +149,8 @@ class ExternClassDef(ClassDef):
     EXTERNALIZABLE_CLASS_DEF = True
     
     def __init__(self, class_, alias=None, static_attrs=None, _built_in=False):
-        ClassDef.__init__(self, class_, alias, static_attrs, amf3=True, _built_in=_built_in)
+        ClassDef.__init__(self, class_, alias, static_attrs, amf3=True,
+            _built_in=_built_in)
  
     def writeExternal(self, obj, context):
         """
