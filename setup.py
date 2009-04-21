@@ -5,7 +5,8 @@ from distutils.core import setup, Extension
 
 extensions = [
     Extension('amfast.encode',
-        sources = [os.path.join('amfast', 'ext_src', 'encoder.c')]),
+        sources = [os.path.join('amfast', 'ext_src', 'encoder.c'),
+            os.path.join('amfast', 'ext_src', 'amf.c')]),
     Extension('amfast.decode',
         sources = [os.path.join('amfast', 'ext_src', 'decoder.c')]),
     Extension('amfast.buffer',

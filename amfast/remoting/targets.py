@@ -2,12 +2,14 @@
 
 import uuid
 
+from amfast.remoting.flex_messages import CommandMessage
+
 # --- CommandMessage Operations --- #
 def client_ping(packet, msg, *args):
     """Respond to a ping request."""
     command = msg.body[0]
     response = msg.response_msg.body
-    if response.headers is None:
+    if (not hasattr(response, 'headers')) or response.headers is None:
         response.headers = {}
 
     response.headers[command.MESSAGING_VERSION] = 1
@@ -31,6 +33,14 @@ def poll_operation(packet, msg, *args):
     """Respond to a poll operation."""
     command = msg.body[0]
     messages = packet.channel_set.message_broker.poll(command.headers[command.FLEX_CLIENT_ID_HEADER])
+
+    if len(messages) == 0:
+        response = msg.response_msg
+        if (not hasattr(response, 'headers')) or \
+            response.headers is None:
+            response.headers = {}
+        response.headers[CommandMessage.NO_OP_POLL_HEADER] = True
+
     print "GOT MESSAGES:"
     for message in messages:
         print message

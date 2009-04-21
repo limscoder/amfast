@@ -37,10 +37,12 @@ static int encode_string(EncoderObj *context, PyObject *value);
 static int encode_date(EncoderObj *context, PyObject *value);
 static int check_xml(PyObject *value);
 static int check_byte_array(PyObject *value);
-static PyObject * class_def_from_class(EncoderObj *context, PyObject *value);
-static PyObject * attributes_from_object(EncoderObj *context, PyObject *value);
-static PyObject* static_attr_vals_from_class_def(PyObject *class_def, PyObject *value);
-static PyObject* dynamic_attrs_from_class_def(PyObject *class_def, PyObject *value);
+static PyObject* class_def_from_class(EncoderObj *context, PyObject *value);
+static PyObject* attributes_from_object(EncoderObj *context, PyObject *value);
+static PyObject* static_attr_vals_from_class_def(EncoderObj *context,
+    PyObject *class_def, PyObject *value);
+static PyObject* dynamic_attrs_from_class_def(EncoderObj *context,
+    PyObject *class_def, PyObject *value);
 
 // AMF0
 static int encode_bool_AMF0(EncoderObj *context, PyObject *value);
@@ -798,7 +800,7 @@ static int encode_object_AMF3(EncoderObj *context, PyObject *value)
     }
 
     // Encode static attrs
-    PyObject *static_attrs = static_attr_vals_from_class_def(class_def, value);
+    PyObject *static_attrs = static_attr_vals_from_class_def(context, class_def, value);
     if (!static_attrs) {
         Py_DECREF(class_def);
         return 0;
@@ -832,7 +834,7 @@ static int encode_object_AMF3(EncoderObj *context, PyObject *value)
 
     // Encode dynamic attrs
     if (PyObject_HasAttrString(class_def, "DYNAMIC_CLASS_DEF")) {
-        PyObject *dynamic_attrs = dynamic_attrs_from_class_def(class_def, value);
+        PyObject *dynamic_attrs = dynamic_attrs_from_class_def(context, class_def, value);
         if (!dynamic_attrs) {
             Py_DECREF(class_def);
             return 0;
@@ -1340,7 +1342,7 @@ static int encode_class_def_AMF0(EncoderObj *context, PyObject *value)
 }
 
 /* Get static attrs. */
-static PyObject* static_attr_vals_from_class_def(PyObject *class_def, PyObject *value)
+static PyObject* static_attr_vals_from_class_def(EncoderObj *context, PyObject *class_def, PyObject *value)
 {
     PyObject *method_name = PyString_FromString("getStaticAttrVals");
     if (!method_name)
@@ -1357,23 +1359,36 @@ static PyObject* static_attr_vals_from_class_def(PyObject *class_def, PyObject *
         return NULL;
     }
 
+    PyObject *static_names = PyObject_GetAttrString(class_def, "static_attrs");
+    int result = type_list(class_def, context->type_map, "getEncodeType", static_names, static_attrs);
+    Py_DECREF(static_names);
+    if (result == 0) {
+        Py_DECREF(static_attrs);
+        return NULL;
+    }
+
     return static_attrs;
 }
 
 /* Get dynamic attrs. */
-static PyObject* dynamic_attrs_from_class_def(PyObject *class_def, PyObject *value)
+static PyObject* dynamic_attrs_from_class_def(EncoderObj *context, PyObject *class_def, PyObject *value)
 {
-    PyObject *method_name = PyString_FromString("getDynamicAttrVals");
-    if (!method_name)
+    PyObject *get_func = PyObject_GetAttrString(class_def, "getDynamicAttrVals");
+    if (!get_func)
         return NULL;
 
-    PyObject *dynamic_attrs = PyObject_CallMethodObjArgs(class_def, method_name, value, NULL);
-    Py_DECREF(method_name);
+    PyObject *dynamic_attrs = PyObject_CallFunctionObjArgs(get_func, value, context->include_private, NULL);
+    Py_DECREF(get_func);
     if (!dynamic_attrs)
         return NULL;
 
     if (!PyDict_Check(dynamic_attrs)) {
         PyErr_SetString(amfast_EncodeError, "ClassDef.getDynamicAttrVals must return a dict.");
+        Py_DECREF(dynamic_attrs);
+        return NULL;
+    }
+
+    if (type_dict(class_def, context->type_map, "getEncodeType", dynamic_attrs) == 0) {
         Py_DECREF(dynamic_attrs);
         return NULL;
     }
@@ -1440,7 +1455,7 @@ static int write_object_AMF0(EncoderObj *context, PyObject *value)
     }
 
     // Get static attrs
-    PyObject *static_attrs = static_attr_vals_from_class_def(class_def, value);
+    PyObject *static_attrs = static_attr_vals_from_class_def(context, class_def, value);
     if (!static_attrs) {
         Py_DECREF(class_def);
         Py_DECREF(attrs);
@@ -1498,7 +1513,7 @@ static int write_object_AMF0(EncoderObj *context, PyObject *value)
 
     // Get dynamic attrs
     if (PyObject_HasAttrString(class_def, "DYNAMIC_CLASS_DEF")) {
-        PyObject *dynamic_attrs = dynamic_attrs_from_class_def(class_def, value);
+        PyObject *dynamic_attrs = dynamic_attrs_from_class_def(context, class_def, value);
         if (!dynamic_attrs) {
             Py_DECREF(class_def);
             Py_DECREF(attrs);

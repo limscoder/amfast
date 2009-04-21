@@ -1,6 +1,5 @@
 """Equivalent to Flex mx.messaging.messages package."""
 import uuid
-import calendar
 import time
 
 import amfast
@@ -45,7 +44,7 @@ class AbstractMessage(object):
             self.headers = headers
 
         if timestamp is None:
-            timestamp = calendar.timegm(time.gmtime())
+            timestamp = int(time.time() * 1000)
         self.timestamp = timestamp
    
         if messageId is None:
@@ -73,7 +72,7 @@ class AbstractMessage(object):
         if amfast.log_debug:
             amfast.logger.debug("\nInvoking FlexMessage:\n%s" % self)
 
-        if self.headers is not None:
+        if hasattr(self, 'headers') and self.headers is not None:
             service = packet.channel_set.service_mapper.message_header_service
             for name, val in self.headers.iteritems():
                 target = service.getTarget(name)
@@ -87,9 +86,14 @@ class AbstractMessage(object):
         self._matchAcknowledge(response)
         return response
 
+    def getAcknowledgeClass(self):
+        """Returns the correct class for the response message."""
+        return AcknowledgeMessage
+
     def acknowledge(self):
         """Return a successful result message."""
-        response = AcknowledgeMessage()
+        class_ = self.getAcknowledgeClass()
+        response = class_()
         self._matchAcknowledge(response)
         return response
 
@@ -103,7 +107,7 @@ class AbstractMessage(object):
 
     def __str__(self):
         header_str = ''
-        if self.headers is not None:
+        if hasattr(self, 'headers') and self.headers is not None:
             header_str = '\n  '.join(["<header name=\"%s\">%s</header>" % (key, val) for key, val in self.headers.iteritems()])
         
         attrs = {}
@@ -337,10 +341,11 @@ class CommandMessage(AsyncMessage):
 
     SELECTOR_HEADER = 'DSSelector'
     MESSAGING_VERSION = 'DSMessagingVersion'
+    NO_OP_POLL_HEADER = 'DSNoOpPoll'
 
     def __init__(self,  body=None, clientId=None, destination=None,
         headers=None, timeToLive=None, timestamp=None, messageId=None,
-        correlationId=None, operation=''):
+        correlationId=None, operation=1000):
 
         AsyncMessage.__init__(self, body=body, clientId=clientId,
             destination=destination, headers=headers, timeToLive=timeToLive,
@@ -356,6 +361,13 @@ class CommandMessage(AsyncMessage):
             raise FlexMessageError("Command '%s' not found." % self.operation)
 
         msg.response_msg.body.body = target.invoke(packet, msg, self.body)
+
+    def getAcknowledgeClass(self):
+        """Returns the correct class for the response message."""
+        if self.operation == self.POLL_OPERATION:
+            return CommandMessage
+
+        return AsyncMessage.getAcknowledgeClass(self)
 
 class_def.assign_attrs(CommandMessage, 'flex.messaging.messages.CommandMessage',
     ('body', 'clientId', 'destination', 'headers',

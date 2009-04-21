@@ -80,3 +80,8 @@ typedef int Py_ssize_t;
 #define PY_SSIZE_T_MIN INT_MIN
 #endif
 #endif
+
+// Functions
+int type_list(PyObject* class_def, PyObject *mapper, const char *method_name,
+    PyObject* name_list, PyObject* val_list);
+int type_dict(PyObject* class_def, PyObject *mapper, const char* method_name, PyObject* dict);

@@ -192,6 +192,7 @@ typedef struct {
     PyObject *obj_refs; // IdxObj for objects
     PyObject *string_refs; // IdxObj for strings
     PyObject *class_refs; // IdxObj for ClassDefs
+    PyObject *type_map; // Maps objects to different types
     PyObject *array_collection_def; // ClassDef for ArrayCollection
     PyObject *object_proxy_def; // ClassDef for ObjectProxy
     PyObject *class_def_name; // Name of method to get class def
