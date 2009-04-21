@@ -72,18 +72,6 @@ class ClassDef(object):
             decode_types = {}
         self.decode_types = decode_types
 
-    def getEncodeType(self, attr, val):
-        """Uses callable to perform a type conversion during encoding."""
-        if attr in self.encode_types:
-            return self.encode_types[attr](val)
-        return val
-
-    def getDecodeType(self, attr, val):
-        """Uses callable to perform a type conversion during decoding."""
-        if attr in self.decode_types:
-            return self.decode_types[attr](val)
-        return val
-
     def getStaticAttrVals(self, obj):
         """Returns a list of values of attributes defined in self.static_attrs
 

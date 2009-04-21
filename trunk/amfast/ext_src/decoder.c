@@ -267,6 +267,12 @@ static int decode_typed_obj_AMF3(DecoderObj *context, PyObject *obj_val, PyObjec
         return 0;
     }
 
+    int result = type_dict(class_def, context->type_map, decoded_attrs, 1);
+    if (result == 0) {
+        Py_DECREF(decoded_attrs);
+        return 0;
+    }
+
     PyObject *return_val = PyObject_CallMethodObjArgs(class_def, context->apply_name,
         obj_val, decoded_attrs, NULL);
     Py_DECREF(decoded_attrs);
@@ -1129,6 +1135,14 @@ static PyObject* decode_typed_obj_AMF0(DecoderObj *context)
     }
 
     if (decode_dynamic_dict_AMF0(context, decoded_attrs) == 0) {
+        Py_DECREF(class_def);
+        Py_DECREF(obj_val);
+        Py_DECREF(decoded_attrs);
+        return NULL;
+    }
+
+    int type_result = type_dict(class_def, context->type_map, decoded_attrs, 1);
+    if (type_result == 0) {
         Py_DECREF(class_def);
         Py_DECREF(obj_val);
         Py_DECREF(decoded_attrs);

@@ -130,6 +130,22 @@ class RoundTripTestCase(unittest.TestCase):
         self.assertEquals('int', decoded[0]._int.__class__.__name__)
         self.assertEquals('unicode', decoded[0]._str.__class__.__name__)
 
+    def testDecodeTypes(self):
+        dec_mapper = class_def.ClassDefMapper()
+
+        dec_mapper.mapClass(class_def.DynamicClassDef(self.TestObject,
+            'test_complex.test', static_attrs=(), decode_types={
+                '_float': float, '_int': int, '_str': str}))
+        dec_mapper.mapClass(class_def.DynamicClassDef(self.TestSubObject, 'test_complex.sub', ()))
+
+        complex = self.buildComplex()
+        enc_context = EncoderContext(class_def_mapper=self.class_mapper, amf3=True, include_private=True)
+        encoded = encode(complex, enc_context)
+        decoded = decode(DecoderContext(encoded, class_def_mapper=dec_mapper, amf3=True))
+        self.assertEquals('float', decoded[0]._float.__class__.__name__)
+        self.assertEquals('int', decoded[0]._int.__class__.__name__)
+        self.assertEquals('str', decoded[0]._str.__class__.__name__)
+
 def suite():
     return unittest.TestLoader().loadTestsFromTestCase(RoundTripTestCase)
 

@@ -1360,7 +1360,7 @@ static PyObject* static_attr_vals_from_class_def(EncoderObj *context, PyObject *
     }
 
     PyObject *static_names = PyObject_GetAttrString(class_def, "static_attrs");
-    int result = type_list(class_def, context->type_map, "getEncodeType", static_names, static_attrs);
+    int result = type_list(class_def, context->type_map, static_names, static_attrs, 0);
     Py_DECREF(static_names);
     if (result == 0) {
         Py_DECREF(static_attrs);
@@ -1388,7 +1388,7 @@ static PyObject* dynamic_attrs_from_class_def(EncoderObj *context, PyObject *cla
         return NULL;
     }
 
-    if (type_dict(class_def, context->type_map, "getEncodeType", dynamic_attrs) == 0) {
+    if (type_dict(class_def, context->type_map, dynamic_attrs, 0) == 0) {
         Py_DECREF(dynamic_attrs);
         return NULL;
     }
