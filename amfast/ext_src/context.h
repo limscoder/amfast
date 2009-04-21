@@ -64,6 +64,7 @@ typedef struct {
     PyObject *obj_refs; // IdxObj for objects
     PyObject *string_refs; // IdxObj for strings
     PyObject *class_refs; // IdxObj for ClassDefs
+    PyObject *type_map; // Maps objects to different types
     PyObject *read_name; // PyString name of method to read from file-like-obj
     PyObject *apply_name; // PyString name of method that applies attributes to instances
     PyObject *class_def_name; // PyString name of method to retrieve a ClassDef

@@ -384,6 +384,7 @@ static PyObject* Decoder_new(PyTypeObject *type, PyObject *args, PyObject *kwarg
         self->obj_refs = NULL;
         self->string_refs = NULL;
         self->class_refs = NULL;
+        self->type_map = NULL;
         self->read_name = NULL;
         self->apply_name = NULL;
         self->class_def_name = NULL;
@@ -483,6 +484,12 @@ static int Decoder_init(PyObject *self_raw, PyObject *args, PyObject *kwargs)
     if (Decoder_initIdx(self) == -1)
         return -1;
 
+    if (self->type_map == NULL) {
+        self->type_map = PyDict_New();
+        if (self->type_map == NULL)
+            return -1;
+    }
+
     if (self->int_buf == 0) {
         if (self->read_name == NULL) {
             self->read_name = PyString_InternFromString("read");
@@ -521,6 +528,7 @@ static void Decoder_dealloc(DecoderObj *self)
     Py_XDECREF(self->obj_refs);
     Py_XDECREF(self->string_refs);
     Py_XDECREF(self->class_refs);
+    Py_XDECREF(self->type_map);
     Py_XDECREF(self->read_name);
     Py_XDECREF(self->apply_name);
     Py_XDECREF(self->class_def_name);
@@ -563,6 +571,8 @@ static PyObject* Decoder_copy(DecoderObj *self, int amf3)
     Py_XINCREF(new_decoder->class_def_name);
     new_decoder->extern_name = self->extern_name;
     Py_XINCREF(new_decoder->extern_name);
+    new_decoder->type_map = self->type_map;
+    Py_XINCREF(new_decoder->type_map);
     new_decoder->int_buf = self->int_buf;
     if (amf3 == 1) {
         new_decoder->amf3 = Py_True;
