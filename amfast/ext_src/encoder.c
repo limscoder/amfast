@@ -619,16 +619,13 @@ static int serialize_byte_array_AMF3(EncoderObj *context, PyObject *value)
     // ByteArray encoding is only available in 2.6+
     if (PyByteArray_Check(value)) {
         value_len = PyByteArray_GET_SIZE(value);
-    } else {
-        PyErr_SetString(amfast_EncodeError, "Cannot encode non ByteArray as byte array.");
-        return 0;
-    }
 
-    if (!_encode_int_AMF3(context, ((int)value_len) << 1 | REFERENCE_BIT)) {
-        return 0;
-    }
+        if (!_encode_int_AMF3(context, ((int)value_len) << 1 | REFERENCE_BIT)) {
+            return 0;
+        }
 
-    return encode_byte_array_AMF3(context, value);
+        return encode_byte_array_AMF3(context, value);
+    }
     #else
     PyObject *byte_string;
     if (check_byte_array(value)) {
@@ -656,7 +653,7 @@ static int serialize_byte_array_AMF3(EncoderObj *context, PyObject *value)
     #endif
 }
 
-/* Serializes a PyByteArray or a PyString. */
+/* Encodes a PyByteArray or a PyString. */
 static int encode_byte_array_AMF3(EncoderObj *context, PyObject *value)
 {
     Py_ssize_t value_len;
@@ -1791,7 +1788,6 @@ static int encode_unknown_object_AMF3(EncoderObj *context, PyObject *value)
         return write_xml_AMF3(context, value);
     }
 
-    #ifndef Py_BYTEARRAYOBJECT_H
     int byte_array_value = check_byte_array(value);
     if (byte_array_value == -1) {
         return 0;
@@ -1800,7 +1796,6 @@ static int encode_unknown_object_AMF3(EncoderObj *context, PyObject *value)
             return 0;
         return serialize_byte_array_AMF3(context, value);
     }
-    #endif
 
     // Generic object
     if (!Encoder_writeByte(context, OBJECT_TYPE))

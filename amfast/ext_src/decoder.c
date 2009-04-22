@@ -692,11 +692,7 @@ static PyObject* decode_byte_array_AMF3(DecoderObj *context, int byte_len)
     if (!str_val)
         return NULL;
 
-    #ifdef Py_BYTEARRAYOBJECT_H
-    byte_array_val = PyByteArray_FromObject(str_val);
-    #else
     byte_array_val = byte_array_from_string(str_val);
-    #endif
 
     return byte_array_val;
 }
