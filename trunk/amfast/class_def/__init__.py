@@ -242,7 +242,7 @@ class ClassDefMapper(object):
         lock = threading.RLock()
         lock.acquire()
         try:
-            self._mapped_classes[id(class_def.class_)] = class_def
+            self._mapped_classes[class_def.class_] = class_def
             self._mapped_aliases[class_def.alias] = class_def
         finally:
             lock.release()
@@ -259,7 +259,7 @@ class ClassDefMapper(object):
         lock = threading.RLock()
         lock.acquire()
         try:
-            result = self._mapped_classes.get(id(class_), None)
+            result = self._mapped_classes.get(class_, None)
         finally:
             lock.release()
 
