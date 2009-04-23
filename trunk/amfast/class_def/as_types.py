@@ -5,15 +5,47 @@ import amfast
 class AsByteArray(object):
     """An Actionscript ByteArray.
 
-    If you're using 2.6+, you can use Python's
-    native ByteArray type.
-
     attributes
     ===========
     bytes - string, bytes.
     """
+    
+    AS_BYTE_ARRAY = True
+
     def __init__(self, bytes):
         self.bytes = bytes
+
+class AsProxy(object):
+    """A proxy object.
+
+    Forces an object to be encoded as a proxy
+    even if use_collection or use_proxies if False.
+
+    attributes
+    ===========
+    source - object, the proxy source.
+    """
+
+    AS_PROXY = True
+
+    def __init__(self, source=None):
+        self.source = source
+
+class AsNoProxy(object):
+    """A no-proxy object.
+
+    Forces an object to be encoded without a proxy
+    even if use_collection or use_proxies is True.
+
+    attributes
+    ===========
+    source - object, the no-proxy source.
+    """
+
+    AS_NO_PROXY = True
+
+    def __init__(self, source=None):
+        self.source = source
 
 class AsError(amfast.AmFastError):
     """Equivalent to: 'Error' in AS3."""

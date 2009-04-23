@@ -958,6 +958,12 @@ static int Encoder_init(PyObject *self_raw, PyObject *args, PyObject *kwargs)
             return -1;
     }
 
+    if (self->class_def_name == NULL) {
+        self->class_def_name = PyString_InternFromString("getClassDefByClass");
+        if (self->class_def_name == NULL)
+            return -1;
+    }
+
     if (self->extern_name == NULL) {
         self->extern_name = PyString_InternFromString("writeExternal");
         if (self->extern_name == NULL)
