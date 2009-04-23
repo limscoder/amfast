@@ -2,6 +2,7 @@
 
 import uuid
 
+from amfast.class_def.as_types import AsNoProxy
 from amfast.remoting.flex_messages import CommandMessage
 
 # --- CommandMessage Operations --- #
@@ -41,7 +42,4 @@ def poll_operation(packet, msg, *args):
             response.headers = {}
         response.headers[CommandMessage.NO_OP_POLL_HEADER] = True
 
-    print "GOT MESSAGES:"
-    for message in messages:
-        print message
-    return messages
+    return AsNoProxy(messages)

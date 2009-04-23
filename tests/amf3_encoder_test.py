@@ -139,6 +139,20 @@ class Amf3EncoderTestCase(unittest.TestCase):
         buf = encode.encode(test, EncoderContext(amf3=True))
         self.assertEquals(result, buf);
 
+    def testTupleForceNoProxy(self):
+        from amfast.class_def.as_types import AsNoProxy
+        test = (0, 1, 2, 3);
+
+        result = '\x09\x09\x01' #array header
+        result += '\x04\x00' #array element 1
+        result += '\x04\x01' #array element 2
+        result += '\x04\x02' #array element 3
+        result += '\x04\x03' #array element 4
+
+        buf = encode.encode(AsNoProxy(test), EncoderContext(amf3=True,
+            use_collections=True))
+        self.assertEquals(result, buf);
+
     def testTupleRefs(self):
         test_tuple = (0, 1, 2, 3);
         test = [test_tuple, test_tuple]
@@ -162,6 +176,21 @@ class Amf3EncoderTestCase(unittest.TestCase):
 
         buf = encode.encode(test, EncoderContext(use_collections=True, amf3=True))
         self.assertEquals(result, buf)
+
+    def testTupleAsForcedCollection(self):
+        from amfast.class_def.as_types import AsProxy
+        test = (0, 1, 2, 3);
+
+        result = '\x0A\x07\x43flex.messaging.io.ArrayCollection' # Object header 
+        result += '\x09\x09\x01' #array header
+        result += '\x04\x00' #array element 1
+        result += '\x04\x01' #array element 2
+        result += '\x04\x02' #array element 3
+        result += '\x04\x03' #array element 4
+
+        buf = encode.encode(AsProxy(test), EncoderContext(use_collections=False, amf3=True))
+        self.assertEquals(result, buf)
+
 
     def testArrayCollectionRef(self):
         test_tuple = (0, 1, 2, 3);
@@ -219,6 +248,18 @@ class Amf3EncoderTestCase(unittest.TestCase):
         buf = encode.encode({'spam': 'eggs'}, EncoderContext(amf3=True))
         self.assertEquals(result, buf)
 
+    def testDictForceNoProxy(self):
+        from amfast.class_def.as_types import AsNoProxy
+
+        result = '\x0A\x0B\x01' # Object header
+        result += '\x09spam' # key
+        result += '\x06\x09eggs' #value
+        result += '\x01' # empty string terminator
+
+        buf = encode.encode(AsNoProxy({'spam': 'eggs'}), EncoderContext(amf3=True,
+            use_proxies=True))
+        self.assertEquals(result, buf)
+
     def testDictRef(self):
         test_dict = {'spam': 'eggs'};
         test = (test_dict, test_dict)
@@ -238,6 +279,18 @@ class Amf3EncoderTestCase(unittest.TestCase):
         result += '\x01' # empty string terminator
 
         buf = encode.encode({'spam': 'eggs'}, EncoderContext(use_proxies=True, amf3=True))
+        self.assertEquals(result, buf)
+
+    def testDictForcedObjectProxy(self):
+        from amfast.class_def.as_types import AsProxy
+
+        result = '\x0A\x07\x3Bflex.messaging.io.ObjectProxy' # Object header 
+        result += '\x0A\x0B\x01' # Object header
+        result += '\x09spam' # key
+        result += '\x06\x09eggs' #value
+        result += '\x01' # empty string terminator
+
+        buf = encode.encode(AsProxy({'spam': 'eggs'}), EncoderContext(use_proxies=False, amf3=True))
         self.assertEquals(result, buf)
 
     def testObjectProxyRef(self):

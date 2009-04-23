@@ -77,11 +77,52 @@ class Amf0EncoderTestCase(unittest.TestCase):
 
         self.assertEquals(encoded, encode.encode(decoded))
 
+    def testCollection(self):
+        from amfast.class_def.as_types import AsProxy
+        decoded = [0, 1, 1.23456789]
+        encoded = '\x0A\x00\x00\x00\x03' # 3 element array header
+        encoded += '\x00\x00\x00\x00\x00\x00\x00\x00\x00' # element 1
+        encoded += '\x00\x3f\xf0\x00\x00\x00\x00\x00\x00' #element 2
+        encoded += '\x00\x3f\xf3\xc0\xca\x42\x83\xde\x1b' #element 3
+
+        self.assertEquals(encoded, encode.encode(AsProxy(decoded)))
+
+    def testNoCollection(self):
+        from amfast.class_def.as_types import AsNoProxy
+        decoded = [0, 1, 1.23456789]
+        encoded = '\x0A\x00\x00\x00\x03' # 3 element array header
+        encoded += '\x00\x00\x00\x00\x00\x00\x00\x00\x00' # element 1
+        encoded += '\x00\x3f\xf0\x00\x00\x00\x00\x00\x00' #element 2
+        encoded += '\x00\x3f\xf3\xc0\xca\x42\x83\xde\x1b' #element 3
+
+        self.assertEquals(encoded, encode.encode(AsNoProxy(decoded)))
+
     def testDict(self):
         encoded = '\x03' #header
         encoded += '\x00\x04spam\x02\x00\x04eggs' #values
         encoded += '\x00\x00\t' # terminator
         self.assertEquals(encoded, encode.encode({'spam': 'eggs'}))
+
+    def testNoProxy(self):
+        from amfast.class_def.as_types import AsProxy
+        encoded = '\x03' #header
+        encoded += '\x00\x04spam\x02\x00\x04eggs' #values
+        encoded += '\x00\x00\t' # terminator
+        self.assertEquals(encoded, encode.encode(AsNoProxy({'spam': 'eggs'})))
+
+    def testProxy(self):
+        from amfast.class_def.as_types import AsProxy
+        encoded = '\x03' #header
+        encoded += '\x00\x04spam\x02\x00\x04eggs' #values
+        encoded += '\x00\x00\t' # terminator
+        self.assertEquals(encoded, encode.encode(AsProxy({'spam': 'eggs'})))
+
+    def testNoProxy(self):
+        from amfast.class_def.as_types import AsNoProxy
+        encoded = '\x03' #header
+        encoded += '\x00\x04spam\x02\x00\x04eggs' #values
+        encoded += '\x00\x00\t' # terminator
+        self.assertEquals(encoded, encode.encode(AsNoProxy({'spam': 'eggs'})))
 
     def testDate(self):
         import datetime
