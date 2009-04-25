@@ -20,6 +20,7 @@ def client_ping(packet, msg, *args):
 def subscribe_operation(packet, msg, *args):
     """Respond to a subscribe operation."""
     command = msg.body[0]
+    headers = command.headers
 
     # Set clientId
     # this ID is unique for each MessageAgent
@@ -28,14 +29,12 @@ def subscribe_operation(packet, msg, *args):
     if ack_msg.clientId is None:
         ack_msg.clientId = str(uuid.uuid4())
 
-    headers = command.headers
-    channel = packet.channel_set.getChannel(headers[command.ENDPOINT_HEADER])
-
+    channel = packet.channel
     connection = channel.getConnection(headers[command.FLEX_CLIENT_ID_HEADER])
     if connection is None:
         connection = channel.connect(headers[command.FLEX_CLIENT_ID_HEADER])
 
-    packet.channel_set.message_agent.subscribe(connection, ack_msg.clientId,
+    channel.channel_set.message_agent.subscribe(connection, ack_msg.clientId,
         command.destination, headers.get(command.SUBTOPIC_HEADER, None),
         headers.get(command.SELECTOR_HEADER, None))
 
@@ -43,11 +42,11 @@ def unsubscribe_operation(packet, msg, *args):
     """Respond to a unsubscribe operation."""
     command = msg.body[0]
     headers = command.headers
-    channel = packet.channel_set.getChannel(headers[command.ENDPOINT_HEADER])
-    
+   
+    channel = packet.channel 
     connection = channel.getConnection(headers[command.FLEX_CLIENT_ID_HEADER])
     if connection is not None:
-        packet.channel_set.message_agent.unsubscribe(connection, command.clientId,
+        channel.channel_set.message_agent.unsubscribe(connection, command.clientId,
             command.destination, headers.get(command.SUBTOPIC_HEADER, None),
             headers.get(command.SELECTOR_HEADER, None))
 
@@ -56,7 +55,7 @@ def disconnect_operation(packet, msg, *args):
     command = msg.body[0]
     headers = command.headers
 
-    connection = packet.channel_set.getConnection(headers[command.FLEX_CLIENT_ID_HEADER])
+    connection = packet.channel.getConnection(headers[command.FLEX_CLIENT_ID_HEADER])
     if connection is not None:
         connection.channel.disconnect(headers[command.FLEX_CLIENT_ID_HEADER])
 
@@ -65,7 +64,7 @@ def poll_operation(packet, msg, *args):
     command = msg.body[0]
     headers = command.headers
 
-    connection = packet.channel_set.getConnection(headers[command.FLEX_CLIENT_ID_HEADER])
+    connection = packet.channel.getConnection(headers[command.FLEX_CLIENT_ID_HEADER])
     if connection is None:
         raise ChannelError("Client is not connected.")
 

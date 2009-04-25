@@ -73,7 +73,7 @@ class AbstractMessage(object):
             amfast.logger.debug("\nInvoking FlexMessage:\n%s" % self)
 
         if hasattr(self, 'headers') and self.headers is not None:
-            service = packet.channel_set.service_mapper.message_header_service
+            service = packet.channel.channel_set.service_mapper.message_header_service
             for name, val in self.headers.iteritems():
                 target = service.getTarget(name)
                 if target is not None:
@@ -275,7 +275,7 @@ class RemotingMessage(AbstractMessage):
     def invoke(self, packet, msg):
         AbstractMessage.invoke(self, packet, msg)
 
-        target = packet.channel_set.service_mapper.getTarget(self.destination, self.operation)
+        target = packet.channel.channel_set.service_mapper.getTarget(self.destination, self.operation)
         if target is None:
             raise FlexMessageError("Operation '%s' not found." % \
                 remoting.Service.SEPARATOR.join((self.destination, self.operation)))
@@ -305,7 +305,7 @@ class AsyncMessage(AbstractMessage):
         """Publish this message."""
         AbstractMessage.invoke(self, packet, msg)
 
-        packet.channel_set.message_agent.publish(self.body,
+        packet.channel.channel_set.message_agent.publish(self.body,
             self.destination, self.headers.get(self.SUBTOPIC_HEADER, None))
 
 class_def.assign_attrs(AsyncMessage, 'flex.messaging.messages.AsyncMessage',
@@ -365,7 +365,7 @@ class CommandMessage(AsyncMessage):
     def invoke(self, packet, msg):
         AbstractMessage.invoke(self, packet, msg)
 
-        target = packet.channel_set.service_mapper.command_service.getTarget(self.operation)
+        target = packet.channel.channel_set.service_mapper.command_service.getTarget(self.operation)
         if target is None:
             raise FlexMessageError("Command '%s' not found." % self.operation)
 

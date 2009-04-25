@@ -28,7 +28,8 @@ class SaClassDef(class_def.ClassDef):
     KEY_ATTR = 'sa_key' # sa instance key
     LAZY_ATTR = 'sa_lazy' # list of lazy attribute names
 
-    def __init__(self, class_, alias=None, static_attrs=None, amf3=None):
+    def __init__(self, class_, alias=None, static_attrs=None, amf3=None,
+        encode_types=None, decode_types=None):
         """Static attributes are inferred from the class mapper,
         so static_attrs needs to be passed only if there are additional
         un-mapped attributes that need to be considered static."""
@@ -48,7 +49,9 @@ class SaClassDef(class_def.ClassDef):
             if not prop.key in combined_attrs:
                 combined_attrs.append(prop.key)
 
-        class_def.ClassDef.__init__(self, class_, alias, combined_attrs, amf3)
+        class_def.ClassDef.__init__(self, class_, alias=alias,
+            static_attrs=combined_attrs, amf3=amf3, encode_types=encode_types,
+            decode_types=decode_types)
 
     def getStaticAttrVals(self, obj):
         lazy_attrs = []
