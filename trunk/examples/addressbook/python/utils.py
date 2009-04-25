@@ -56,8 +56,8 @@ def setup_channel_set(channel_set):
         class_def_mapper=class_mapper, use_legacy_xml=True)
     decoder = Decoder(class_def_mapper=class_mapper)
     for channel in channel_set:
-        channel.encoder = encoder
-        channel.decoder = decoder
+        channel.endpoint.encoder = encoder
+        channel.endpoint.decoder = decoder
 
     # Map service targets to controller methods
     channel_set.service_mapper.default_service.mapTarget(CallableTarget(sa_obj.echo, 'echo'))
@@ -86,7 +86,7 @@ def setup_channel_set(channel_set):
         """Publishes the current server time."""
         current_time = '%s' % datetime.now()
         message_agent.publish(current_time, 'serverTime')
-        t = Timer(interval, publishTime, (message_agent, interval))
-        t.start()
+        #t = Timer(interval, publishTime, (message_agent, interval))
+        #t.start()
 
     publishTime(channel_set.message_agent, 5)
