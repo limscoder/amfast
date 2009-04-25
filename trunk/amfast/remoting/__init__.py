@@ -374,6 +374,8 @@ class ServiceMapper(object):
             messaging.CommandMessage.POLL_OPERATION))
         self.command_service.mapTarget(ExtCallableTarget(targets.subscribe_operation,
             messaging.CommandMessage.SUBSCRIBE_OPERATION))
+        self.command_service.mapTarget(ExtCallableTarget(targets.unsubscribe_operation,
+            messaging.CommandMessage.UNSUBSCRIBE_OPERATION))
         self.command_service.mapTarget(ExtCallableTarget(targets.disconnect_operation,
             messaging.CommandMessage.DISCONNECT_OPERATION))
 

@@ -100,6 +100,7 @@ class AbstractMessage(object):
     def _matchAcknowledge(self, response):
         """Syncs values between this message and it's response acknowledgement."""
         response.correlationId = self.messageId
+        response.clientId = self.clientId
 
     def _getId(self):
         """Get a messageId or clientId."""
@@ -300,6 +301,13 @@ class AsyncMessage(AbstractMessage):
         if correlationId is not None:
             self.correlationId = correlationId
 
+    def invoke(self, packet, msg):
+        """Publish this message."""
+        AbstractMessage.invoke(self, packet, msg)
+
+        packet.channel_set.message_agent.publish(self.body,
+            self.destination, self.headers.get(self.SUBTOPIC_HEADER, None))
+
 class_def.assign_attrs(AsyncMessage, 'flex.messaging.messages.AsyncMessage',
     ('body', 'clientId', 'destination', 'headers',
         'messageId', 'timestamp', 'timeToLive', 'correlationId'), True)
@@ -335,6 +343,7 @@ class CommandMessage(AsyncMessage):
     """
 
     SUBSCRIBE_OPERATION = 0
+    UNSUBSCRIBE_OPERATION = 1
     POLL_OPERATION = 2
     CLIENT_PING_OPERATION = 5
     DISCONNECT_OPERATION = 12
