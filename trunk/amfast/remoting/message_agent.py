@@ -36,7 +36,7 @@ class MessageAgent(object):
 
     def unsubscribe(self, connection, client_id, topic,
         sub_topic=None, selector=None):
-        """Subscribe a client to a topic and channel."""
+        """Subscribe a client from a topic."""
 
         if sub_topic is not None:
             topic = self.SUBTOPIC_SEPARATOR.join((topic, sub_topic))
@@ -49,6 +49,9 @@ class MessageAgent(object):
             topic_map = self._topics.get(topic, None)
             if topic_map is not None:
                del topic_map[client_id]
+
+               if len(topic_map) < 1:
+                   del self._topics[topic]
         finally:
             lock.release()
 
