@@ -12,11 +12,12 @@ class TwistedChannel(Resource, Channel):
     def render_POST(self, request):
         if request.content:
             len_str = 'Content-Length'
-            if request.requestHeaders.hasHeader(len_str) is True:
-                content_lens = request.requestHeaders.getRawHeaders(len_str)
-                raw_request = request.content.read(int(content_lens[0]))
+            content_len = request.getHeader(len_str)
+            if content_len is not None:
+                raw_request = request.content.read(int(content_len))
             else:
                 raw_request = request.content
-            return self.invoke(raw_request)
+
+            return self.invoke(self.decode(raw_request))
         else:
             raise Exception("No content")
