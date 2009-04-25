@@ -24,10 +24,13 @@ class Connection(object):
         self._subscriptions = {}
 
     def getSubscriptions(self):
+        subscriptions = []
+
         lock = threading.RLock()
         lock.acquire()
         try:
-            subscriptions = self._subscriptions.values()
+            for client_subscriptions in self._subscriptions.values():
+                subscriptions.extend(client_subscriptions.values())
         finally:
             lock.release()
 
@@ -82,7 +85,6 @@ class Connection(object):
             lock.release()
 
     def clean(self, current_time=None):
-        print "Cleaning connection"
         """Remove all expired messages."""
         if current_time is None:
             current_time = int(time.time())
@@ -103,11 +105,13 @@ class Channel(object):
     """An individual channel that can be send/recieve messages."""
 
     def __init__(self, name, max_connections=-1, endpoint=None,
-        time_to_live=1800, connection_class=Connection):
+        time_to_live=1800, clean_freq=300, connection_class=Connection):
         self.name = name
         self.max_connections = max_connections
         self.connection_class = connection_class
         self.time_to_live = time_to_live
+        self.clean_freq = clean_freq
+        self._last_cleaned = int(time.time())
 
         if endpoint is None:
             endpoint = AmfEndpoint()
@@ -133,6 +137,7 @@ class Channel(object):
     def invoke(self, request):
         """Invoke an incoming request packet."""
 
+        self.clean()
         try:
             request.channel = self
             return self.endpoint.encodePacket(request.invoke())
@@ -188,11 +193,17 @@ class Channel(object):
             lock.release()
 
     def clean(self):
-        print "cleaning channel."
+        current_time = int(time.time())
+        if self._last_cleaned < current_time - self.clean_freq:
+            self._last_cleaned = current_time
+            t = threading.Timer(0, self._clean)
+            t.start()
+
+    def _clean(self):
         current_time = int(time.time())
         cutoff = current_time - self.time_to_live
 
-        for connection in self._connections:
+        for connection in self._connections.values():
             if connection._last_active < cutoff:
                 self.disconnect(connection.flex_client_id)
             else:
@@ -203,7 +214,7 @@ class ChannelSet(object):
     from any of the channels in the ChannelSet.
     """
 
-    def __init__(self, service_mapper=None, message_agent=None, clean_freq=10):
+    def __init__(self, service_mapper=None, message_agent=None):
         if service_mapper is None:
             service_mapper = ServiceMapper()
         self.service_mapper = service_mapper
@@ -213,8 +224,6 @@ class ChannelSet(object):
         self.message_agent = message_agent
 
         self._channels = {}
-        #self._cleaner = amfast.PerpetualTimer(clean_freq, self.clean)
-        #self._cleaner.run()
 
     def __iter__(self):
         return self._channels.itervalues()
@@ -248,8 +257,5 @@ class ChannelSet(object):
         return channel
 
     def clean(self):
-        print "Cleaning channelSet"
-        print self._channels
         for channel in self._channels.values():
-            print channel.name
             channel.clean()

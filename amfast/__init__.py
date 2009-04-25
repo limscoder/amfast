@@ -2,7 +2,6 @@
 import sys
 import traceback
 import calendar
-import threading
 from datetime import datetime
 import logging
 
@@ -14,20 +13,6 @@ class AmFastError(Exception):
     def _set_message(self, message):
         self._message = message
     message = property(_get_message, _set_message)
-
-class PerpetualTimer(threading._Timer):
-    """A subclass of threading._Timer whose run() method repeats.
-
-    This is copied from: CherryPy
-    http://www.cherrypy.org/browser/trunk/cherrypy/process/plugins.py
-    """
-    
-    def run(self):
-        while True:
-            self.finished.wait(self.interval)
-            if self.finished.isSet():
-                return
-            self.function(*self.args, **self.kwargs)
 
 def epoch_from_date(date):
     """Returns epoch milliseconds."""
