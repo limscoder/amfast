@@ -104,6 +104,8 @@ class Connection(object):
 class Channel(object):
     """An individual channel that can be send/recieve messages."""
 
+    CONTENT_TYPE = 'application/x-amf'
+
     def __init__(self, name, max_connections=-1, endpoint=None,
         time_to_live=1800, clean_freq=300, connection_class=Connection):
         self.name = name

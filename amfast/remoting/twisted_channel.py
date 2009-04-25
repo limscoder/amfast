@@ -18,6 +18,8 @@ class TwistedChannel(Resource, Channel):
             else:
                 raw_request = request.content
 
-            return self.invoke(self.decode(raw_request))
+            response = self.invoke(self.decode(raw_request))
+            request.setHeader('Content-Type', self.CONTENT_TYPE)
+            return response
         else:
             raise Exception("No content")

@@ -47,7 +47,6 @@ if __name__ == '__main__':
     polling_channel = CherryPyChannel('amf-polling-channel')
     channel_set.mapChannel(polling_channel)
     utils.setup_channel_set(channel_set)
-    channel_set.clean()
 
     app = App()
     app.amf = rpc_channel.processMsg
