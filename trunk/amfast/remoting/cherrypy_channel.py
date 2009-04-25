@@ -24,4 +24,6 @@ class CherryPyChannel(Channel):
         except KeyError:
             raw_request = cherrypy.request.rfile
 
-        return self.invoke(self.decode(raw_request))
+        response = self.invoke(self.decode(raw_request))
+        cherrypy.response.headers['Content-Type'] = self.CONTENT_TYPE
+        return response
