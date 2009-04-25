@@ -222,6 +222,8 @@ class ClassDefMapper(object):
 
         # Flex remoting messages
         self.mapClass(ClassDef(messaging.RemotingMessage, _built_in=True))
+        self.mapClass(messaging.AsyncSmallMsgDef(messaging.AsyncMessage,
+            alias="DSA", _built_in=True))
         self.mapClass(ClassDef(messaging.AsyncMessage, _built_in=True))
         self.mapClass(messaging.CommandSmallMsgDef(messaging.CommandMessage,
             alias="DSC", _built_in=True))

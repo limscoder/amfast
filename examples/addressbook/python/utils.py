@@ -82,15 +82,11 @@ def setup_channel_set(channel_set):
     #coder.generateFilesFromMapper(gateway.class_def_mapper, use_accessors=False,
     #    packaged=True, constructor=False, bindable=True, extends='SAObject')
 
-    def publishTime(message_broker, interval=5):
+    def publishTime(message_agent, interval=5):
         """Publishes the current server time."""
-        print "PUBLISHING TIME!!"
         current_time = '%s' % datetime.now()
-        print "GOT CURRENT TIME!!"
-        message_broker.publish(current_time, 'serverTime')
-        print "PUBLISHED TIME!!"
-        t = Timer(interval, publishTime, (message_broker, interval))
+        message_agent.publish(current_time, 'serverTime')
+        t = Timer(interval, publishTime, (message_agent, interval))
         t.start()
-        print "STARTED TIMER!!"
 
-    publishTime(channel_set.message_broker, 5)
+    publishTime(channel_set.message_agent, 5)
