@@ -411,11 +411,15 @@ class_def.assign_attrs(AcknowledgeMessage, 'flex.messaging.messages.AcknowledgeM
 class ErrorMessage(AcknowledgeMessage):
     """A response message sent back to the client after a failure."""
 
-    def __init__(self, exc=None, faultCode='', faultString='',
+    def __init__(self, body=None, clientId=None, destination=None,
+        headers=None, timeToLive=None, timestamp=None, messageId=None,
+        correlationId=None, exc=None, faultCode='', faultString='',
         faultDetail='', rootCause=None, extendedData=None):
         """exc must be a FaultError or None."""
        
-        AcknowledgeMessage.__init__(self)
+        AcknowledgeMessage.__init__(self, body=body, clientId=clientId,
+            destination=destination, headers=headers, timeToLive=timeToLive,
+            timestamp=timestamp, messageId=messageId, correlationId=correlationId)
 
         if exc is not None:
             self.faultCode = exc.faultCode
