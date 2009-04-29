@@ -1602,8 +1602,8 @@ static int write_object_AMF0(EncoderObj *context, PyObject *value)
 /* Encode an AMF packet. */
 static int encode_packet(EncoderObj *context, PyObject *value)
 {
-    // write flash version
-    PyObject *client_type = PyObject_GetAttrString(value, "version");
+    // write flash client_type
+    PyObject *client_type = PyObject_GetAttrString(value, "client_type");
     if (!client_type)
         return 0;
 
@@ -1629,13 +1629,13 @@ static int encode_packet(EncoderObj *context, PyObject *value)
     }
 
     // Set client type
-    unsigned short amf_version;
+    unsigned short amf_client_type;
     if (PyUnicode_Compare(client_type, flash_8) == 0) {
-        amf_version = FLASH_8;
+        amf_client_type = FLASH_8;
     } else if (PyUnicode_Compare(client_type, flash_com) == 0) {
-        amf_version = FLASH_COM;
+        amf_client_type = FLASH_COM;
     } else if (PyUnicode_Compare(client_type, flash_9) == 0) {
-        amf_version = FLASH_9;
+        amf_client_type = FLASH_9;
     } else {
         PyErr_SetString(amfast_EncodeError, "Unknown client type.");
         Py_DECREF(client_type);
@@ -1649,7 +1649,7 @@ static int encode_packet(EncoderObj *context, PyObject *value)
     Py_DECREF(flash_8);
     Py_DECREF(flash_com);
     Py_DECREF(flash_9);
-    if (!encode_ushort(context, amf_version))
+    if (!encode_ushort(context, amf_client_type))
         return 0;
 
     // write headers

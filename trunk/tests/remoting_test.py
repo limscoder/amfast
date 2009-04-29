@@ -68,10 +68,10 @@ class RemotingTestCase(unittest.TestCase):
         encoded += '\x0A\x00\x00\x00\x01' # Body start - 1 element array header
         encoded += '\x01\x00' # Body 2 value
 
-        packet = self.channel.decodePacket(encoded)
+        packet = self.channel.endpoint.decodePacket(encoded)
 
         # version
-        self.assertEquals(packet.FLASH_8, packet.version)
+        self.assertEquals(packet.FLASH_8, packet.client_type)
 
         # headers
         self.assertEquals('eggs', packet.headers[0].value)
@@ -102,10 +102,10 @@ class RemotingTestCase(unittest.TestCase):
         encoded += '\x00\x00\x00\x02' # Body byte length
         encoded += '\x01\x01' # Body value
 
-        packet = self.channel.decodePacket(encoded)
+        packet = self.channel.endpoint.decodePacket(encoded)
 
         # version
-        self.assertEquals(packet.FLASH_8, packet.version)
+        self.assertEquals(packet.FLASH_8, packet.client_type)
 
         # headers
         self.assertEquals('eggs', packet.headers[0].value)
@@ -136,8 +136,8 @@ class RemotingTestCase(unittest.TestCase):
         encoded += '\x0A\x00\x00\x00\x01' # Body start - 1 element array header
         encoded += '\x01\x00' # Body 2 value
 
-        packet = self.channel.decodePacket(encoded)
-        encoded_packet = self.channel.encodePacket(packet)
+        packet = self.channel.endpoint.decodePacket(encoded)
+        encoded_packet = self.channel.endpoint.encodePacket(packet)
         self.assertEquals(encoded, encoded_packet)
 
     def testHeaderTarget(self):
@@ -255,9 +255,9 @@ class RemotingTestCase(unittest.TestCase):
         outter_msg.body = (inner_msg, )
 
         packet = remoting.Packet(messages=[outter_msg])
-        encoded_packet = self.channel_set.encodePacket(packet)
+        encoded_packet = self.channel_set.endpoint.encodePacket(packet)
         encoded_response = self.channel_set.invoke(encoded_packet)
-        response = self.channel_set.decodePacket(encoded_response)
+        response = self.channel_set.endpoint.decodePacket(encoded_response)
 
         # Check outer msg
         self.assertEquals(1, len(response.messages))
