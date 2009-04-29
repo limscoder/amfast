@@ -1186,7 +1186,6 @@ static PyObject* decode_packet(DecoderObj *context)
         return NULL;
     }
 
-
     PyObject *headers = decode_headers_AMF0(context);
     if (!headers) {
         Py_DECREF(packet_class);

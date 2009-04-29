@@ -238,7 +238,7 @@ class Packet(object):
 
     attributes:
     ============
-     * version - string, the type of client connected to the server.
+     * client_type - string, the type of client connected to the server.
      * headers - dict, keys = header names, values = Header objects.
      * messages - list, a list of messages that belong to the packet.
     """
@@ -247,10 +247,10 @@ class Packet(object):
     FLASH_COM = "FLASH_COM"
     FLASH_9 = "FLASH_9"
 
-    def __init__(self, version=None, headers=None, messages=None):
-        if version is None:
-            version = self.FLASH_8
-        self.version = version
+    def __init__(self, client_type=None, headers=None, messages=None):
+        if client_type is None:
+            client_type = self.FLASH_8
+        self.client_type = client_type 
 
         if headers is None:
             headers = []
@@ -261,8 +261,7 @@ class Packet(object):
         self.messages = messages
 
     def _getAmf3(self):
-        print "VERSIONS IS: %s" % self.version
-        if self.version == self.FLASH_9:
+        if self.client_type == self.FLASH_9:
             return True
         return False
     is_amf3 = property(_getAmf3)
@@ -302,7 +301,7 @@ class Packet(object):
     def acknowledge(self):
         """Create a response to this packet."""
         response = Packet()
-        response.version = self.version
+        response.client_type = self.client_type
         return response
 
     def __str__(self):
@@ -321,10 +320,10 @@ class Packet(object):
  </messages>
 
  <attributes>
-  <attr name="version">%s</attr>
+  <attr name="client_type">%s</attr>
  </attributes>
 </Packet>
-""" % (header_msg, message_msg, self.version)
+""" % (header_msg, message_msg, self.client_type)
 
 class ServiceMapper(object):
     """Maps service to service name.

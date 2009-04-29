@@ -55,8 +55,8 @@ if __name__ == '__main__':
 
     app = App()
     app.amf = rpc_channel.processMsg
-    app.amfPolling = polling_channel.processMsg
-    app.pyAmf = pyamf_channel.processMsg
+    #app.amfPolling = polling_channel.processMsg
+    app.amfPolling = pyamf_channel.processMsg
     cherrypy.quickstart(app, '/', config=cp_options)
 
     print "Serving on %s:%s" % (options.domain, options.port)
