@@ -24,7 +24,7 @@
 || int || int ||
 || Number || float ||
 || String || unicode ||
-|| Object, MixedArray || dict ||
+|| Object, !MixedArray || dict ||
 || Array || list ||
 || XML, XMLDocument || xml.dom.minidom.Document ||
 || Date || datetime || 
