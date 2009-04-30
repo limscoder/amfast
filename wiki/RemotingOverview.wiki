@@ -1,0 +1,82 @@
+#summary Overview of AmFast remoting features.
+
+= Remoting =
+ * ChannelSet objects route request messages and dispatch response messages.
+ * Each ChannelSet contains one or more [Channel] objects. [Channel]s handle the technical details of sending and receiving messages.
+ * RPC destinations are mapped with [Target] objects.
+
+== Example ==
+{{{
+import amfast.remoting as remoting
+
+# This method will be exposed to remote invocation.
+# Exposed methods are passed arguments from the client.
+def remote_method(arg1, arg2):
+    print "%s:%s" % (arg1, arg2)
+
+# A CallableTarget contains a callable
+# that gets invoked when a request message
+# is received.
+target = remoting.CallableTarget('exposed_method_name', remote_method)
+
+# A Service object is a collection of Targets.
+service = remoting.Service('exposed_service')
+
+# Add a target to a service.
+service.mapTarget(target)
+
+# A ServiceMapper object keeps track
+# of all exposed services and targets.
+service_mapper = remoting.ServiceMapper()
+
+# Expose a service
+service_mapper.mapService(service)
+
+# A ChannelSet uses 
+
+
+
+
+
+
+
+
+
+
+
+# Gateway objects process requests and dispatch responses.
+gateway = remoting.Gateway()
+
+# Service objects provide an interface for clients to invoke methods on the server.
+service = remoting.Service('ExposedServiceName')
+
+# Target objects are individual invokable methods that belong to a service.
+service.setTarget(remoting.CallableTarget(remote_method, 'exposed_method_name'))
+
+# Exposed targets are accessed from the client with the name:
+# 'ExposedServiceName.exposed_method_name'
+
+# ExtCallableTarget objects expose the AMF request/response packet and message
+# for operations that need to directly access headers or other message information.
+service.setTarget(remoting.ExtCallableTarget(remote_method_2, 'exposed_method_name')
+
+# Use a gateway's 'service_mapper' property to map services to a gateway
+gateway.service_mapper.mapService(service)
+
+# Headers can also be mapped to targets
+# with the gateway.service_mapper.packet_header_service
+# and gateway.service_mapper.message_header_service objects.
+
+# Map a NetConnection header
+gateway.service_mapper.packet_header_service.setTarget(remoting.CallableTarget(remote_login, 'Credentials'))
+
+# Map a RemoteObject header
+gateway.service_mapper.message_header_service.setTarget(remoting.CallableTarget(remote_method, 'message_header_name'))
+
+# Flex CommandMessages can be mapped to targets
+# with the gateway.service_mapper.command_service object.
+gateway.service_mapper.command_service.setTarget(remoting.CallableTarget(remote_login, 8))
+
+# Gateways process an AMF packet
+response_packet_byte_string = gateway.process_packet(amf_packet_byte_string)
+}}}
