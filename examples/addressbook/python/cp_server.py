@@ -7,7 +7,6 @@ import cherrypy
 import amfast
 from amfast.remoting.channel import ChannelSet
 from amfast.remoting.cherrypy_channel import CherryPyChannel
-from amfast.remoting.pyamf_endpoint import PyAmfEndpoint
 import utils
 
 class App(object):
@@ -49,14 +48,9 @@ if __name__ == '__main__':
     channel_set.mapChannel(polling_channel)
     utils.setup_channel_set(channel_set)
 
-    # For testing PyAmf compatibility
-    pyamf_channel = CherryPyChannel('pyamf-channel', endpoint=PyAmfEndpoint())
-    channel_set.mapChannel(pyamf_channel)
-
     app = App()
     app.amf = rpc_channel.processMsg
-    #app.amfPolling = polling_channel.processMsg
-    app.amfPolling = pyamf_channel.processMsg
+    app.amfPolling = polling_channel.processMsg
     cherrypy.quickstart(app, '/', config=cp_options)
 
     print "Serving on %s:%s" % (options.domain, options.port)
