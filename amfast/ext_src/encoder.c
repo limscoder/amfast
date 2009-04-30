@@ -735,7 +735,7 @@ static int serialize_byte_array_AMF3(EncoderObj *context, PyObject *value)
 
         return encode_byte_array_AMF3(context, value);
     }
-    #else
+    #endif
     PyObject *byte_string;
     if (check_byte_array(value)) {
         byte_string = PyObject_GetAttrString(value, "bytes");
@@ -759,7 +759,6 @@ static int serialize_byte_array_AMF3(EncoderObj *context, PyObject *value)
     result = encode_byte_array_AMF3(context, byte_string);
     Py_DECREF(byte_string);
     return result; 
-    #endif
 }
 
 /* Encodes a PyByteArray or a PyString. */

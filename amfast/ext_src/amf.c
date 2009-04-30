@@ -51,7 +51,7 @@ int type_list(PyObject* class_def, PyObject *mapper,
     }
 
     if (types == NULL)
-        return NULL;
+        return 0;
 
     Py_ssize_t name_len = PySequence_Size(name_list);
     if (name_len == -1) {
@@ -125,7 +125,7 @@ int type_dict(PyObject* class_def, PyObject *mapper, PyObject* dict, int type)
     }
 
     if (types == NULL)
-        return NULL;
+        return 0;
 
     PyObject *key;
     PyObject *val;

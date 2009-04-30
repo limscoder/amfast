@@ -126,12 +126,12 @@ static PyObject* PyIdx_ret(IdxObj *self, PyObject *args, PyObject *kwargs)
 }
 
 static PyMethodDef Idx_methods[] = {
-    {"map", (PyCFunction)PyIdx_map, METH_VARARGS,
+    {"map", (PyCFunction)PyIdx_map, METH_VARARGS | METH_KEYWORDS,
      "Map an object to the next index. Returns the index the object was mapped to.\n\n"
      "arguments\n"
      "==========\n"
      " * obj - object, the object to map."},
-    {"ret", (PyCFunction)PyIdx_ret, METH_VARARGS,
+    {"ret", (PyCFunction)PyIdx_ret, METH_VARARGS | METH_KEYWORDS,
      "Retrieve an indexed object.\n\n"
      "arguments\n"
      "==========\n"
@@ -314,12 +314,12 @@ static PyObject* PyRef_ret(RefObj *self, PyObject *args, PyObject *kwargs)
 }
 
 static PyMethodDef Ref_methods[] = {
-    {"map", (PyCFunction)PyRef_map, METH_VARARGS,
+    {"map", (PyCFunction)PyRef_map, METH_VARARGS | METH_KEYWORDS,
      "Map an object to the next index. Returns the index the object was mapped to.\n\n"
      "arguments\n"
      "==========\n"
      " * obj - object, the object to map."},
-    {"ret", (PyCFunction)PyRef_ret, METH_VARARGS,
+    {"ret", (PyCFunction)PyRef_ret, METH_VARARGS | METH_KEYWORDS,
      "Retrieve the index of a mapped object.\n\n"
      "arguments\n"
      "==========\n"
@@ -716,7 +716,7 @@ static PyObject* PyDecoder_copy(DecoderObj *self, PyObject *args, PyObject *kwar
 {
     int amf3 = 0;
     if (self->amf3 == Py_True)
-        amf3 = 1;
+       amf3 = 1;
 
     static char *kwlist[] = {"amf3", NULL};
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|i", kwlist, &amf3))
@@ -726,12 +726,12 @@ static PyObject* PyDecoder_copy(DecoderObj *self, PyObject *args, PyObject *kwar
 }
 
 static PyMethodDef Decoder_methods[] = {
-    {"copy", (PyCFunction)PyDecoder_copy, METH_VARARGS,
+    {"copy", (PyCFunction)PyDecoder_copy, METH_VARARGS | METH_KEYWORDS,
      "Copy the decoder context. Settings are preserved, but index counts are reset.\n\n"
      "arguments\n"
      "==========\n"
      " * amf3 - bool, True to decode as AMF3."},
-    {"read", (PyCFunction)PyDecoder_readPyString, METH_VARARGS,
+    {"read", (PyCFunction)PyDecoder_readPyString, METH_VARARGS | METH_KEYWORDS,
      "Reads from the buffer.\n\n"
      "arguments\n"
      "==========\n"
@@ -1216,13 +1216,13 @@ static PyObject* Encoder_getReturnVal(EncoderObj *self)
 }
 
 static PyMethodDef Encoder_methods[] = {
-    {"copy", (PyCFunction)PyEncoder_copy, METH_VARARGS,
+    {"copy", (PyCFunction)PyEncoder_copy, METH_VARARGS | METH_KEYWORDS,
      "Copy the encoder context. Settings are preserved, but index counts are reset.\n\n"
      "arguments\n"
      "==========\n"
      " * amf3 - bool, True to encode as AMF3."
      " * new_buf - bool, True to encode to a new Buffer object."},
-    {"write", (PyCFunction)PyEncoder_writePyString, METH_VARARGS,
+    {"write", (PyCFunction)PyEncoder_writePyString, METH_VARARGS | METH_KEYWORDS,
      "Writes a string to the buffer.\n\n"
      "arguments\n"
      "==========\n"
