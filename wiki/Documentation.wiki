@@ -2,11 +2,14 @@
 
 = Documentation =
 
-!AmFast can encode and decode Python objects to/from AMF format.
+== Remoting ==
+ * RemotingInterface
 
+== Encoding/Decoding ==
  * TypeMap
  * CustomClasses
- * RemotingInterface
  * EncodingAndDecoding
- * ExampleImplementations
  * ActionScriptCodeGeneration
+
+== Examples ==
+ * ExampleImplementations
