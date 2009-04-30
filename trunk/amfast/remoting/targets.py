@@ -5,6 +5,7 @@ import uuid
 from amfast.class_def.as_types import AsNoProxy
 from amfast.remoting.flex_messages import CommandMessage
 from amfast.remoting.channel import ChannelError
+from amfast.remoting.endpoint import AmfEndpoint
 
 # --- CommandMessage Operations --- #
 def client_ping(packet, msg, *args):
@@ -67,5 +68,10 @@ def poll_operation(packet, msg, *args):
     connection = packet.channel.getConnection(headers[command.FLEX_CLIENT_ID_HEADER])
     if connection is None:
         raise ChannelError("Client is not connected.")
-
-    return AsNoProxy(connection.poll())
+    
+    messages = connection.poll()
+    if isinstance(packet.channel.endpoint, AmfEndpoint):
+        # Make sure messages are not encoded as an ArrayCollection
+        return AsNoProxy(messages)
+    else:
+        return messages

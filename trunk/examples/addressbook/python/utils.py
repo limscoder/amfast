@@ -8,7 +8,7 @@ import amfast
 from amfast.encoder import Encoder
 from amfast.decoder import Decoder
 from amfast.class_def import ClassDefMapper, DynamicClassDef, ExternClassDef
-#from amfast.class_def.sa_class_def import SaClassDef
+from amfast.class_def.sa_class_def import SaClassDef
 from amfast.class_def.code_generator import CodeGenerator
 from amfast.remoting import Service, CallableTarget
 
@@ -35,19 +35,19 @@ def setup_channel_set(channel_set):
     # with the registClassAlias function,
     # or the RemoteClass metadata tag.
     class_mapper = ClassDefMapper()
-#    class_mapper.mapClass(SaClassDef(models.User, 'models.User'))
-#    class_mapper.mapClass(SaClassDef(models.Email, 'models.Email'))
-#    class_mapper.mapClass(SaClassDef(models.PhoneNumber, 'models.PhoneNumber'))
+    class_mapper.mapClass(SaClassDef(models.User, 'models.User'))
+    class_mapper.mapClass(SaClassDef(models.Email, 'models.Email'))
+    class_mapper.mapClass(SaClassDef(models.PhoneNumber, 'models.PhoneNumber'))
 
     # These classes are for interacting with the Red5 echo test client.
-#    class_mapper.mapClass(DynamicClassDef(models.RemoteClass,
-#        'org.red5.server.webapp.echo.RemoteClass', amf3=False))
-#    class_mapper.mapClass(ExternClassDef(models.ExternClass,
-#        'org.red5.server.webapp.echo.ExternalizableClass'))
+    class_mapper.mapClass(DynamicClassDef(models.RemoteClass,
+        'org.red5.server.webapp.echo.RemoteClass', amf3=False))
+    class_mapper.mapClass(ExternClassDef(models.ExternClass,
+        'org.red5.server.webapp.echo.ExternalizableClass'))
 
     # Expose class_mapper to our controller
     sa_obj = controller.SAObject()
-#    sa_obj.class_def_mapper = class_mapper
+    sa_obj.class_def_mapper = class_mapper
 
     # Set Channel options
     # We're going to use the same
@@ -81,12 +81,3 @@ def setup_channel_set(channel_set):
     #coder = CodeGenerator()
     #coder.generateFilesFromMapper(gateway.class_def_mapper, use_accessors=False,
     #    packaged=True, constructor=False, bindable=True, extends='SAObject')
-
-    def publishTime(message_agent, interval=5):
-        """Publishes the current server time."""
-        current_time = '%s' % datetime.now()
-        message_agent.publish(current_time, 'serverTime')
-        #t = Timer(interval, publishTime, (message_agent, interval))
-        #t.start()
-
-    publishTime(channel_set.message_agent, 5)
