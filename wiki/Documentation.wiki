@@ -4,8 +4,9 @@
 
 == Remoting ==
  * RemotingOverview
- * RemotingInterface
  * ChannelSet
+ * [Channel]
+ * [Endpoint]
 
 == Encoding/Decoding ==
  * TypeMap
