@@ -18,10 +18,10 @@
 						width="300"/>
 				</mx:FormItem>
 				
-				<mx:FormItem label="server time:"
+				<mx:FormItem label="latest message:"
 					width="100%"
-					toolTip="Server time is pushed from the server. Click 'Subscribe' to start receiving messages.">
-					<mx:Label id="serverTime"
+					toolTip="This message is pushed from the server. Click the 'Publish' button to send a message to the server.">
+					<mx:Label id="lastMessage"
 						width="200"/>
 				</mx:FormItem>
 			</mx:Form>
@@ -36,7 +36,7 @@
 				<mx:FormItem width="100%">
 					<mx:Button
 						label="Subscribe"
-						click="subscribeServerTime()"
+						click="subscribeMessaging()"
 						toolTip="Subscribe server time messages."
 						width="100%"/>
 				</mx:FormItem>
@@ -44,8 +44,18 @@
 				<mx:FormItem width="100%">
 					<mx:Button
 						label="UnSubscribe"
-						click="unSubscribeServerTime()"
+						click="unSubscribeMessaging()"
 						toolTip="UnSubscribe server time messages."
+						width="100%"/>
+				</mx:FormItem>
+				
+				<mx:FormItem width="100%">
+					<mx:Button
+						id="publishBtn"
+						label="Publish"
+						click="publishMessage()"
+						toolTip="Publish a message."
+						enabled="false"
 						width="100%"/>
 				</mx:FormItem>
 			</mx:Form>
@@ -116,6 +126,7 @@
 			import mx.messaging.messages.ErrorMessage;
 			import flash.net.*;
 		
+			
 			import mx.messaging.messages.AcknowledgeMessage;
 			import mx.messaging.Consumer;
 		
@@ -123,9 +134,11 @@
 			import mx.controls.Alert;
 			import mx.managers.PopUpManager;
 			import mx.messaging.Consumer;
+			import mx.messaging.Producer;
 			import mx.messaging.ChannelSet;
 			import mx.messaging.channels.AMFChannel;
 			import mx.messaging.events.MessageAckEvent;
+			import mx.messaging.events.MessageEvent;
 			import mx.messaging.events.MessageFaultEvent;
 			import mx.rpc.remoting.mxml.RemoteObject;
 			import mx.rpc.AbstractOperation;
@@ -138,7 +151,9 @@
 			protected var serviceUrl:String;
 			protected var consumers:Object;
 			protected var consumerUrl:String;
-		
+			protected var producers:Object;
+			protected var producerUrl:String;
+			
 			[Bindable]
 			protected var users:ArrayCollection;
 
@@ -193,41 +208,64 @@
 				// Create a channel set and add your channel(s) to it
 				var channels:ChannelSet = new ChannelSet();
 				channels.addChannel(channel);
-				
 				consumer.channelSet = channels;
-				consumer.resubscribeInterval = 1;
-				consumer.addEventListener(MessageAckEvent.ACKNOWLEDGE,
-					acknowledgeHandler, false, 0 , true);
-				consumer.addEventListener(MessageFaultEvent.FAULT,
-					faultHandler, false, 0, true);
 					
 				return consumer;
 			}
 			
-			protected function subscribeServerTime():void
+			/**
+			 * Create a message Producer with url from user input.
+			 */
+			public function getProducer(destination:String):Producer
 			{
-				var consumer:Consumer = getConsumer('serverTime');
-				consumer.subscribe();
+				if (producers == null) {
+					producers = {};
+				}
+				
+				if (messagingUrl.text == producerUrl &&
+					producers.hasOwnProperty(destination)) {
+					// Use existing producer
+					return producers[destination];
+				}
+				
+				var producer:Producer = new Producer();
+				producer.destination = destination;
+				producers[destination] = producer;
+				
+				var consumer:Consumer = getConsumer(destination);
+				producer.channelSet = consumer.channelSet;
+				
+				return producer;
 			}
 			
-			protected function unSubscribeServerTime():void
+			protected function subscribeMessaging():void
 			{
-				var consumer:Consumer = getConsumer('serverTime');
+				var consumer:Consumer = getConsumer('lastMessage');
+				consumer.addEventListener(MessageEvent.MESSAGE,
+					lastMsgMsgHandler, false, 0 , true);
+				consumer.addEventListener(MessageFaultEvent.FAULT,
+					faultHandler, false, 0, true);
+				consumer.subscribe();
+				
+				publishBtn.enabled = true;
+			}
+			
+			protected function unSubscribeMessaging():void
+			{
+				var consumer:Consumer = getConsumer('lastMessage');
 				if (consumer.subscribed) {
 					consumer.unsubscribe();
 				}
+				
+				publishBtn.enabled = false;
 			}
 			
 			/**
 			 * Handle an incoming message.
 			 */
-			protected function acknowledgeHandler(event:MessageAckEvent):void
+			protected function lastMsgMsgHandler(event:MessageEvent):void
 			{
-				if (!(event.message.body is Date)) {
-					return;
-				}
-				
-				serverTime.text = event.message.body.toUTCString();
+				lastMessage.text = String(event.message.body);
 			}
 			
 			/**
@@ -237,6 +275,15 @@
 			{
 				Alert.show(event.faultString, 'Message Fault',
 					Alert.OK, this, null, null);
+			}
+			
+			/**
+			 * Launch dialog to publish a message.
+			 */
+			protected function publishMessage():void
+			{
+				var dlg:PublishMsgDlg = new PublishMsgDlg();
+				PopUpManager.addPopUp(dlg, DisplayObject(this));
 			}
 			
 			/**

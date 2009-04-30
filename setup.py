@@ -1,20 +1,25 @@
 import os
-from setuptools import setup, find_packages
+from setuptools import setup, find_packages, Feature
 
 from distutils.core import setup, Extension
+from distutils.command.build_ext import build_ext
 
-extensions = [
-    Extension('amfast.encode',
-        sources = [os.path.join('amfast', 'ext_src', 'encoder.c'),
-            os.path.join('amfast', 'ext_src', 'amf.c')]),
-    Extension('amfast.decode',
-        sources = [os.path.join('amfast', 'ext_src', 'decoder.c'),
-            os.path.join('amfast', 'ext_src', 'amf.c')]),
-    Extension('amfast.buffer',
-        sources = [os.path.join('amfast', 'ext_src', 'buffer.c')]),
-    Extension('amfast.context',
-        sources = [os.path.join('amfast', 'ext_src', 'context.c')])
-    ]
+extensions = Feature(
+    "AMF encoder/decoder C extension.",
+    standard = True,
+    optional = True,
+    ext_modules = [
+        Extension('amfast.encode',
+            sources = [os.path.join('amfast', 'ext_src', 'encoder.c'),
+                os.path.join('amfast', 'ext_src', 'amf.c')]),
+        Extension('amfast.decode',
+            sources = [os.path.join('amfast', 'ext_src', 'decoder.c'),
+                os.path.join('amfast', 'ext_src', 'amf.c')]),
+        Extension('amfast.buffer',
+            sources = [os.path.join('amfast', 'ext_src', 'buffer.c')]),
+        Extension('amfast.context',
+            sources = [os.path.join('amfast', 'ext_src', 'context.c')])
+    ])
 
 setup(name="AmFast",
     version = "0.3.0",
@@ -28,7 +33,7 @@ setup(name="AmFast",
     platforms = ["any"],
     test_suite = "tests.suite",
     packages = ['amfast', 'amfast.class_def', 'amfast.remoting'],
-    ext_modules = extensions,
+    features = {'extensions': extensions},
     classifiers = [
         "Programming Language :: Python :: 2.4",
         "Programming Language :: Python :: 2.5",
