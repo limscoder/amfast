@@ -18,3 +18,10 @@ Use [http://twistedmatrix.com/trac/ Twisted] web framework to serve the example 
 {{{
 twistd -noy addressbook/python/cp_server.py
 }}}
+
+== WSGI Example ==
+
+Use simple WSIG to serve the example address book over http with the following command:
+{{{
+python addressbook/python/wsgi_server.py
+}}}
