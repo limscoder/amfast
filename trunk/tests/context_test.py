@@ -55,7 +55,7 @@ class ContextTestCase(unittest.TestCase):
 
     def testCopyDecoderContext(self):
         con = DecoderContext(self.test_string, amf3=True)
-        con_2 = con.copy()
+        con_2 = con.copy(amf3=True)
         self._testDecoderContext(con_2)
 
     def testReadString(self):

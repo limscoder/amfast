@@ -244,21 +244,21 @@ static PyObject* PyBuffer_getPyString(BufferObj *self, PyObject *args, PyObject 
 }
 
 static PyMethodDef Buffer_methods[] = {
-    {"read", (PyCFunction)PyBuffer_readPyString, METH_VARARGS,
+    {"read", (PyCFunction)PyBuffer_readPyString, METH_VARARGS | METH_KEYWORDS,
      "Read from buffer. Returns a string.\n\n"
      "arguments\n"
      "==========\n"
      " * len - int, length to read from buffer."},
-    {"getvalue", (PyCFunction)PyBuffer_getPyString, METH_VARARGS,
+    {"getvalue", (PyCFunction)PyBuffer_getPyString, METH_VARARGS | METH_KEYWORDS,
      "Gets a string value.\n"},
     {"tell", (PyCFunction)PyBuffer_tell, METH_NOARGS,
      "Returns the current position in the buffer.\n\n"},
-    {"seek", (PyCFunction)PyBuffer_seek, METH_VARARGS,
+    {"seek", (PyCFunction)PyBuffer_seek, METH_VARARGS  | METH_KEYWORDS,
      "Moves to a specified position in the buffer.\n\n"
      "arguments\n"
      "==========\n"
      " * pos - int, position to move to in the buffer."},
-    {"write", (PyCFunction)PyBuffer_writePyString, METH_VARARGS,
+    {"write", (PyCFunction)PyBuffer_writePyString, METH_VARARGS | METH_KEYWORDS,
      "Writes a string to the buffer.\n\n"
      "arguments\n"
      "==========\n"
