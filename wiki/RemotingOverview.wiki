@@ -6,8 +6,10 @@
  * Each ChannelSet contains one or more [Channel] objects. [Channel]s handle the technical details of sending and receiving messages.
  * A ChannelSet's ServiceMapper determines how to process a [Message] when a [Message] is received by a [Channel].
 
-== Example ==
+== Simple Wsgi Example ==
 {{{
+from wsgiref import simple_server
+
 import amfast.remoting as remoting
 from amfast.remoting import channel
 from amfast.remoting.wsgi_channel import WsgiChannel
@@ -47,4 +49,9 @@ channel_set = channel.ChannelSet(service_mapper=service_mapper)
 # Twisted Web, and WSGI.
 wsgi_app = WsgiChannel('rpc-channel')
 channel_set.mapChannel(wsgi_app)
+
+# Serve the WSGI channel
+server = simple_server((domain, port), simple_server.WSGIRequestHandler)
+server.set_app(wsgi_app)
+server.serve_forever()
 }}}
