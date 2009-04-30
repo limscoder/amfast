@@ -21,7 +21,7 @@ twistd -noy addressbook/python/cp_server.py
 
 == WSGI Example ==
 
-Use simple WSIG to serve the example contact manager over http with the following command:
+Use simple WSGI to serve the example contact manager over http with the following command:
 {{{
 python addressbook/python/wsgi_server.py
 }}}
