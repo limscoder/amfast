@@ -10,5 +10,3 @@
  * EncodingAndDecoding
  * ExampleImplementations
  * ActionScriptCodeGeneration
-
-2Doc
