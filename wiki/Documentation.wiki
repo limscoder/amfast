@@ -3,6 +3,7 @@
 = Documentation =
 
 == Remoting ==
+ * RemotingOverview
  * RemotingInterface
  * ChannelSet
 
