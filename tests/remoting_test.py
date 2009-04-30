@@ -143,7 +143,7 @@ class RemotingTestCase(unittest.TestCase):
     def testHeaderTarget(self):
         header = remoting.Header(self.target_name, False, self.arg)
         packet = remoting.Packet(headers=[header])
-        packet.channel_set = self.channel_set
+        packet.channel = self.channel
         packet.invoke()
 
     def testOldStyleTarget(self):
@@ -182,7 +182,7 @@ class RemotingTestCase(unittest.TestCase):
         outter_msg.body = (inner_msg, )
 
         packet = remoting.Packet(messages=[outter_msg])
-        packet.channel_set = self.channel_set
+        packet.channel = self.channel
         response = packet.invoke()
 
         # Check outer msg
@@ -195,7 +195,6 @@ class RemotingTestCase(unittest.TestCase):
         self.assertEquals('123', response.messages[0].body.correlationId)
 
     def testRoTargetFault(self):
-        return
         outter_msg = remoting.Message(target='null', response='/1')
         inner_msg = messaging.RemotingMessage()
         inner_msg.destination = 'fault'
@@ -219,7 +218,6 @@ class RemotingTestCase(unittest.TestCase):
         self.assertEquals('123', response.messages[0].body.correlationId)
 
     def testRoPing(self):
-        return
         outter_msg = remoting.Message(target='null', response='/1')
         inner_msg = messaging.CommandMessage()
         inner_msg.destination = self.service_name
@@ -230,7 +228,7 @@ class RemotingTestCase(unittest.TestCase):
         outter_msg.body = (inner_msg, )
 
         packet = remoting.Packet(messages=[outter_msg])
-        packet.channel_set = self.channel_set
+        packet.channel = self.channel
         response = packet.invoke()
 
         # Check outer msg
@@ -241,10 +239,8 @@ class RemotingTestCase(unittest.TestCase):
         # Check inner msg
         self.assertEquals(messaging.AcknowledgeMessage, response.messages[0].body.__class__)
         self.assertEquals('123', response.messages[0].body.correlationId)
-        self.assertEquals(True, response.messages[0].body.body)
 
     def testProcessPacket(self):
-        return
         outter_msg = remoting.Message(target='null', response='/1')
         inner_msg = messaging.CommandMessage()
         inner_msg.destination = self.service_name
@@ -255,9 +251,10 @@ class RemotingTestCase(unittest.TestCase):
         outter_msg.body = (inner_msg, )
 
         packet = remoting.Packet(messages=[outter_msg])
-        encoded_packet = self.channel_set.endpoint.encodePacket(packet)
-        encoded_response = self.channel_set.invoke(encoded_packet)
-        response = self.channel_set.endpoint.decodePacket(encoded_response)
+        encoded_packet = self.channel.endpoint.encodePacket(packet)
+        decoded_packet = self.channel.endpoint.decodePacket(encoded_packet)
+        encoded_response = self.channel.invoke(decoded_packet)
+        response = self.channel.endpoint.decodePacket(encoded_response)
 
         # Check outer msg
         self.assertEquals(1, len(response.messages))
@@ -267,7 +264,6 @@ class RemotingTestCase(unittest.TestCase):
         # Check inner msg
         self.assertEquals(messaging.AcknowledgeMessage, response.messages[0].body.__class__)
         self.assertEquals('123', response.messages[0].body.correlationId)
-        self.assertEquals(True, response.messages[0].body.body)
 
 def suite():
     return unittest.TestLoader().loadTestsFromTestCase(RemotingTestCase)
