@@ -1,0 +1,17 @@
+#summary ChannelSet objects.
+
+= ChannelSet =
+
+ * ChannelSet objects route request messages and dispatch response messages.
+ * Each ChannelSet contains one or more Channel objects, which handle the technical details of sending and receiving messages.
+ * Each Channel object contains an Endpoint object that controls how message are encoded and decoded.
+
+== Creating a ChannelSet and adding Channels ===
+
+
+= Details =
+
+Add your content here.  Format your content with:
+  * Text in *bold* or _italic_
+  * Headings, paragraphs, and lists
+  * Automatic links to other wiki pages
