@@ -1,0 +1,5 @@
+#summary Service object.
+
+= Service =
+
+ * Service objects are collections of [Target]s
