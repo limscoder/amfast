@@ -2,7 +2,7 @@
 
 = Endpoints =
 
- * Endpoints encode and decode messages received by channels.
+ * [Endpoint]s encode and decode messages received by [Channel]s.
 
 == Creating a Channel with a Custom Endpoint ==
 {{{
