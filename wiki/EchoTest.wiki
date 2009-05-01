@@ -8,6 +8,8 @@ The example has scripts for serving the application via [http://www.cherrypy.org
 
 Start the server and point your browser to the domain:port the server is running on.
 
+To run the tests, enter domain:port/amf in the 'HTTP' text input. 
+
 == !CherryPy ==
 
 Use [http://www.cherrypy.org/ CherryPy] web framework to serve the example contact manager over http with the following command:
