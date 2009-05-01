@@ -198,7 +198,7 @@ class Message(object):
             target_name = qualified_name.pop()
             service_name = Service.SEPARATOR.join(qualified_name)
 
-        target = request.channel_set.service_mapper.getTarget(service_name, target_name)
+        target = request.channel.channel_set.service_mapper.getTarget(service_name, target_name)
         if target is None:
             raise RemotingError("Target '%s' not found." % self.target)
 

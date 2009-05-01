@@ -16,12 +16,3 @@ class Email(object):
     def __init__(self):
         self.label = None
         self.email = None
-
-# These classes are for interacting with the Ref5
-# echo test client.
-class RemoteClass(object):
-    pass
-
-class ExternClass(object):
-    pass
-
