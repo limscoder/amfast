@@ -68,6 +68,6 @@ def function_exposed_to_command(command_body):
 target = remoting.CallableTarget(function_exposed_to_command, OPERATION_NUMBER)
 
 # Use the special attribute
-# 'command_service'.
+# 'command_service' to map the target.
 service_mapper.command_service.mapTarget(target)
 }}}
