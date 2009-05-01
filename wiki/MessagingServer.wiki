@@ -30,3 +30,43 @@ server.serve_forever()
 
 # Our messaging server is up and running!
 }}}
+
+== Mapping RPC Destinations ==
+ * Target objects map callables to RPC destinations.
+ * Service objects are collections of Targets.
+ * ServiceMapper objects are collections of services.
+ * Each ChannelSet object contains a ServiceMapper that it uses to route RPC messages.
+
+{{{
+from amfast import remoting
+
+# This function will be exposed to remote invocation.
+# The arguments are passed from the client.
+def remote_function(arg1, arg2):
+    print "%s:%s" % (arg1, arg2)
+
+# A CallableTarget contains a callable
+# that gets invoked when a request message
+# is received.
+target = remoting.CallableTarget(remote_function, 'exposed_method_name')
+
+# A Service object is a collection of Targets.
+service = remoting.Service('exposed_service_name')
+
+# Add a target to a service.
+service.mapTarget(target)
+
+# A ServiceMapper object keeps track
+# of all exposed services and targets.
+service_mapper = remoting.ServiceMapper()
+
+# Add a service to a ServiceMapper.
+service_mapper.mapService(service)
+
+# Expose the ServiceMapper's Services
+channel_set.service_mapper = service_mapper
+
+# The mapped target can be accessed from a client
+# with a RemoteObject request to:
+# 'exposed_service_name.exposed_method_name'
+}}}
