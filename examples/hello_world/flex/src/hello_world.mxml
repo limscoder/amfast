@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Application xmlns:mx="http://www.adobe.com/2006/mxml">
+	<mx:Panel width="400" height="200"
+		title="Flex -- AmFast -- HelloWorld Example">
+		<mx:Form width="100%">
+			<mx:FormItem label="remoting url:" width="100%">
+				<mx:TextInput
+					id="remotingUrl"
+					text="http://localhost:8000/amf"
+					width="100%"/>
+			</mx:FormItem>
+			
+			<mx:FormItem label="input:"
+				width="100%"
+				toolTip="Input to send to the server.">
+				<mx:TextInput id="serverInput"
+					width="100%" text="Hello World!"/>
+			</mx:FormItem>
+		</mx:Form>
+		
+		<mx:HBox width="100%" horizontalAlign="center">
+			<mx:Button
+				label="Submit"
+				click="submit()"
+				toolTip="Send input to server." />
+			<mx:Button
+				label="Raise Exception"
+				click="raiseException()"
+				toolTip="Raise an exception on the server." />
+		</mx:HBox>
+	</mx:Panel>
+	
+	<mx:Script>
+		<![CDATA[
+			import flash.net.*;
+		
+			import mx.controls.Alert;
+			import mx.messaging.ChannelSet;
+			import mx.messaging.channels.AMFChannel;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			import mx.rpc.AbstractOperation;
+			import mx.rpc.events.*;
+
+			protected var service:RemoteObject;
+			protected var serviceUrl:String;
+			
+			/**
+			 * Create a RemoteObject with url from user input.
+			 */
+			public function getService():RemoteObject
+			{
+				if (remotingUrl.text == serviceUrl && service != null) {
+					// Use existing service
+					return service;
+				}
+				
+				// Create the AMF Channel
+				serviceUrl = remotingUrl.text;
+				var channel:AMFChannel = new AMFChannel("amf-channel", serviceUrl);
+
+				// Create a channel set and add your channel(s) to it
+				var channels:ChannelSet = new ChannelSet();
+				channels.addChannel(channel);
+
+				// Create a new remote object and set channels
+				var remoteObject:RemoteObject = new RemoteObject("ExampleService");
+				remoteObject.showBusyCursor = true;
+				remoteObject.channelSet = channels;
+				return remoteObject;
+			}
+			
+			/**
+			 * Send input to server.
+			 */
+			public function submit():void
+			{
+				var remoteObj:RemoteObject = getService();
+				var operation:AbstractOperation = remoteObj.getOperation('echo');
+				operation.addEventListener(ResultEvent.RESULT, submitData_resultHandler);
+				operation.send(serverInput.text);
+			}
+			
+			protected function submitData_resultHandler(event:ResultEvent):void
+			{
+				Alert.show(String(event.result), "Got Result:");
+			}
+			
+			/**
+			 * Raise an exception on the server side.
+			 */
+			public function raiseException():void
+			{
+				var remoteObj:RemoteObject = getService();
+				var operation:AbstractOperation = remoteObj.getOperation('raiseException');
+				operation.send();
+			}
+		]]>
+	</mx:Script>
+</mx:Application>
