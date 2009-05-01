@@ -13,6 +13,8 @@ from amfast.remoting.endpoint import AmfEndpoint
 
 # The AmfEndpoint uses 
 # Encoder and Decoder objects.
+# to customize how objects
+# are serialized/deserialized.
 from amfast.encoder import Encoder
 from amfast.decoder import Decoder
 
