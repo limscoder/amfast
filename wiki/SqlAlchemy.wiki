@@ -6,6 +6,8 @@ There is a simple contact manager example located in SVN within the [http://code
 
 The contact manager example has scripts for serving the application via [http://www.cherrypy.org/ CherryPy], [http://twistedmatrix.com/trac/ Twisted Web], or WSGI.
 
+Start the server and point your browser to the domain:port the server is running on.
+
 == !CherryPy ==
 
 Use [http://www.cherrypy.org/ CherryPy] web framework to serve the example contact manager over http with the following command:
@@ -25,3 +27,10 @@ Use simple WSGI to serve the example contact manager over http with the followin
 {{{
 python addressbook/python/wsgi_server.py
 }}}
+
+The WSGI example does not serve the Flash file, so you will have to manually open the file in your browser:
+{{{
+addressbook/flex/deploy/addressbook.html
+}}}
+
+The WSGI example also does not server the crossdomain.xml file, so this example will only work locally.
