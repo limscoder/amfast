@@ -1,6 +1,6 @@
 #summary Channel objects.
 
 = Channels =
- * [Channel] objects send and receive [Messages].
- * [Channel]s use [Endpoints] to encode and decode the messages they send and receive.
- * AmFast has built-in [Channels] for use with [http://cherrypy.org CherryPy], [http://twistedmatrix.com Twisted Web] and WSGI.
+ * [Channel] objects send and receive [Message]s.
+ * [Channel]s use [Endpoints] to encode and decode the [Message]s they send and receive.
+ * AmFast has built-in [Channel]s for use with [http://cherrypy.org CherryPy], [http://twistedmatrix.com Twisted Web] and WSGI.
