@@ -112,8 +112,8 @@ target = remoting.CallableTarget(function_exposed_to_header, 'header_name')
 service_mapper.packet_header_service.mapTarget(target)
 }}}
 
-=== Mapping CommandMessages to Targets ===
- * CommandMessages can be mapped to Targets by mapping the CommandMessage's operation number.
+=== Mapping !CommandMessages to Targets ===
+ * !CommandMessages can be mapped to Targets by mapping the !CommandMessage's operation number.
 
 {{{
 from amfast import remoting
@@ -132,4 +132,54 @@ target = remoting.CallableTarget(function_exposed_to_command, OPERATION_NUMBER)
 # Use the special attribute
 # 'command_service' to map the target.
 service_mapper.command_service.mapTarget(target)
+}}}
+
+== Producer/Consumer Messaging ==
+ * Each !ChannelSet object contains a !MessageAgent object which handles Consumer subscriptions and Producer publishing.
+
+{{{
+# Publish a message to a topic.
+#
+# Message can be any object.
+# 'sub_topic' can be None.
+channel_set.message_agent.publish(message, 'topic', 'sub_topic')
+}}}
+
+== Configurable Endpoints ==
+ * Channel objects use Endpoint objects to encode and decode the messages they receive.
+ * Object serialization and de-serialization is customized on a per-[Channel] basis by configuring the [Channel]'s endpoints.
+
+=== !AmfEndpoint ===
+ * !AmfEndpoint uses !AmFast's built-in AMF encoder/decoder.
+
+{{{
+# AmFast's default Endpoint
+# encodes/decodes AMF packets
+# with a C-extension, so it is very fast.
+from amfast.remoting.endpoint import AmfEndpoint
+
+# The AmfEndpoint uses 
+# Encoder and Decoder objects.
+# to customize how objects
+# are serialized/deserialized.
+from amfast.encoder import Encoder
+from amfast.decoder import Decoder
+
+# This channel will encode and decode messages
+# with an AmfEndpoint.
+channel.endpoint = AmfEndpoint(encoder=Encoder(), decoder=Decoder()))
+}}}
+
+=== PyAmfEndpoint ===
+ * Use the PyAmfEndpoint for a pure-Python encoder/decoder.
+ * See [http://pyamf.org PyAmf] project for details about configuring the PyAmf encoder/decoder.
+
+{{{
+# Use the PyAmfEndpoint
+# for a pure-Python alternative.
+from amfast.remoting.pyamf_endpoint import PyAmfEndpoint
+
+# !!!If you use the PyAmfEndpoint,
+# classes must be mapped using the PyAmf syntax!!!
+channel.endpoint = PyAmfEndpoint()
 }}}
