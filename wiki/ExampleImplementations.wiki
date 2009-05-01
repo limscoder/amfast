@@ -2,4 +2,5 @@
 
 = Examples =
 
- * SqlAlchemy
+ * SqlAlchemy - An example using [http://sqlalchemy.org SqlAlchemy] for persistence.
+ * EchoTest - An example using the Red5 project's EchoTest.
