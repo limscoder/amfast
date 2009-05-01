@@ -25,7 +25,6 @@ class RemotingTestCase(unittest.TestCase):
 
         # Map header targets
         self.service_mapper.packet_header_service.mapTarget(target)
-        self.service_mapper.message_header_service.mapTarget(target)
 
         # Map message targets
         self.service_name = 'login'
