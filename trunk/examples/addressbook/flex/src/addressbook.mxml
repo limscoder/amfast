@@ -74,14 +74,6 @@
 						toolTip="Raise an exception on the server side."
 						width="100%"/>
 				</mx:FormItem>
-				
-				<mx:FormItem width="100%">
-					<mx:Button
-						label="Red5 Echo Test"
-						click="launchEchoTest()"
-						toolTip="Launch Red5's echo test .swf."
-						width="100%"/>
-				</mx:FormItem>
 			</mx:Form>
 		</mx:HBox>
 		
@@ -286,17 +278,6 @@
 				PopUpManager.addPopUp(dlg, DisplayObject(this));
 			}
 			
-			/**
-			 * Launch the echo test .swf from 
-			 * The Red5 project - http://code.google.com/p/red5/
-			 */
-			protected function launchEchoTest():void
-			{
-				var request:URLRequest = new URLRequest('red5Test.html');
-				flash.net.navigateToURL(request, "_blank");
-				return;	
-			}
-				 
 			/**
 			 * Insert default data
 			 */

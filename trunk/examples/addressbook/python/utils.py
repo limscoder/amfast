@@ -39,12 +39,6 @@ def setup_channel_set(channel_set):
     class_mapper.mapClass(SaClassDef(models.Email, 'models.Email'))
     class_mapper.mapClass(SaClassDef(models.PhoneNumber, 'models.PhoneNumber'))
 
-    # These classes are for interacting with the Red5 echo test client.
-    class_mapper.mapClass(DynamicClassDef(models.RemoteClass,
-        'org.red5.server.webapp.echo.RemoteClass', amf3=False))
-    class_mapper.mapClass(ExternClassDef(models.ExternClass,
-        'org.red5.server.webapp.echo.ExternalizableClass'))
-
     # Expose class_mapper to our controller
     sa_obj = controller.SAObject()
     sa_obj.class_def_mapper = class_mapper
@@ -60,11 +54,6 @@ def setup_channel_set(channel_set):
         channel.endpoint.decoder = decoder
 
     # Map service targets to controller methods
-    channel_set.service_mapper.default_service.mapTarget(CallableTarget(sa_obj.echo, 'echo'))
-    service = Service('Red5Echo')
-    service.mapTarget(CallableTarget(sa_obj.echo, 'echo'))
-    channel_set.service_mapper.mapService(service)
-
     service = Service('ExampleService')
     service.mapTarget(CallableTarget(sa_obj.load, 'load'))
     service.mapTarget(CallableTarget(sa_obj.loadAttr, 'loadAttr'))
