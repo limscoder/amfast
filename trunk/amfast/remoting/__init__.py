@@ -22,9 +22,6 @@ class Service(object):
     # Name of special service that handles packet header targets
     PACKET_HEADER_SERVICE = 'PACKET_HEADER_SERVICE'
 
-    # Name of special service that handles message header targets
-    MESSAGE_HEADER_SERVICE = 'MESSAGE_HEADER_SERVICE'
-
     # Name of special service that handles command messages
     COMMAND_SERVICE = 'COMMAND_SERVICE'
 
@@ -359,8 +356,6 @@ class ServiceMapper(object):
         # Map built in targets
         self.packet_header_service = Service(Service.PACKET_HEADER_SERVICE)
         self.mapService(self.packet_header_service)
-        self.message_header_service = Service(Service.MESSAGE_HEADER_SERVICE)
-        self.mapService(self.message_header_service)
         self.command_service = Service(Service.COMMAND_SERVICE)
         self.mapService(self.command_service)
         self.default_service = Service(Service.DEFAULT_SERVICE)

@@ -32,6 +32,11 @@ class AbstractMessage(object):
     DESTINATION_CLIENT_ID_HEADER = 'DSDstClientId'
     ENDPOINT_HEADER = 'DSEndpoint'
     FLEX_CLIENT_ID_HEADER = 'DSId'
+    PRIORITY_HEADER = 'DSPriority'
+    REMOTE_CREDENTIALS_CHARSET_HEADER = 'DSRemoteCredentialsCharset'
+    REMOTE_CREDENTIALS_HEADER = 'DSRemoteCredentials'
+    REQUEST_TIMEOUT_HEADER = 'DSRequestTimeout'
+    STATUS_CODE_HEADER = 'DSStatusCode'
 
     def __init__(self, body=None, clientId=None, destination=None,
         headers=None, timeToLive=None, timestamp=None, messageId=None):
@@ -71,13 +76,6 @@ class AbstractMessage(object):
         """Invoke all message headers."""
         if amfast.log_debug:
             amfast.logger.debug("\nInvoking FlexMessage:\n%s" % self)
-
-        if hasattr(self, 'headers') and self.headers is not None:
-            service = packet.channel.channel_set.service_mapper.message_header_service
-            for name, val in self.headers.iteritems():
-                target = service.getTarget(name)
-                if target is not None:
-                    target.invoke(packet, msg, (val,))
 
     def fail(self, exc):
         """Return an error message."""
@@ -345,12 +343,27 @@ class CommandMessage(AsyncMessage):
     SUBSCRIBE_OPERATION = 0
     UNSUBSCRIBE_OPERATION = 1
     POLL_OPERATION = 2
+    CLIENT_SYNC_OPERATION = 4
     CLIENT_PING_OPERATION = 5
+    CLUSTER_REQUEST_OPERATION = 7
+    LOGIN_OPERATION = 8
+    LOGOUT_OPERATION = 9
+    SUBSCRIPTION_INVALIDATE_OPERATION = 10
+    MULTI_SUBSCRIBE_OPERATION = 11
     DISCONNECT_OPERATION = 12
+    TRIGGER_CONNECT_OPERATION = 13
 
-    SELECTOR_HEADER = 'DSSelector'
+    ADD_SUBSCRIPTIONS = 'DSAddSub'
+    CREDENTIALS_CHARSET_HEADER = 'DSCredentialsCharset'
+    MAX_FREQUENCY_HEADER = 'DSMaxFrequency'
     MESSAGING_VERSION = 'DSMessagingVersion'
+    NEEDS_CONFIG_HEADER = 'DSNeedsConfig'
     NO_OP_POLL_HEADER = 'DSNoOpPoll'
+    POLL_WAIT_HEADER = 'DSPollWait'
+    PRESERVE_DURABLE_HEADER = 'DSPreserveDurable'
+    REMOVE_SUBSCRIPTIONS = 'DSRemSub'
+    SELECTOR_HEADER = 'DSSelector'
+    SUBTOPIC_SEPARATOR = '_;_'
 
     def __init__(self,  body=None, clientId=None, destination=None,
         headers=None, timeToLive=None, timestamp=None, messageId=None,
