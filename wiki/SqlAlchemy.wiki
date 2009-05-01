@@ -2,9 +2,11 @@
 
 = !SqlAlchemy Example =
 
-There is a simple contact manager example located in SVN within the [http://code.google.com/p/amfast/source/browse/trunk/examples examples] directory. The application persists data with [http://www.sqlite.org/ SqlLite] and [http://www.sqlalchemy.org/ SqlAlchemy].
+This example demonstrates persisting data with [http://www.sqlite.org/ SqlLite] and [http://www.sqlalchemy.org/ SqlAlchemy].
 
-The contact manager example has scripts for serving the application via [http://www.cherrypy.org/ CherryPy], [http://twistedmatrix.com/trac/ Twisted Web], or WSGI.
+The example is located in SVN within the [http://code.google.com/p/amfast/source/browse/trunk/examples/addressbook examples/addressbook] directory
+
+The example has scripts for serving the application via [http://www.cherrypy.org/ CherryPy], [http://twistedmatrix.com/trac/ Twisted Web], or WSGI.
 
 Start the server and point your browser to the domain:port the server is running on.
 
