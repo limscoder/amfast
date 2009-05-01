@@ -1,27 +1,5 @@
-#summary Implementation examples
+#summary Implementation examples.
 
 = Examples =
 
-There is a simple contact manager example located in SVN within the [http://code.google.com/p/amfast/source/browse/trunk/examples examples] directory. The application persists data with [http://www.sqlite.org/ SqlLite] and [http://www.sqlalchemy.org/ SqlAlchemy]. The example demonstrates using !AmFast to implement !RemoteObject RPC and Producer/Consumer messaging.
-
-The contact manager example has scripts for serving the application via [http://www.cherrypy.org/ CherryPy], [http://twistedmatrix.com/trac/ Twisted Web], or WSGI.
-
-== !CherryPy ==
-
-Use [http://www.cherrypy.org/ CherryPy] web framework to serve the example contact manager over http with the following command:
-{{{
-python addressbook/python/cp_server.py
-}}}
-
-== Twisted Example ==
-Use [http://twistedmatrix.com/trac/ Twisted] web framework to serve the example contact manager over http with the following command:
-{{{
-twistd -noy addressbook/python/cp_server.py
-}}}
-
-== WSGI Example ==
-
-Use simple WSGI to serve the example contact manager over http with the following command:
-{{{
-python addressbook/python/wsgi_server.py
-}}}
+ * SqlAlchemy
