@@ -4,29 +4,33 @@
 
 This example uses [http://code.google.com/p/red5/ Red5 project]'s echo test application.
 
-The contact manager example has scripts for serving the application via CherryPy, Twisted Web, or WSGI.
+The example has scripts for serving the application via [http://www.cherrypy.org/ CherryPy], [http://twistedmatrix.com/trac/ Twisted Web], or WSGI.
 
 Start the server and point your browser to the domain:port the server is running on.
-CherryPy
 
-Use CherryPy web framework to serve the example contact manager over http with the following command:
+== !CherryPy ==
 
+Use [http://www.cherrypy.org/ CherryPy] web framework to serve the example contact manager over http with the following command:
+{{{
 python echo_test/python/cp_server.py
+}}}
 
-Twisted Example
-
-Use Twisted web framework to serve the example contact manager over http with the following command:
-
+== Twisted Example ==
+Use [http://twistedmatrix.com/trac/ Twisted] web framework to serve the example contact manager over http with the following command:
+{{{
 twistd -noy echo_test/python/cp_server.py
+}}}
 
-WSGI Example
+== WSGI Example ==
 
 Use simple WSGI to serve the example contact manager over http with the following command:
-
+{{{
 python echo_test/python/wsgi_server.py
+}}}
 
 The WSGI example does not serve the Flash file, so you will have to manually open the file in your browser:
-
+{{{
 echo_test/flex/deploy/red5Test.html
+}}}
 
-The WSGI example also does not server the crossdomain.xml file, so this example will only work locally. 
+The WSGI example also does not server the crossdomain.xml file, so this example will only work locally.
