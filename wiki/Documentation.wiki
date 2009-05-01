@@ -5,9 +5,6 @@
 == Messaging ==
  * RemotingOverview
  * ProducerConsumerOverview
- * ChannelSet
- * [Channel]
- * [Endpoint]
 
 == Encoding/Decoding ==
  * TypeMap
