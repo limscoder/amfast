@@ -1,5 +1,9 @@
 #summary Authentication tutorial.
 
+= Authentication =
+ * !NetConnection and !RemoteObject authentication protocols are supported.
+ * Use ServiceMapper objects to map [Target]s that handle the authentication procedure.
+
 == !NetConnection ==
 
 {{{
@@ -20,7 +24,7 @@ target = remoting.CallableTarget(remote_login, 'Credentials')
 service_mapper.packet_header_service.mapTarget(target)
 }}}
 
-== !RemotObject ==
+== !RemoteObject ==
 {{{
 from amfast import remoting
 from amfast.remoting import flex_messages as messaging
