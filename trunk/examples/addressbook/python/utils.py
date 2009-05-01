@@ -63,7 +63,6 @@ def setup_channel_set(channel_set):
     service.mapTarget(CallableTarget(sa_obj.remove, 'remove'))
     service.mapTarget(CallableTarget(sa_obj.removeList, 'removeList'))
     service.mapTarget(CallableTarget(sa_obj.insertDefaultData, 'insertDefaultData'))
-    service.mapTarget(CallableTarget(sa_obj.raiseException, 'raiseException'))
     channel_set.service_mapper.mapService(service)
 
     # Generate source code for mapped models

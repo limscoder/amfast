@@ -1,81 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <mx:Application xmlns:mx="http://www.adobe.com/2006/mxml">
 	<mx:Panel width="100%" height="100%"
-		title="Flex -- AmFast -- SQLAlchemy Address Book Example">
-		<mx:HBox width="100%">
-			<mx:Form>
-				<mx:FormItem label="remoting url:">
-					<mx:TextInput
-						id="remotingUrl"
-						text="http://localhost:8000/amf"
-						width="300"/>
-				</mx:FormItem>
-				
-				<mx:FormItem label="messaging url:">
-					<mx:TextInput
-						id="messagingUrl"
-						text="http://localhost:8000/amfPolling"
-						width="300"/>
-				</mx:FormItem>
-				
-				<mx:FormItem label="latest message:"
-					width="100%"
-					toolTip="This message is pushed from the server. Click the 'Publish' button to send a message to the server.">
-					<mx:Label id="lastMessage"
-						width="200"/>
-				</mx:FormItem>
-			</mx:Form>
-			
-			<mx:VRule />
-			
-			<mx:Form>
-				<mx:FormItem>
-					<mx:Label text="Messaging" />
-				</mx:FormItem>
-				
-				<mx:FormItem width="100%">
-					<mx:Button
-						label="Subscribe"
-						click="subscribeMessaging()"
-						toolTip="Subscribe server time messages."
-						width="100%"/>
-				</mx:FormItem>
-				
-				<mx:FormItem width="100%">
-					<mx:Button
-						label="UnSubscribe"
-						click="unSubscribeMessaging()"
-						toolTip="UnSubscribe server time messages."
-						width="100%"/>
-				</mx:FormItem>
-				
-				<mx:FormItem width="100%">
-					<mx:Button
-						id="publishBtn"
-						label="Publish"
-						click="publishMessage()"
-						toolTip="Publish a message."
-						enabled="false"
-						width="100%"/>
-				</mx:FormItem>
-			</mx:Form>
-			
-			<mx:VRule />
-			
-			<mx:Form>
-				<mx:FormItem>
-					<mx:Label text="Tests" />
-				</mx:FormItem>
-				
-				<mx:FormItem width="100%">
-					<mx:Button
-						label="Raise Exception"
-						click="raiseException()"
-						toolTip="Raise an exception on the server side."
-						width="100%"/>
-				</mx:FormItem>
-			</mx:Form>
-		</mx:HBox>
+		title="Flex -- AmFast -- SQLAlchemy Example">
+		<mx:Form>
+			<mx:FormItem label="remoting url:">
+				<mx:TextInput
+					id="remotingUrl"
+					text="http://localhost:8000/amf"
+					width="300"/>
+			</mx:FormItem>
+		</mx:Form>
 		
 		<mx:DataGrid
 			id="userGrid"
@@ -115,23 +49,11 @@
 	
 	<mx:Script>
 		<![CDATA[
-			import mx.messaging.messages.ErrorMessage;
-			import flash.net.*;
-		
-			
-			import mx.messaging.messages.AcknowledgeMessage;
-			import mx.messaging.Consumer;
-		
 			import mx.collections.ArrayCollection;
 			import mx.controls.Alert;
 			import mx.managers.PopUpManager;
-			import mx.messaging.Consumer;
-			import mx.messaging.Producer;
 			import mx.messaging.ChannelSet;
 			import mx.messaging.channels.AMFChannel;
-			import mx.messaging.events.MessageAckEvent;
-			import mx.messaging.events.MessageEvent;
-			import mx.messaging.events.MessageFaultEvent;
 			import mx.rpc.remoting.mxml.RemoteObject;
 			import mx.rpc.AbstractOperation;
 			import mx.rpc.events.*;
@@ -141,10 +63,6 @@
 
 			protected var service:RemoteObject;
 			protected var serviceUrl:String;
-			protected var consumers:Object;
-			protected var consumerUrl:String;
-			protected var producers:Object;
-			protected var producerUrl:String;
 			
 			[Bindable]
 			protected var users:ArrayCollection;
@@ -172,110 +90,6 @@
 				remoteObject.showBusyCursor = true;
 				remoteObject.channelSet = channels;
 				return remoteObject;
-			}
-			
-			/**
-			 * Create a message Consumer with url from user input.
-			 */
-			public function getConsumer(destination:String):Consumer
-			{
-				if (consumers == null) {
-					consumers = {};
-				}
-				
-				if (messagingUrl.text == consumerUrl &&
-					consumers.hasOwnProperty(destination)) {
-					// Use existing consumer
-					return consumers[destination];
-				}
-				
-				var consumer:Consumer = new Consumer();
-				consumer.destination = destination;
-				consumers[destination] = consumer;
-				
-				// Create the AMF Channel
-				consumerUrl = messagingUrl.text;
-				var channel:AMFChannel = new AMFChannel("amf-polling-channel", consumerUrl);
-
-				// Create a channel set and add your channel(s) to it
-				var channels:ChannelSet = new ChannelSet();
-				channels.addChannel(channel);
-				consumer.channelSet = channels;
-					
-				return consumer;
-			}
-			
-			/**
-			 * Create a message Producer with url from user input.
-			 */
-			public function getProducer(destination:String):Producer
-			{
-				if (producers == null) {
-					producers = {};
-				}
-				
-				if (messagingUrl.text == producerUrl &&
-					producers.hasOwnProperty(destination)) {
-					// Use existing producer
-					return producers[destination];
-				}
-				
-				var producer:Producer = new Producer();
-				producer.destination = destination;
-				producers[destination] = producer;
-				
-				var consumer:Consumer = getConsumer(destination);
-				producer.channelSet = consumer.channelSet;
-				
-				return producer;
-			}
-			
-			protected function subscribeMessaging():void
-			{
-				var consumer:Consumer = getConsumer('lastMessage');
-				consumer.addEventListener(MessageEvent.MESSAGE,
-					lastMsgMsgHandler, false, 0 , true);
-				consumer.addEventListener(MessageFaultEvent.FAULT,
-					faultHandler, false, 0, true);
-				consumer.subscribe();
-				
-				publishBtn.enabled = true;
-			}
-			
-			protected function unSubscribeMessaging():void
-			{
-				var consumer:Consumer = getConsumer('lastMessage');
-				if (consumer.subscribed) {
-					consumer.unsubscribe();
-				}
-				
-				publishBtn.enabled = false;
-			}
-			
-			/**
-			 * Handle an incoming message.
-			 */
-			protected function lastMsgMsgHandler(event:MessageEvent):void
-			{
-				lastMessage.text = String(event.message.body);
-			}
-			
-			/**
-			 * Handle a failed message.
-			 */ 
-			protected function faultHandler(event:MessageFaultEvent):void
-			{
-				Alert.show(event.faultString, 'Message Fault',
-					Alert.OK, this, null, null);
-			}
-			
-			/**
-			 * Launch dialog to publish a message.
-			 */
-			protected function publishMessage():void
-			{
-				var dlg:PublishMsgDlg = new PublishMsgDlg();
-				PopUpManager.addPopUp(dlg, DisplayObject(this));
 			}
 			
 			/**

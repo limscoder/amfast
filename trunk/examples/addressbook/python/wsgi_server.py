@@ -13,17 +13,12 @@ class App(object):
         self.channel_set = ChannelSet()
         rpc_channel = WsgiChannel('amf-channel')
         self.channel_set.mapChannel(rpc_channel)
-        polling_channel = WsgiChannel('amf-polling-channel')
-        self.channel_set.mapChannel(polling_channel)
         utils.setup_channel_set(self.channel_set)
 
     def __call__(self, environ, start_response):
         path = environ['PATH_INFO'].replace('/', '')
 
-        if path == 'amfPolling':
-            channel = self.channel_set.getChannel('amf-polling-channel')
-            return channel(environ, start_response)
-        elif path == 'amf':
+        if path == 'amf':
             channel = self.channel_set.getChannel('amf-channel')
             return channel(environ, start_response)
         else:
