@@ -1,50 +1,38 @@
 #summary How to use AmFast to encode and decode AMF.
 
-= Encoding =
+== Encoding ==
+ * Use the amfast.encoder.Encoder class to encode objects.
+
+=== Encoder ===
+    * amf3 - bool - True to encode as AMF3.
+    * use_collections - bool - True to encode lists and tuples as ArrayCollections.
+    * use_proxies - bool - True to encode dicts as ObjectProxies.
+    * use_references - bool - True to encode multiply occurring objects by reference.
+    * use_legacy_xml - bool - True to encode XML as XMLDocument instead of e4x.
+    * include_private - bool - True to encode attributes starting with '_'.
+    * class_def_mapper - amfast.class_def.ClassDefMapper - The object that retrieves ClassDef objects.
+    * buffer - file-like-object - Output buffer. Set to None to output to a string.
 
 {{{
-import amfast.encoder as encoder
-byte_string = encoder.encode(value)
+from amfast.encoder import Encoder
+
+# Encode an object to AMF0
+encoder = Encoder(amf3=False)
+encoded = encoder.encode(obj)
+
+# Encode an object to AMF3
+encoder = Encoder(amf3=True)
+encoded = encoder.encode(obj)
+
+# Encode an AMF Packet
+encoded = encoder.encode_packet(packet_obj)
+
+# If the 'buffer' attribute
+# of the encoder is not set,
+# the return value of 'encode'
+# method is a string.
+#
+# If the 'buffer' attribute
+# is set, the return value is
+# the buffer object.
 }}}
-
-encode(...)
-    Description:
-    =============
-    Encode a Python object in AMF format.
-    
-    Useage:
-    ===========
-    byte_string = encode(value, **kwargs)
-    
-    Optional keyword arguments:
-    ============================
-     * amf3 - bool - True to encode as AMF3 format. - Default = False
-     * packet - bool - True to encode a AMF packet. - Default = False
-     * use_array_collections - bool - True to encode lists and tuples as !ArrayCollections - Default = False
-     * use_object_proxies - bool - True to encode dicts as !ObjectProxys - Default = False
-     * use_references - bool - True to encode multiply occuring objects as references - Default = True
-     * use_legacy_xml - bool - True to encode XML as old XMLDocument instead of E4X - Default = False
-     * include_private - bool - True to encode attributes starting with an underscore - Default = False
-     * class_def_mapper - !ClassDefMapper - object that retrieves a !ClassDef object used for customizing serialization of objects - Default = None (all objects are anonymous)
-
-= Decoding =
-
-{{{
-import amfast.decoder as decoder
-py_obj = decoder.decode(byte_string)
-}}}
-
-decode(...)
-    Description:
-    =============
-    Decode an AMF3 stream to Python objects.
-    
-    Useage:
-    ===========
-    py_obj = decode(value, **kwargs)
-    
-    Optional keyword arguments:
-    ============================
-     * packet - bool - True to decode as an AMF !NetConnection packet (decode a remoting call). - Default = False
-     * amf3 - bool - True to decode as AMF3 format. - Default = False
-     * class_def_mapper - !ClassDefMapper - object that retrieves a !ClassDef object used for customizing de-serialization of objects - Default = None (all objects are anonymous)
