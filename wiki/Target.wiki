@@ -1,0 +1,33 @@
+#summary Target object.
+
+= Target =
+ 
+ * A [Target] is an object with a callable that gets invoked when an RPC request is received.
+ * [Target]s are mapped to [Service]s and destinations with ServiceMapper objects.
+
+== Create a Target ==
+{{{
+from amfast import remoting
+
+# This function will be exposed to remote invocation.
+# The arguments are passed from the client.
+def remote_function(arg1, arg2):
+    print "%s:%s" % (arg1, arg2)
+
+# A CallableTarget contains a callable
+# that gets invoked when a request message
+# is received.
+target = remoting.CallableTarget(remote_function, 'exposed_method_name')
+
+# This function will be exposed,
+# but it will also receive the 
+# request Packet and Message
+# objects that invoked the Target.
+def remote_function(packet, message, arg1, arg2):
+    print "%s:%s" % (arg1, arg2)
+
+# Use ExtCallableTarget to exposed
+# the request Packet and Message to
+# the callable.
+target = remoting.ExtCallableTarget(remoting_function, 'ext_exposed_method_name')
+}}}
