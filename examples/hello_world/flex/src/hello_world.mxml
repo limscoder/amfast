@@ -32,8 +32,6 @@
 	
 	<mx:Script>
 		<![CDATA[
-			import flash.net.*;
-		
 			import mx.controls.Alert;
 			import mx.messaging.ChannelSet;
 			import mx.messaging.channels.AMFChannel;

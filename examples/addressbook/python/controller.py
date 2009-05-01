@@ -59,6 +59,3 @@ class SAObject(object):
         session = Schema().session
         session.add(user)
         session.commit()
-
-    def raiseException(self):
-        raise Exception("Example Exception")

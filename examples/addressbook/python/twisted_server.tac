@@ -22,13 +22,10 @@ root.addHost(domain, static.File("../flex/deploy"))
 channel_set = ChannelSet()
 rpc_channel = TwistedChannel('rpc')
 channel_set.mapChannel(rpc_channel)
-polling_channel = TwistedChannel('amf-polling-channel')
-channel_set.mapChannel(polling_channel)
 utils.setup_channel_set(channel_set)
 
 # Setup channels
 root.putChild('amf', rpc_channel)
-root.putChild('amfPolling', polling_channel)
 
 # Setup server
 port = 8000
