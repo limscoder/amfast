@@ -34,8 +34,8 @@ server.serve_forever()
 == Mapping RPC Destinations ==
  * Target objects map callables to RPC destinations.
  * Service objects are collections of Targets.
- * ServiceMapper objects are collections of services.
- * Each ChannelSet object contains a ServiceMapper that it uses to route RPC messages.
+ * !ServiceMapper objects are collections of services.
+ * Each !ChannelSet object contains a !ServiceMapper that it uses to route RPC messages.
 
 {{{
 from amfast import remoting
