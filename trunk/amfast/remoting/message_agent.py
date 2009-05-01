@@ -56,7 +56,16 @@ class MessageAgent(object):
             lock.release()
 
     def publish(self, body, topic, sub_topic=None, client_id=None, ttl=600):
-        """Publish a message."""
+        """Publish a message.
+
+        arguments:
+        ===========
+        body - AbstractMessage or object.
+        topic - string, the topic to publish to.
+        sub_topic - string, the sub topic to publish to. Default = None
+        client_id - string, if provided, only publish to specific client. Default = None
+        ttl - int time to live in secoded. Default = 600
+        """
 
         current_time = int(time.time() * 1000)
         ttl *= 1000
@@ -74,12 +83,22 @@ class MessageAgent(object):
             if com_topic in self._topics:
                 connections = self._topics[com_topic]
 
-        for client_id, connection in connections.iteritems():
+        # Get msg properties
+        if isinstance(body, messaging.AbstractMessage):
+            msg_class = body.__class__
+            headers = body.headers
+            body = body.body
+        else:
+            msg_class = messaging.AsyncMessage
             headers = None
-            if sub_topic is not None:
-                headers = {messaging.AsyncMessage.SUBTOPIC_HEADER: sub_topic}
+        
+        if sub_topic is not None:
+            if headers is None:
+                headers = {}
+            headers[messaging.AsyncMessage.SUBTOPIC_HEADER] = sub_topic
 
-            msg = messaging.AsyncMessage(headers=headers, body=body,
+        for client_id, connection in connections.iteritems():
+            msg = msg_class(headers=headers, body=body,
                 clientId=client_id, destination=topic, timestamp=current_time,
                 timeToLive=ttl)
 
