@@ -35,12 +35,13 @@ service_mapper = remoting.ServiceMapper()
 service_mapper.mapService(service)
 
 # ServiceMappers
-# can also map Packet headers,
-# so that when a Packet contains a 
-# specific header, a target will be invoked.
+# can also map AMF Packet headers.
+# When a request Packet contains a
+# mapped header, a target will be invoked.
 
 # This function will be invoked when
-# the header it is mapped to is received.
+# the header it is mapped to is present
+# in an AMF request Packet.
 # The Header object is passed to the function.
 def function_exposed_to_header(header_val):
     print header_val
@@ -58,13 +59,13 @@ service_mapper.packet_header_service.mapTarget(target)
 
 # This function will be invoked when
 # a CommandMessage is received.
-# The CommandMessage's body will be passed.
-def function_exposed_to_command(command_body):
-    print command_body
+# The CommandMessage object body will be passed.
+def function_exposed_to_command(command):
+    print command
 
 # Use the CommandMessage's
 # 'operation' value to create
-# a target
+# a target.
 target = remoting.CallableTarget(function_exposed_to_command, OPERATION_NUMBER)
 
 # Use the special attribute
