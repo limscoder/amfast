@@ -8,20 +8,17 @@
 
 == Simple Wsgi Example ==
 {{{
-from wsgiref import simple_server
+from amfast import remoting
 
-import amfast.remoting as remoting
-from amfast.remoting import channel
-from amfast.remoting.wsgi_channel import WsgiChannel
-
-# This method will be exposed to remote invocation.
-def remote_method(arg1, arg2):
+# This function will be exposed to remote invocation.
+# The arguments are passed from the client.
+def remote_function(arg1, arg2):
     print "%s:%s" % (arg1, arg2)
 
 # A CallableTarget contains a callable
 # that gets invoked when a request message
 # is received.
-target = remoting.CallableTarget('exposed_method', remote_method)
+target = remoting.CallableTarget(remote_function, 'exposed_method')
 
 # A Service object is a collection of Targets.
 service = remoting.Service('exposed_service')
