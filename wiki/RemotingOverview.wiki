@@ -4,7 +4,7 @@
  * ChannelSet objects route request messages and dispatch response messages.
  * Each ChannelSet contains a ServiceMapper which maps [Target] objects to destinations.
  * Each ChannelSet contains one or more [Channel] objects. [Channel]s handle the technical details of sending and receiving messages.
- * A ChannelSet's ServiceMapper determines how to process a [Message] when a [Message] is received by a [Channel].
+ * A ChannelSet's ServiceMapper determines how to process a [Message] when a RPC [Message] is received by a [Channel].
 
 == Simple Wsgi Example ==
 {{{
