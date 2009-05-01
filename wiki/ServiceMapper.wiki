@@ -1,0 +1,73 @@
+#summary ServiceMapper objects.
+
+= !ServiceMapper =
+
+ * ServiceMapper objects map [Service]s and [Target]s to destinations.
+
+== Using a !ServiceMapper ==
+
+{{{
+from amfast import remoting
+
+# This function will be exposed to remote invocation.
+# The arguments are passed from the client.
+def remote_function(arg1, arg2):
+    print "%s:%s" % (arg1, arg2)
+
+# A CallableTarget contains a callable
+# that gets invoked when a request message
+# is received.
+target = remoting.CallableTarget(remote_function, 'exposed_method')
+
+# A Service object is a collection of Targets.
+service = remoting.Service('exposed_service')
+
+# Add a target to a service.
+service.mapTarget(target)
+
+# A ServiceMapper object keeps track
+# of all exposed services and targets.
+service_mapper = remoting.ServiceMapper()
+
+# Expose a service.
+# This service can be accessed from a client
+# with a RemoteObject request to 'exposed_service.exposed_method'
+service_mapper.mapService(service)
+
+# ServiceMappers
+# can also map Packet headers,
+# so that when a Packet contains a 
+# specific header, a target will be invoked.
+
+# This function will be invoked when
+# the header it is mapped to is received.
+# The Header object is passed to the function.
+def function_exposed_to_header(header_val):
+    print header_val
+
+# The target's name must be the name of the header.
+target = remoting.CallableTarget(function_exposed_to_header, 'header_name')
+
+# Use the special attribute
+# 'packet_header_service' to map
+# a header Target.
+service_mapper.packet_header_service.mapTarget(target)
+
+# ServiceMappers can also
+# map CommandMessage Operations.
+
+# This function will be invoked when
+# a CommandMessage is received.
+# The CommandMessage's body will be passed.
+def function_exposed_to_command(command_body):
+    print command_body
+
+# Use the CommandMessage's
+# 'operation' value to create
+# a target
+target = remoting.CallableTarget(function_exposed_to_command, OPERATION_NUMBER)
+
+# Use the special attribute
+# 'command_service'.
+service_mapper.command_service.mapTarget(target)
+}}}
