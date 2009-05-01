@@ -4,6 +4,7 @@
 
 == Remoting ==
  * RemotingOverview
+ * MessagingOverview
  * ChannelSet
  * [Channel]
  * [Endpoint]
