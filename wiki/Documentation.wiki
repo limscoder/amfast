@@ -2,21 +2,11 @@
 
 = Documentation =
  * MessagingServer
-
-== Messaging Server ==
- 
- * RemotingOverview
- * ProducerConsumerOverview
- * CustomEncodingDecoding
+ * ExampleImplementations
+ * [Faq]
 
 == Encoding/Decoding ==
  * TypeMap
  * CustomClasses
  * EncodingAndDecoding
  * ActionScriptCodeGeneration
-
-== Examples ==
- * ExampleImplementations
-
-== FAQ ==
- * [Faq]
