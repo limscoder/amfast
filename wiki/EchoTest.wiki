@@ -14,25 +14,25 @@ To run the tests, enter domain:port/amf in the 'HTTP' text input.
 
 Use [http://www.cherrypy.org/ CherryPy] web framework to serve the example contact manager over http with the following command:
 {{{
-python echo_test/python/cp_server.py
+python echo/python/cp_server.py
 }}}
 
 == Twisted Example ==
 Use [http://twistedmatrix.com/trac/ Twisted] web framework to serve the example contact manager over http with the following command:
 {{{
-twistd -noy echo_test/python/cp_server.py
+twistd -noy echo/python/cp_server.py
 }}}
 
 == WSGI Example ==
 
 Use simple WSGI to serve the example contact manager over http with the following command:
 {{{
-python echo_test/python/wsgi_server.py
+python echo/python/wsgi_server.py
 }}}
 
 The WSGI example does not serve the Flash file, so you will have to manually open the file in your browser:
 {{{
-echo_test/flex/deploy/red5Test.html
+echo/flex/deploy/red5Test.html
 }}}
 
 The WSGI example also does not server the crossdomain.xml file, so this example will only work locally.
