@@ -20,7 +20,7 @@ class_mapper.mapClass(class_def.DynamicClassDef(MyCustomClass, 'class.alias', ()
 # Map a custom class implementing IExternalizable
 # ExternClassDef must be sub-classed, and the
 # methods readExternal and writeExternal must be implemented.
-class_mapper.mapClass(class_def.ExterClassDef(MyCustomClass,'class.alias'))
+class_mapper.mapClass(class_def.ExternClassDef(MyCustomClass,'class.alias'))
 
 # Map a custom class that is also mapped with SQLAlchemy.
 # Attributes mapped with SQLAlchemy will automatically be
