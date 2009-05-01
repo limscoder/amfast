@@ -72,7 +72,7 @@ channel_set.service_mapper = service_mapper
 }}}
 
 === Exposing AMF Packet and Message to Targets ===
- * AMF Packet and Message objects can be exposed to Targets using the ExtCallableTargetClass.
+ * AMF Packet and Message objects can be exposed to Targets using the !ExtCallableTargetClass.
 
 {{{
 from amfast import remoting
@@ -147,7 +147,7 @@ channel_set.message_agent.publish(message, 'topic', 'sub_topic')
 
 == Configurable Endpoints ==
  * Channel objects use Endpoint objects to encode and decode the messages they receive.
- * Object serialization and de-serialization is customized on a per-[Channel] basis by configuring the [Channel]'s endpoints.
+ * Object serialization and de-serialization is customized on a per-Channel basis by configuring the Channel's endpoints.
 
 === !AmfEndpoint ===
  * !AmfEndpoint uses !AmFast's built-in AMF encoder/decoder.
