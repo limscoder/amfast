@@ -71,7 +71,7 @@ channel_set.service_mapper = service_mapper
 # 'exposed_service_name.exposed_method_name'
 }}}
 
-=== Exposing AMF Packet and Message to Targets. ===
+=== Exposing AMF Packet and Message to Targets ===
  * AMF Packet and Message objects can be exposed to Targets using the ExtCallableTargetClass.
 
 {{{
@@ -88,4 +88,48 @@ def remote_function(packet, message, arg1, arg2):
 # the request Packet and Message to
 # the callable.
 target = remoting.ExtCallableTarget(remoting_function, 'ext_exposed_method_name')
+}}}
+
+=== Mapping AMF Packet Headers to Targets ===
+ * AMF Packet Headers can be mapped to Targets that get invoked whenever a request Packet containing the Header is received.
+
+{{{
+from amfast import remoting
+
+# This function will be invoked when
+# the header it is mapped to is present
+# in an AMF request Packet.
+# The Header object is passed to the function.
+def function_exposed_to_header(header_val):
+    print header_val
+
+# The target's name must be the name of the header.
+target = remoting.CallableTarget(function_exposed_to_header, 'header_name')
+
+# Use the special attribute
+# 'packet_header_service' to map
+# a header Target.
+service_mapper.packet_header_service.mapTarget(target)
+}}}
+
+=== Mapping CommandMessages to Targets ===
+ * CommandMessages can be mapped to Targets by mapping the CommandMessage's operation number.
+
+{{{
+from amfast import remoting
+
+# This function will be invoked when
+# a CommandMessage is received.
+# The CommandMessage object body will be passed.
+def function_exposed_to_command(command_body):
+    print command_body
+
+# Use the CommandMessage's
+# 'operation' value to create
+# a target.
+target = remoting.CallableTarget(function_exposed_to_command, OPERATION_NUMBER)
+
+# Use the special attribute
+# 'command_service' to map the target.
+service_mapper.command_service.mapTarget(target)
 }}}
