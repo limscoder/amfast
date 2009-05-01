@@ -2,9 +2,10 @@
 
 = Documentation =
 
-== Messaging ==
+== Messaging Server ==
  * RemotingOverview
  * ProducerConsumerOverview
+ * AuthenticationTutorial
 
 == Encoding/Decoding ==
  * TypeMap
@@ -14,3 +15,6 @@
 
 == Examples ==
  * ExampleImplementations
+
+== FAQ ==
+ * [Faq]
