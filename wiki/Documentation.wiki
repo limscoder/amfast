@@ -5,6 +5,7 @@
 == Messaging Server ==
  * RemotingOverview
  * ProducerConsumerOverview
+ * CustomEncodingDecoding
 
 == Encoding/Decoding ==
  * TypeMap
