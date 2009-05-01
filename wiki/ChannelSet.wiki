@@ -2,5 +2,5 @@
 
 = !ChannelSet =
 
- * ChannelSet objects route request messages and dispatch response [Message]s.
+ * ChannelSet objects route request [Message]s and dispatch response [Message]s.
  * ChannelSet objects contain one or more [Channel] objects that send and receive [Message]s.
