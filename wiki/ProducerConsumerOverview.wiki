@@ -2,7 +2,7 @@
 
 = Producer/Consumer Messaging =
  * ChannelSet objects route request messages and dispatch response messages.
- * Each ChannelSet contains a MessageAgent object which handles receiving and publishing messages.
+ * Each ChannelSet contains a MessageAgent object which handles receiving and publishing AsyncMessages.
  * Each ChannelSet contains one or more [Channel] objects. [Channel]s handle the technical details of sending and receiving messages.
 
 == Simple Wsgi Example ==
