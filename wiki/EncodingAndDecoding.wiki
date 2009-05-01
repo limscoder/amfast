@@ -1,5 +1,7 @@
 #summary How to use AmFast to encode and decode AMF.
 
+= Encoding and Decoding =
+
 == Encoding ==
  * Use the amfast.encoder.Encoder class to encode objects.
 
@@ -35,4 +37,26 @@ encoded = encoder.encode_packet(packet_obj)
 # If the 'buffer' attribute
 # is set, the return value is
 # the buffer object.
+}}}
+
+== Decoding ==
+ * Use the amfast.decoder.Decoder class to decode objects.
+
+=== Decoder ===
+  * amf3 - bool - True to decode as AMF3.
+  * class_def_mapper - amfast.class_def.ClassDefMapper - The object that retrieves ClassDef objects.
+
+{{{
+from amfast.decoder import Decoder
+
+# Decode an object from AMF0
+decoder = Decoder(amf3=False)
+obj = decoder.decode(encoded)
+
+# Decode an object from AMF3
+decoder = Decoder(amf3=True)
+obj = decoder.decode(encoded)
+
+# Decode an AMF Packet
+packet_obj = decoder.decode_packet(encoded)
 }}}
