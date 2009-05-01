@@ -70,3 +70,22 @@ channel_set.service_mapper = service_mapper
 # with a RemoteObject request to:
 # 'exposed_service_name.exposed_method_name'
 }}}
+
+=== Exposing AMF Packet and Message to Targets. ===
+ * AMF Packet and Message objects can be exposed to Targets using the ExtCallableTargetClass.
+
+{{{
+from amfast import remoting
+
+# This function will be exposed.
+# In addition to any arguments supplied
+# by the client, the AMF Packet and Message
+# objects that invoked the Target are passed.
+def remote_function(packet, message, arg1, arg2):
+    print "%s:%s" % (arg1, arg2)
+
+# Use ExtCallableTarget to expose
+# the request Packet and Message to
+# the callable.
+target = remoting.ExtCallableTarget(remoting_function, 'ext_exposed_method_name')
+}}}
