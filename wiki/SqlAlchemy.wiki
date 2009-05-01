@@ -8,7 +8,7 @@ The example is located in SVN within the [http://code.google.com/p/amfast/source
 
 The example has scripts for serving the application via [http://www.cherrypy.org/ CherryPy], [http://twistedmatrix.com/trac/ Twisted Web], or WSGI.
 
-Start the server and point your browser to the domain:port the server is running on.
+Start the server and point your browser to the localhost:8000 the server is running on.
 
 == !CherryPy ==
 
@@ -34,5 +34,3 @@ The WSGI example does not serve the Flash file, so you will have to manually ope
 {{{
 addressbook/flex/deploy/addressbook.html
 }}}
-
-The WSGI example also does not server the crossdomain.xml file, so this example will only work locally.
