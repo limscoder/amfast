@@ -1,4 +1,4 @@
-#summary Overview of Producer/Consumer messaging.
+#summary Overview of Producer/Consumer Messaging.
 
 = Producer/Consumer messaging =
  * ChannelSet objects route request messages and dispatch response messages.
