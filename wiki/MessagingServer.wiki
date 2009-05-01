@@ -170,9 +170,9 @@ from amfast.decoder import Decoder
 channel.endpoint = AmfEndpoint(encoder=Encoder(), decoder=Decoder()))
 }}}
 
-=== PyAmfEndpoint ===
- * Use the PyAmfEndpoint for a pure-Python encoder/decoder.
- * See [http://pyamf.org PyAmf] project for details about configuring the PyAmf encoder/decoder.
+=== !PyAmfEndpoint ===
+ * Use the !PyAmfEndpoint for a pure-Python encoder/decoder.
+ * See [http://pyamf.org PyAmf] project for details about configuring the !PyAmf encoder/decoder.
 
 {{{
 # Use the PyAmfEndpoint
