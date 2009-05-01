@@ -13,7 +13,7 @@ class App(object):
     """Base web app."""
     @cherrypy.expose
     def index(self):
-        raise cherrypy.HTTPRedirect('/red5Test.html')
+        raise cherrypy.HTTPRedirect('/addressbook.html')
 
 if __name__ == '__main__':
     usage = """usage: %s [options]""" % __file__
@@ -44,10 +44,13 @@ if __name__ == '__main__':
     channel_set = ChannelSet()
     rpc_channel = CherryPyChannel('amf-channel')
     channel_set.mapChannel(rpc_channel)
+    polling_channel = CherryPyChannel('amf-polling-channel')
+    channel_set.mapChannel(polling_channel)
     utils.setup_channel_set(channel_set)
 
     app = App()
     app.amf = rpc_channel.processMsg
+    app.amfPolling = polling_channel.processMsg
     cherrypy.quickstart(app, '/', config=cp_options)
 
     print "Serving on %s:%s" % (options.domain, options.port)
