@@ -1,8 +1,10 @@
 #summary Documentation
 
 = Documentation =
+ * MessagingServer
 
 == Messaging Server ==
+ 
  * RemotingOverview
  * ProducerConsumerOverview
  * CustomEncodingDecoding
