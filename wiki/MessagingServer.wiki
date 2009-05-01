@@ -1,0 +1,32 @@
+#summary Messaging server documentation.
+
+= Messaging Server =
+
+<wiki:toc max_depth="5" />
+
+== Overview ==
+
+ * !ChannelSet objects route request messages and dispatch response messages.
+ * Each !ChannelSet contains one or more Channel objects. Channels handle the technical details of sending and receiving messages.
+ * !AmFast includes built-in Channels for [http://cherrypy.org CherryPy], [http://twistedmatrix.com Twisted Web], and WSGI.
+
+{{{
+from amfast.remoting.channel import ChannelSet
+from amfast.remoting.wsgi_channel import WsgiChannel
+
+# Each ChannelSet contains one or more Channels.
+# Channels handle the actual receiving and sending of messages.
+channel_set = channel.ChannelSet()
+
+# Create a WsgiChannel, which uses
+# WSGI to handle messages.
+wsgi_app = WsgiChannel('rpc-channel')
+channel_set.mapChannel(wsgi_app)
+
+# Serve the WSGI channel
+server = simple_server((domain, port), simple_server.WSGIRequestHandler)
+server.set_app(wsgi_app)
+server.serve_forever()
+
+# Our messaging server is up and running!
+}}}
