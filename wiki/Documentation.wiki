@@ -2,9 +2,9 @@
 
 = Documentation =
 
-== Remoting ==
+== Messaging ==
  * RemotingOverview
- * MessagingOverview
+ * ProducerConsumerOverview
  * ChannelSet
  * [Channel]
  * [Endpoint]
