@@ -3,11 +3,6 @@
 = Documentation =
  * MessagingServer
  * EncodeAndDecode
+ * ActionScriptCodeGeneration
  * ExampleImplementations
  * [Faq]
-
-== Encoding/Decoding ==
- * TypeMap
- * CustomClasses
- * EncodingAndDecoding
- * ActionScriptCodeGeneration
