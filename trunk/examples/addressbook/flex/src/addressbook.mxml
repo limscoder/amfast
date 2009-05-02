@@ -89,6 +89,7 @@
 				var remoteObject:RemoteObject = new RemoteObject("ExampleService");
 				remoteObject.showBusyCursor = true;
 				remoteObject.channelSet = channels;
+				service = remoteObject;
 				return remoteObject;
 			}
 			
