@@ -2,6 +2,7 @@
 
 = Documentation =
  * MessagingServer
+ * EncodeAndDecode
  * ExampleImplementations
  * [Faq]
 
