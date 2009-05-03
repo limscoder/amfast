@@ -73,9 +73,8 @@
 			import mx.messaging.messages.AsyncMessage;
 
 			protected var consumers:Object;
-			protected var consumerUrl:String;
+			protected var serverUrl:String;
 			protected var producers:Object;
-			protected var producerUrl:String;
 			
 			[Bindable]
 			protected var messages:ArrayCollection = new ArrayCollection();
@@ -89,7 +88,7 @@
 					consumers = {};
 				}
 				
-				if (messagingUrl.text == consumerUrl &&
+				if (messagingUrl.text == serverUrl &&
 					consumers.hasOwnProperty(destination)) {
 					// Use existing consumer
 					return consumers[destination];
@@ -100,8 +99,8 @@
 				consumers[destination] = consumer;
 				
 				// Create the AMF Channel
-				consumerUrl = messagingUrl.text;
-				var channel:AMFChannel = new AMFChannel("amf-polling-channel", consumerUrl);
+				serverUrl = messagingUrl.text;
+				var channel:AMFChannel = new AMFChannel("amf-polling-channel", serverUrl);
 
 				// Create a channel set and add your channel(s) to it
 				var channels:ChannelSet = new ChannelSet();
@@ -120,7 +119,7 @@
 					producers = {};
 				}
 				
-				if (messagingUrl.text == producerUrl &&
+				if (messagingUrl.text == serverUrl &&
 					producers.hasOwnProperty(destination)) {
 					// Use existing producer
 					return producers[destination];
