@@ -224,6 +224,16 @@ static int Ref_init(PyObject *self_raw, PyObject *args, PyObject *kwargs)
 
 static void Ref_dealloc(RefObj *self)
 {
+    // DECREF all mapped refs
+    // They are incremented in Ref_map.
+    PyObject *obj, *key, *val;
+    Py_ssize_t pos = 0;
+
+    while (PyDict_Next(self->refs, &pos, &key, &val)) {
+        obj = PyLong_AsVoidPtr(key);
+        Py_DECREF(obj);
+    }
+
     Py_XDECREF(self->refs);
     self->ob_type->tp_free((PyObject*)self);
 }
@@ -251,8 +261,14 @@ static int Ref_map(RefObj *self, PyObject *obj)
         return -1;
     }
 
-    result = (int)PyInt_AsLong(val);
-    Py_DECREF(val);
+    
+    Py_DECREF(val); // give ownership to dict
+
+    // Make sure the mapped object doesn't get
+    // GC'd before we retrieve it.
+    Py_INCREF(obj);
+
+    result = self->idx;
     self->idx++;
     return result;
 }
