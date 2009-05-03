@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <mx:Application xmlns:mx="http://www.adobe.com/2006/mxml">
-	<mx:Panel width="400" height="200"
-		title="Flex -- AmFast -- HelloWorld Example">
+	<mx:Panel width="400" height="300"
+		title="Flex -- AmFast -- Authentication Example">
 		<mx:Form width="100%">
 			<mx:FormItem label="remoting url:" width="100%">
 				<mx:TextInput
@@ -34,10 +34,13 @@
 		
 		<mx:HBox width="100%" horizontalAlign="center">
 			<mx:Button
+				id="loginBtn"
 				label="Login"
 				click="login()"
 				toolTip="Login to server." />
 			<mx:Button
+				id="logoutBtn"
+				enabled="false"
 				label="Logout"
 				click="logout()"
 				toolTip="Logout of server." />
@@ -89,13 +92,13 @@
 			public function login():void
 			{
 				var remoteObj:RemoteObject = getService();
-				remoteObj.setCredentials(userName.text, password.text);
+				remoteObj.channelSet.login(userName.text, password.text);
 			}
 			
 			public function logout():void
 			{
 				var remoteObj:RemoteObject = getService();
-				remoteObj.logout();
+				remoteObj.channelSet.logout();
 			}
 			
 			/**
