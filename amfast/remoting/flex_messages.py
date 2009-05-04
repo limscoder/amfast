@@ -303,7 +303,7 @@ class AsyncMessage(AbstractMessage):
         """Publish this message."""
         AbstractMessage.invoke(self, packet, msg)
 
-        packet.channel.channel_set.message_agent.publish(self.body,
+        packet.channel.channel_set.message_agent.publish(self,
             self.destination, self.headers.get(self.SUBTOPIC_HEADER, None))
 
 class_def.assign_attrs(AsyncMessage, 'flex.messaging.messages.AsyncMessage',
