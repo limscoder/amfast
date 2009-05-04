@@ -5,7 +5,7 @@
 	width="600">
 	<mx:Form>
 		<mx:FormItem label="Persistent:">
-			<mx:Label text="{user.isPersistent()}" />
+			<mx:Label text="{user.isPersistent}" />
 		</mx:FormItem>
 	
 		<mx:FormItem label="First Name:">
@@ -96,11 +96,15 @@
 	
 	<mx:Script>
 		<![CDATA[
+			import mx.collections.ItemResponder;
+			import mx.rpc.AsyncToken;
 			import mx.core.Application;
 			import mx.managers.PopUpManager;
 			import mx.rpc.remoting.mxml.RemoteObject;
 			import mx.rpc.AbstractOperation;
 			import mx.rpc.events.*;
+			
+			import events.SaEvent;
 			
 			import models.User;
 			import models.Email;
@@ -201,18 +205,14 @@
 				user.first_name = firstName.text;
 				user.last_name = lastName.text;
 				
-				var remoteObj:RemoteObject = Application.application.getService();
-				var operation:AbstractOperation = remoteObj.getOperation('save');
-                operation.addEventListener(ResultEvent.RESULT, save_resultHandler);
-                operation.send(user);
+				user.addEventListener(SaEvent.PERSISTENCE_CHANGED,
+					save_resultHandler);
+				user.save();
 			}
 			
-			protected function save_resultHandler(event:Event):void
+			protected function save_resultHandler(event:SaEvent):void
 			{
-				event.target.removeEventListener(ResultEvent.RESULT, save_resultHandler);
-				if (!user.isPersistent()) {
-					Application.application.loadUsers();
-				}
+				Application.application.loadUsers();
 				
 				close();
 			}

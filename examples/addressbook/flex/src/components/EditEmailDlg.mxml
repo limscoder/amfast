@@ -4,7 +4,7 @@
 	creationComplete="creationCompleteHandler()">
 	<mx:Form>
 		<mx:FormItem label="Persistent:">
-			<mx:Label text="{email.isPersistent()}" />
+			<mx:Label text="{email.isPersistent}" />
 		</mx:FormItem>
 	
 		<mx:FormItem label="Label:">

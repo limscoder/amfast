@@ -4,7 +4,7 @@ package models
 	
 	[RemoteClass(alias="models.User")]
 	[Bindable]
-	public class User extends SAObject
+	public class User extends SaObject
 	{
 		public var id:Object;
 		public var first_name:String;

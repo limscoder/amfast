@@ -3,18 +3,15 @@ from persistent import Schema
 
 class SAObject(object):
     """Handles common operations for persistent objects."""
+
     def getClassDefByAlias(self, alias):
         return self.class_def_mapper.getClassDefByAlias(alias)
 
+#---- These operations are performed on a single object. ---#
     def load(self, class_alias, key):
         class_def = self.getClassDefByAlias(class_alias)
         session = Schema().session
         return session.query(class_def.class_).get(key)
-
-    def loadAll(self, class_alias):
-        class_def = self.getClassDefByAlias(class_alias)
-        session = Schema().session
-        return session.query(class_def.class_).all()
 
     def loadAttr(self, class_alias, key, attr):
         obj = self.load(class_alias, key)
@@ -24,10 +21,13 @@ class SAObject(object):
         session = Schema().session
         merged_obj = session.merge(obj)
         session.commit()
+        return merged_obj
 
-    def saveList(self, objs):
-        for obj in objs:
-            self.save(obj)
+    def saveAttr(self, class_alias, key, attr, val):
+        obj = self.load(class_alias, key)
+        setattr(obj, attr, val)
+        session.commit()
+        return getattr(obj, attr)
 
     def remove(self, class_alias, key):
         class_def = self.getClassDefByAlias(class_alias)
@@ -35,6 +35,17 @@ class SAObject(object):
         obj = session.query(class_def.class_).get(key)
         session.delete(obj)
         session.commit()
+
+#---- These operations are performed on multiple objects. ----#
+    def loadAll(self, class_alias):
+        class_def = self.getClassDefByAlias(class_alias)
+        session = Schema().session
+        return session.query(class_def.class_).all()
+
+    def saveList(self, objs):
+        for obj in objs:
+            self.save(obj)
+        return objs
 
     def removeList(self, class_alias, keys):
         for key in keys:
@@ -59,3 +70,4 @@ class SAObject(object):
         session = Schema().session
         session.add(user)
         session.commit()
+
