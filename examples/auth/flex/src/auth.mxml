@@ -13,15 +13,15 @@
 			<mx:FormItem label="User:"
 				width="100%"
 				toolTip="User name to login as.">
-				<mx:TextInput id="userName"
-					width="100%" text="Correct"/>
+				<mx:TextInput id="username"
+					width="100%" text="correct"/>
 			</mx:FormItem>
 			
 			<mx:FormItem label="Password:"
 				width="100%"
 				toolTip="Password to login with.">
 				<mx:TextInput id="password"
-					width="100%" text="Correct"/>
+					width="100%" text="correct"/>
 			</mx:FormItem>
 			
 			<mx:FormItem label="input:"
@@ -29,6 +29,23 @@
 				toolTip="Input to send to the server.">
 				<mx:TextInput id="serverInput"
 					width="100%" text="Hello World!"/>
+			</mx:FormItem>
+			
+			<mx:FormItem label="connection:"
+				width="100%"
+				toolTip="Connection type to use.">
+				<mx:HBox width="100%">
+					<mx:RadioButton
+						id="netConnectionType"
+						label="NetConnection"
+						groupName="roType"
+						selected="true" />
+					
+					<mx:RadioButton
+						id="remoteObjectType"
+						label="RemoteObject"
+						groupName="roType" />
+				</mx:HBox>
 			</mx:FormItem>
 		</mx:Form>
 		
@@ -40,87 +57,182 @@
 				toolTip="Login to server." />
 			<mx:Button
 				id="logoutBtn"
-				enabled="false"
 				label="Logout"
 				click="logout()"
 				toolTip="Logout of server." />
 			<mx:Button
 				label="Submit"
 				click="submit()"
-				toolTip="Send input to server." />
+				toolTip="Submit to server." />
 		</mx:HBox>
 	</mx:Panel>
 	
 	<mx:Script>
 		<![CDATA[
+			import flash.net.Responder;
+
+			import mx.collections.ItemResponder;
 			import mx.controls.Alert;
 			import mx.messaging.ChannelSet;
 			import mx.messaging.channels.AMFChannel;
+			import mx.rpc.AsyncToken;
 			import mx.rpc.remoting.mxml.RemoteObject;
-			import mx.rpc.AbstractOperation;
 			import mx.rpc.events.*;
 
-			protected var service:RemoteObject;
-			protected var serviceUrl:String;
+			protected var nc:NetConnection;
+			protected var ncUrl:String;
+			protected var ro:RemoteObject;
+			protected var roUrl:String;
+			
+			/**
+			 * Create a NetConnection with url from user input.
+			 */
+			protected function getNetConnection():NetConnection
+			{
+				if (remotingUrl.text == ncUrl && nc != null) {
+					// If a NetConnection already exists
+					// and the user has not changed the 
+					// URL, then return the existing nc
+					return nc;
+				}
+				
+				// Create the NetConnection
+				ncUrl = remotingUrl.text;
+				nc = new NetConnection();
+				nc.connect(ncUrl);
+				
+				return nc;
+			}
 			
 			/**
 			 * Create a RemoteObject with url from user input.
 			 */
-			public function getService():RemoteObject
+			protected function getRemoteObject():RemoteObject
 			{
-				if (remotingUrl.text == serviceUrl && service != null) {
-					// Use existing service
-					return service;
+				if (remotingUrl.text == roUrl && ro != null) {
+					// If a RemotObject already exists
+					// and the user has not changed the 
+					// URL, then return the existing ro
+					return ro;
 				}
 				
 				// Create the AMF Channel
-				serviceUrl = remotingUrl.text;
-				var channel:AMFChannel = new AMFChannel("amf-channel", serviceUrl);
+				roUrl = remotingUrl.text;
+				var channel:AMFChannel = new AMFChannel("amf-channel", roUrl);
 
 				// Create a channel set and add your channel(s) to it
 				var channels:ChannelSet = new ChannelSet();
 				channels.addChannel(channel);
 
-				// Create a new remote object and set channels
-				var remoteObject:RemoteObject = new RemoteObject("ExampleService");
-				remoteObject.showBusyCursor = true;
-				remoteObject.channelSet = channels;
-				service = remoteObject;
-				return remoteObject;
-			}
-			
-			public function login():void
-			{
-				var remoteObj:RemoteObject = getService();
-				remoteObj.channelSet.login(userName.text, password.text);
-			}
-			
-			public function logout():void
-			{
-				var remoteObj:RemoteObject = getService();
-				remoteObj.channelSet.logout();
+				// Create a new remote object
+				ro = new RemoteObject("ExampleService");
+				ro.showBusyCursor = true;
+				ro.channelSet = channels;
+				
+				return ro;
 			}
 			
 			/**
 			 * Send input to server.
 			 */
-			public function submit():void
+			protected function submit():void
 			{
-				var remoteObj:RemoteObject = getService();
-				var operation:AbstractOperation = remoteObj.getOperation('echo');
-				operation.addEventListener(ResultEvent.RESULT, submitData_resultHandler);
-				operation.addEventListener(FaultEvent.FAULT, submitData_faultHandler);
-				operation.send(serverInput.text);
+				if (remoteObjectType.selected) {
+					submitRo();
+				} else if (netConnectionType.selected) {
+					submitNc();
+				}
 			}
 			
-			protected function submitData_resultHandler(event:ResultEvent):void
+			/**
+			 * Invoke using NetConnection.
+			 */
+			protected function submitNc():void
+			{
+				var netConnection:NetConnection = getNetConnection();
+				var responder:Responder = new Responder(onResult, onFault);
+				
+				netConnection.call("ExampleService.echo", responder, serverInput.text);
+			}
+			
+			/**
+			 * Handle a NetConnection result.
+			 */
+			protected function onResult(result:*):void
+			{
+				Alert.show(String(result), "Got Result:");
+			}
+			
+			/**
+			 * Handle a NetConnection fault.
+			 */
+			protected function onFault(fault:*):void
+			{
+				Alert.show(String(fault.message), "Error:");
+			}
+			
+			/**
+			 * Invoke using RemoteObject.
+			 */
+			protected function submitRo():void
+			{
+				var remoteObj:RemoteObject = getRemoteObject();
+				var token:AsyncToken = remoteObj.echo(serverInput.text);
+				
+				token.addResponder(new ItemResponder(submitData_resultHandler,
+					submitData_faultHandler, token));
+			}
+			
+			/**
+			 * Handle a RemoteObject result.
+			 */
+			protected function submitData_resultHandler(event:ResultEvent,
+				token:AsyncToken):void
 			{
 				Alert.show(String(event.result), "Got Result:");
 			}
 			
-			protected function submitData_faultHandler(event:FaultEvent):void
+			/**
+			 * Handle a RemoteObject fault.
+			 */
+			protected function submitData_faultHandler(event:FaultEvent,
+				token:AsyncToken):void
 			{
 				Alert.show(String(event.fault.faultString), "Error:");
+			}
+			
+			/**
+			 * Login to the server.
+			 */
+			protected function login():void
+			{
+				if (remoteObjectType.selected) {
+					//submitRo();
+				} else if (netConnectionType.selected) {
+					loginNc();
+				}
+			}
+			
+			protected function loginNc():void
+			{
+				var nc:NetConnection = getNetConnection();
+				nc.addHeader("Credentials", false, {
+					'userid': username.text, 'password': password.text});
+			}
+			
+			protected function logout():void
+			{
+				if (remoteObjectType.selected) {
+					//submitRo();
+				} else if (netConnectionType.selected) {
+					logoutNc();
+				}
+			}
+			
+			protected function logoutNc():void
+			{
+				var nc:NetConnection = getNetConnection();
+				nc.addHeader("Credentials", false, {'userid': '', 'password': ''});
 			}
 		]]>
 	</mx:Script>

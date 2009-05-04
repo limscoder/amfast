@@ -20,6 +20,16 @@ def setup_channel_set(channel_set):
     # Map service targets to controller methods
     cont_obj = controller.Controller()
     service = Service('ExampleService')
-    service.mapTarget(CallableTarget(cont_obj.echo, 'echo'))
-    service.mapTarget(CallableTarget(cont_obj.raiseException, 'raiseException'))
+
+    # Set secure=True to raise an exception
+    # when an un-authenticated user attempts
+    # to access the target. 
+    service.mapTarget(CallableTarget(cont_obj.echo, 'echo', secure=True))
     channel_set.service_mapper.mapService(service)
+
+    # Set the ChannelSet's 'checkCredentials' attribute
+    # to enable authentication.
+    #
+    # In this example, we're using a method from the
+    # controller to check credentials.
+    channel_set.checkCredentials = cont_obj.checkCredentials
