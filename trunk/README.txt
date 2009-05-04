@@ -1,10 +1,6 @@
 For installation instructions and other information visit:
 http://code.google.com/p/amfast/
 
-Thanks to the following projects for inspiration and implementation examples:
-PyAMF: http://pyamf.org
-AMFEXT: http://www.teslacore.it/wiki/index.php?title=AMFEXT
-
 Copyright (c) 2009 Dave Thompson
 
 Permission is hereby granted, free of charge, to any person obtaining a copy

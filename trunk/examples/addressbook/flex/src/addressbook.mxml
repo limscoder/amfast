@@ -21,7 +21,7 @@
 			toolTip="Double click on a user to edit their details."
 			allowMultipleSelection="true">
 			<mx:columns>
-				<mx:DataGridColumn headerText="Key" dataField="sa_key" />
+				<mx:DataGridColumn headerText="Key" dataField="sa_key" labelFunction="getKeyLabel"/>
 				<mx:DataGridColumn headerText="First Name" dataField="first_name" />
 				<mx:DataGridColumn headerText="Last Name" dataField="last_name" />
 			</mx:columns>
@@ -50,12 +50,13 @@
 	<mx:Script>
 		<![CDATA[
 			import mx.collections.ArrayCollection;
+			import mx.collections.ItemResponder;
 			import mx.controls.Alert;
 			import mx.managers.PopUpManager;
 			import mx.messaging.ChannelSet;
 			import mx.messaging.channels.AMFChannel;
+			import mx.rpc.AsyncToken;
 			import mx.rpc.remoting.mxml.RemoteObject;
-			import mx.rpc.AbstractOperation;
 			import mx.rpc.events.*;
 			
 			import components.*;
@@ -66,7 +67,15 @@
 			
 			[Bindable]
 			protected var users:ArrayCollection;
-
+			
+			/**
+			 * Gets the id label for a contact.
+			 */
+			protected function getKeyLabel(item:*, col:*):String
+			{
+				return String(item.sa_key.getItemAt(0));
+			}
+			
 			/**
 			 * Create a RemoteObject with url from user input.
 			 */
@@ -96,28 +105,28 @@
 			/**
 			 * Insert default data
 			 */
-			public function insertDefaultData():void
+			protected function insertDefaultData():void
 			{
 				var remoteObj:RemoteObject = getService();
-				var operation:AbstractOperation = remoteObj.getOperation('insertDefaultData');
-				operation.addEventListener(ResultEvent.RESULT, insertDefaultData_resultHandler);
-				operation.send();
+				var token:AsyncToken = remoteObj.insertDefaultData();
+				
+				token.addResponder(new ItemResponder(insertDefaultData_resultHandler,
+					faultHandler, token));
 			}
 			
-			protected function insertDefaultData_resultHandler(event:Event):void
+			protected function insertDefaultData_resultHandler(event:Event,
+				token:AsyncToken):void
 			{
-				event.target.removeEventListener(ResultEvent.RESULT, insertDefaultData_resultHandler);
 				loadUsers();
 			}
 			
 			/**
-			 * Raise an exception on the server side.
+			 * Handle a RemoteObject fault.
 			 */
-			public function raiseException():void
+			protected function faultHandler(event:FaultEvent,
+				token:AsyncToken):void
 			{
-				var remoteObj:RemoteObject = getService();
-				var operation:AbstractOperation = remoteObj.getOperation('raiseException');
-				operation.send();
+				Alert.show(String(event.fault.faultString), "Error:");
 			}
 			
 			/**
@@ -126,15 +135,17 @@
 			public function loadUsers():void
 			{
 				var remoteObj:RemoteObject = getService();
-				var operation:AbstractOperation = remoteObj.getOperation('loadAll');
-				operation.addEventListener(ResultEvent.RESULT, loadAll_resultHandler);
-				operation.send(SAObject.getRemoteAlias(models.User));
+				var token:AsyncToken = remoteObj.loadAll(SaObject.getRemoteAlias(
+					models.User));
+				
+				token.addResponder(new ItemResponder(loadAll_resultHandler,
+					faultHandler, token));
 			}
 			
-			protected function loadAll_resultHandler(event:Event):void
+			protected function loadAll_resultHandler(event:ResultEvent,
+				token:AsyncToken):void
 			{
-				event.target.removeEventListener(ResultEvent.RESULT, loadAll_resultHandler);
-				users = ArrayCollection(ResultEvent(event).result);
+				users = ArrayCollection(event.result);
 			}
 
 			protected function editUser():void
@@ -168,15 +179,16 @@
 				}
 				
 				var remoteObj:RemoteObject = getService();
-				var operation:AbstractOperation = remoteObj.getOperation('removeList');
-				operation.addEventListener(ResultEvent.RESULT, remove_resultHandler);
-				
-				operation.send(SAObject.getRemoteAlias(models.User), removeKeys);
+				var token:AsyncToken = remoteObj.removeList(
+					SaObject.getRemoteAlias(models.User), removeKeys);
+					
+				token.addResponder(new ItemResponder(remove_resultHandler,
+					faultHandler, token));
 			}
 			
-			protected function remove_resultHandler(event:Event):void
+			protected function remove_resultHandler(event:ResultEvent,
+				token:AsyncToken):void
 			{
-				event.target.removeEventListener(ResultEvent.RESULT, remove_resultHandler);
 				loadUsers();
 			}
 		]]>
