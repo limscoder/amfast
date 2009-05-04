@@ -12,6 +12,9 @@ from amfast.remoting.message_agent import MessageAgent, Subscription
 class ChannelError(RemotingError):
     pass
 
+class SecurityError(ChannelError):
+    pass
+
 class Connection(object):
     """A client connection to a channel."""
 
@@ -229,6 +232,9 @@ class ChannelSet(object):
 
     def __iter__(self):
         return self._channels.itervalues()
+
+    def checkCredentials(self, user, password):
+        raise SecurityError('Authentication not implemented.');
 
     def mapChannel(self, channel):
         lock = threading.RLock()

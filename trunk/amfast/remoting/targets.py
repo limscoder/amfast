@@ -7,6 +7,13 @@ from amfast.remoting.flex_messages import CommandMessage
 from amfast.remoting.channel import ChannelError
 from amfast.remoting.endpoint import AmfEndpoint
 
+def nc_auth(packet, msg, credentials):
+    """NetConnection style authentication."""
+    packet.channel.channel_set.checkCredentials(
+        credentials['userid'], credentials['password'])
+
+    packet._authenticated = True
+
 # --- CommandMessage Operations --- #
 def client_ping(packet, msg, *args):
     """Respond to a ping request."""

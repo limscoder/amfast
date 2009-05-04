@@ -71,9 +71,11 @@ class Target(object):
     attributes:
     ============
      * name - string, name of the target.
+     * secure - boolean, True to require login.
     """
-    def __init__(self, name):
+    def __init__(self, name, secure=False):
         self.name = name
+        self.secure = secure
 
     def _invokeStr(self, args):
         return "<targetInvocation target=\"%s\">%s</targetInvocation>" % \
@@ -97,10 +99,11 @@ class CallableTarget(Target):
     attributes:
     ============
      * name - string, name of the target.
+     * secure - boolean, True to require login.
      * callable - callable, a callable that can be invoked.
     """
-    def __init__(self, callable, name):
-        Target.__init__(self, name)
+    def __init__(self, callable, name, secure=False):
+        Target.__init__(self, name, secure)
         self.callable = callable
 
     def invoke(self, packet, msg, args):
@@ -115,6 +118,7 @@ class ExtCallableTarget(CallableTarget):
     attributes:
     ============
      * name - string, name of the target.
+     * secure - boolean, True to require login.
      * callable - callable, a callable that can be invoked.
     """
     def invoke(self, packet, msg, args):
@@ -141,7 +145,8 @@ class Header(object):
 
     def invoke(self, request):
         """Invoke an action on this header if one has been mapped."""
-        target = request.channel_set.service_mapper.packet_header_service.getTarget(self.name)
+        target = request.channel.channel_set.service_mapper.\
+            packet_header_service.getTarget(self.name)
         if target is not None:
             return target.invoke(request, None, (self.value,))
         return False
@@ -201,6 +206,11 @@ class Message(object):
         target = request.channel.channel_set.service_mapper.getTarget(service_name, target_name)
         if target is None:
             raise RemotingError("Target '%s' not found." % self.target)
+
+        if target.secure is True:
+            # Make sure user is authenticated
+            if not hasattr(request, '_authenticated'):
+                raise RemotingError('Target requires authentication.');
 
         self.response_msg.body = target.invoke(request, self, self.body)
 
@@ -360,6 +370,10 @@ class ServiceMapper(object):
         self.mapService(self.command_service)
         self.default_service = Service(Service.DEFAULT_SERVICE)
         self.mapService(self.default_service)
+
+        # NetConnection authentication
+        self.packet_header_service.mapTarget(ExtCallableTarget(targets.nc_auth,
+            'Credentials'))
 
         # CommandMessages
         self.command_service.mapTarget(ExtCallableTarget(targets.client_ping,
