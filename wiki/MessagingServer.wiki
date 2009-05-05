@@ -67,7 +67,7 @@ service_mapper.mapService(service)
 channel_set.service_mapper = service_mapper
 
 # The mapped target can be accessed from a client
-# with a RemoteObject request to:
+# with a NetConnection or RemoteObject request to:
 # 'exposed_service_name.exposed_method_name'
 }}}
 
