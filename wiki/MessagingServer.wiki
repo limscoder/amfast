@@ -145,6 +145,42 @@ service_mapper.command_service.mapTarget(target)
 channel_set.message_agent.publish(message, 'topic', 'sub_topic')
 }}}
 
+== Authentication ==
+ * Authentication can be used with both !NetConnection and !RemoteObject
+ * Targets and !MessageAgents can be secured.
+
+{{{
+# Add a login method to a ChannelSet
+# to enable authentication.
+#
+# The method should accept user and password
+# arguments. It should return True on login,
+# and raise a amfast.remoting.channel.SecurityError
+# on failure.
+def login(user, password):
+    if user == 'correct' and 'pass' == 'correct':
+        return True
+
+    raise amfast.remoting.channel.SecurityError('Invalid credentials.')
+
+channel_set.login = login
+
+# Set the 'secure' attribute to True
+# to protect a Target.
+#
+# This will stop unauthenticated users
+# from invoking a Target.
+target.secure = True
+
+# Set the 'secure' attribute to True
+# to protect a MessageAgent.
+#
+# This will stop un-authenticated
+# users from publishing or subscribing
+# to topics.
+channel_set.message_agent.secure = True
+}}}
+
 == Configurable Endpoints ==
  * Channel objects use Endpoint objects to encode and decode the messages they receive.
  * Object serialization and de-serialization is customized on a per-Channel basis by configuring the Channel's endpoints.
