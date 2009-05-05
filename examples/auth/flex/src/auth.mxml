@@ -39,7 +39,8 @@
 						id="netConnectionType"
 						label="NetConnection"
 						groupName="roType"
-						selected="true" />
+						selected="true"
+						change="netConnectionSelected(event)"/>
 					
 					<mx:RadioButton
 						id="remoteObjectType"
@@ -133,6 +134,18 @@
 			}
 			
 			/**
+			 * Make sure both buttons are enabled
+			 * when NetConnection is selected.
+			 */
+			protected function netConnectionSelected(event:Event):void
+			{
+				if (event.target.selected) {
+					loginBtn.enabled = true;
+					logoutBtn.enabled = true;
+				}
+			}
+			
+			/**
 			 * Send input to server.
 			 */
 			protected function submit():void
@@ -180,7 +193,7 @@
 				var token:AsyncToken = remoteObj.echo(serverInput.text);
 				
 				token.addResponder(new ItemResponder(submitData_resultHandler,
-					submitData_faultHandler, token));
+					faultHandler, token));
 			}
 			
 			/**
@@ -195,7 +208,7 @@
 			/**
 			 * Handle a RemoteObject fault.
 			 */
-			protected function submitData_faultHandler(event:FaultEvent,
+			protected function faultHandler(event:FaultEvent,
 				token:AsyncToken):void
 			{
 				Alert.show(String(event.fault.faultString), "Error:");
@@ -207,12 +220,37 @@
 			protected function login():void
 			{
 				if (remoteObjectType.selected) {
-					//submitRo();
+					loginRo();
 				} else if (netConnectionType.selected) {
 					loginNc();
 				}
 			}
 			
+			/**
+			 * Login with RemoteObject.
+			 */
+			protected function loginRo():void
+			{
+				var ro:RemoteObject = getRemoteObject();
+				var token:AsyncToken = ro.channelSet.login(username.text, password.text);
+				
+				token.addResponder(new ItemResponder(login_resultHandler,
+					faultHandler, token));
+			}
+			
+			/**
+			 * Successful login handler.
+			 */
+			protected function login_resultHandler(event:ResultEvent,
+				token:AsyncToken):void
+			{
+				loginBtn.enabled = false;
+				logoutBtn.enabled = true;
+			}
+			
+			/**
+			 * Set NetConnection credentials.
+			 */
 			protected function loginNc():void
 			{
 				var nc:NetConnection = getNetConnection();
@@ -220,15 +258,43 @@
 					'userid': username.text, 'password': password.text});
 			}
 			
+			/**
+			 * Logout.
+			 */
 			protected function logout():void
 			{
 				if (remoteObjectType.selected) {
-					//submitRo();
+					logoutRo();
 				} else if (netConnectionType.selected) {
 					logoutNc();
 				}
 			}
 			
+			/**
+			 * Logout with RemoteObject.
+			 */
+			protected function logoutRo():void
+			{
+				var ro:RemoteObject = getRemoteObject();
+				var token:AsyncToken = ro.channelSet.logout();
+				
+				token.addResponder(new ItemResponder(logout_resultHandler,
+					faultHandler, token));
+			}
+			
+			/**
+			 * Successful logout.
+			 */
+			protected function logout_resultHandler(event:ResultEvent,
+				token:AsyncToken):void
+			{
+				loginBtn.enabled = true;
+				logoutBtn.enabled = false;
+			}
+			
+			/**
+			 * Unset NetConnection credentials.
+			 */
 			protected function logoutNc():void
 			{
 				var nc:NetConnection = getNetConnection();

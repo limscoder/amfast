@@ -378,6 +378,10 @@ class ServiceMapper(object):
         # CommandMessages
         self.command_service.mapTarget(ExtCallableTarget(targets.client_ping,
             messaging.CommandMessage.CLIENT_PING_OPERATION))
+        self.command_service.mapTarget(ExtCallableTarget(targets.login_operation,
+            messaging.CommandMessage.LOGIN_OPERATION))
+        self.command_service.mapTarget(ExtCallableTarget(targets.logout_operation,
+            messaging.CommandMessage.LOGOUT_OPERATION))
         self.command_service.mapTarget(ExtCallableTarget(targets.poll_operation,
             messaging.CommandMessage.POLL_OPERATION))
         self.command_service.mapTarget(ExtCallableTarget(targets.subscribe_operation,

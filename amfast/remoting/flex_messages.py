@@ -6,6 +6,7 @@ import amfast
 from amfast.decode import decode
 from amfast import class_def, remoting
 from amfast.class_def.as_types import AsError
+from amfast.remoting.channel import SecurityError
 
 class FlexMessageError(remoting.RemotingError):
     """Errors raised by this module."""
@@ -273,10 +274,19 @@ class RemotingMessage(AbstractMessage):
     def invoke(self, packet, msg):
         AbstractMessage.invoke(self, packet, msg)
 
-        target = packet.channel.channel_set.service_mapper.getTarget(self.destination, self.operation)
+        # Make sure connection timestamp is updated everytime.
+        channel_set = packet.channel.channel_set
+        connection = channel_set.getFlexConnection(packet, msg)
+
+        target = channel_set.service_mapper.getTarget(self.destination, self.operation)        
         if target is None:
             raise FlexMessageError("Operation '%s' not found." % \
                 remoting.Service.SEPARATOR.join((self.destination, self.operation)))
+
+        if target.secure is True:
+            if connection.authenticated is False:
+                raise SecurityError("Operation requires authentication.")
+
         msg.response_msg.body.body = target.invoke(packet, msg, self.body)
 
 class_def.assign_attrs(RemotingMessage, 'flex.messaging.messages.RemotingMessage',
@@ -303,7 +313,14 @@ class AsyncMessage(AbstractMessage):
         """Publish this message."""
         AbstractMessage.invoke(self, packet, msg)
 
-        packet.channel.channel_set.message_agent.publish(self,
+        channel_set = packet.channel.channel_set
+        connection = channel_set.getFlexConnection(packet, msg)
+
+        if channel_set.message_agent.secure is True:
+            if connection.authenticated is False:
+                raise SecurityError("Operation requires authentication.")
+
+        channel_set.message_agent.publish(self,
             self.destination, self.headers.get(self.SUBTOPIC_HEADER, None))
 
 class_def.assign_attrs(AsyncMessage, 'flex.messaging.messages.AsyncMessage',
@@ -382,7 +399,7 @@ class CommandMessage(AsyncMessage):
         if target is None:
             raise FlexMessageError("Command '%s' not found." % self.operation)
 
-        msg.response_msg.body.body = target.invoke(packet, msg, self.body)
+        msg.response_msg.body.body = target.invoke(packet, msg, (self.body,))
 
     def getAcknowledgeClass(self):
         """Returns the correct class for the response message."""

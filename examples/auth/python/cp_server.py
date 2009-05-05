@@ -13,7 +13,7 @@ class App(object):
     """Base web app."""
     @cherrypy.expose
     def index(self):
-        raise cherrypy.HTTPRedirect('/hello_world.html')
+        raise cherrypy.HTTPRedirect('/auth.html')
 
 if __name__ == '__main__':
     usage = """usage: %s [options]""" % __file__

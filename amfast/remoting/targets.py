@@ -1,10 +1,10 @@
 """Built in Target functions."""
-
 import uuid
+import base64
 
 from amfast.class_def.as_types import AsNoProxy
 from amfast.remoting.flex_messages import CommandMessage
-from amfast.remoting.channel import ChannelError
+from amfast.remoting.channel import ChannelError, SecurityError
 from amfast.remoting.endpoint import AmfEndpoint
 
 def nc_auth(packet, msg, credentials):
@@ -12,49 +12,85 @@ def nc_auth(packet, msg, credentials):
     packet.channel.channel_set.checkCredentials(
         credentials['userid'], credentials['password'])
 
+    # Flag indicating packet was 
+    # authenticated properly.
     packet._authenticated = True
 
 # --- CommandMessage Operations --- #
+# TODO:
+# These should probably be made
+# into CommandMessage methods.
+
 def client_ping(packet, msg, *args):
-    """Respond to a ping request."""
-    command = msg.body[0]
+    """Respond to a ping request and connect to the channel."""
     response = msg.response_msg.body
     if (not hasattr(response, 'headers')) or response.headers is None:
         response.headers = {}
 
-    response.headers[command.MESSAGING_VERSION] = 1
-    response.headers[command.FLEX_CLIENT_ID_HEADER] = str(uuid.uuid4())
+    response.headers[CommandMessage.MESSAGING_VERSION] = 1
+
+    # Set FlexClientId (unique to a single Flex client)
+    # and create connection.
+    connection = packet.channel.channel_set.getFlexConnection(packet, msg)
+
+def login_operation(packet, msg, raw_creds):
+    """RemoteObject style authentication."""
+
+    cred_str = base64.decodestring(raw_creds)
+
+    command = msg.body[0]
+    if hasattr(command, 'headers') and \
+        command.CREDENTIALS_CHARSET_HEADER in command.headers:
+        # Convert encoded string
+        cred_str = unicode(cred_str, command.headers[command.CREDENTIALS_CHARSET_HEADER])
+
+    creds = cred_str.split(':')
+    
+    channel_set = packet.channel.channel_set
+    channel_set.checkCredentials(creds[0], creds[1])
+    connection = channel_set.getFlexConnection(packet, msg)
+    connection.authenticated = True
+    connection.setSessionAttr('flex_user', creds[0])
+
+def logout_operation(packet, msg, *args):
+    """RemoteObject style authentication."""
+
+    connection = packet.channel.channel_set.getFlexConnection(packet, msg)
+    connection.authenticated = False
+    connection.delSessionAttr('flex_user')
 
 def subscribe_operation(packet, msg, *args):
     """Respond to a subscribe operation."""
-    command = msg.body[0]
-    headers = command.headers
-
-    # Set clientId
-    # this ID is unique for each MessageAgent
-    # acting as a consumer.
+    # Set clientId (unique for each MessageAgent acting as a consumer).
+    # A single Flex client may have multiple clientIds.
     ack_msg = msg.response_msg.body
     if ack_msg.clientId is None:
         ack_msg.clientId = str(uuid.uuid4())
 
-    channel = packet.channel
-    connection = channel.getConnection(headers[command.FLEX_CLIENT_ID_HEADER])
-    if connection is None:
-        connection = channel.connect(headers[command.FLEX_CLIENT_ID_HEADER])
+    command = msg.body[0]
+    headers = command.headers
 
-    channel.channel_set.message_agent.subscribe(connection, ack_msg.clientId,
+    # Subscribe to topic
+    channel_set = packet.channel.channel_set
+    connection = channel_set.getFlexConnection(packet, msg)
+
+    if channel_set.message_agent.secure is True:
+        if connection.authenticated is False:
+            raise SecurityError("Operation requires authentication.")
+
+    channel_set.message_agent.subscribe(connection, ack_msg.clientId,
         command.destination, headers.get(command.SUBTOPIC_HEADER, None),
         headers.get(command.SELECTOR_HEADER, None))
 
 def unsubscribe_operation(packet, msg, *args):
-    """Respond to a unsubscribe operation."""
+    """Respond to an unsubscribe operation."""
     command = msg.body[0]
     headers = command.headers
    
-    channel = packet.channel 
-    connection = channel.getConnection(headers[command.FLEX_CLIENT_ID_HEADER])
+    channel_set = packet.channel.channel_set
+    connection = channel_set.getFlexConnection(packet, msg)
     if connection is not None:
-        channel.channel_set.message_agent.unsubscribe(connection, command.clientId,
+        channel_set.message_agent.unsubscribe(connection, command.clientId,
             command.destination, headers.get(command.SUBTOPIC_HEADER, None),
             headers.get(command.SELECTOR_HEADER, None))
 
@@ -63,19 +99,17 @@ def disconnect_operation(packet, msg, *args):
     command = msg.body[0]
     headers = command.headers
 
-    connection = packet.channel.getConnection(headers[command.FLEX_CLIENT_ID_HEADER])
-    if connection is not None:
-        connection.channel.disconnect(headers[command.FLEX_CLIENT_ID_HEADER])
+    connection = packet.channel.channel_set.getFlexConnection(packet, msg)
+    connection.disconnect()
+    response = msg.response_msg.body
+    del response.headers[response.FLEX_CLIENT_ID]
 
 def poll_operation(packet, msg, *args):
     """Respond to a poll operation."""
     command = msg.body[0]
     headers = command.headers
 
-    connection = packet.channel.getConnection(headers[command.FLEX_CLIENT_ID_HEADER])
-    if connection is None:
-        raise ChannelError("Client is not connected.")
-    
+    connection = packet.channel.channel_set.getFlexConnection(packet, msg)
     messages = connection.poll()
     if isinstance(packet.channel.endpoint, AmfEndpoint):
         # Make sure messages are not encoded as an ArrayCollection

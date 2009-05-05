@@ -9,10 +9,10 @@ class MessageAgent(object):
 
     SUBTOPIC_SEPARATOR = "_;_"
 
-    def __init__(self):
+    def __init__(self, secure=False):
+        self.secure = secure
         self._topics = {} # Messages will be published by topic
         self._clients = {} # Messages will be retrieved by client
-        self.clientId = str(uuid.uuid4()) # MessageAgent clientId
 
     def subscribe(self, connection, client_id, topic,
         sub_topic=None, selector=None):
@@ -35,8 +35,8 @@ class MessageAgent(object):
             lock.release()
 
     def unsubscribe(self, connection, client_id, topic,
-        sub_topic=None, selector=None):
-        """Subscribe a client from a topic."""
+        sub_topic=None, selector=None, _disconnect=False):
+        """Un-Subscribe a client from a topic."""
 
         if sub_topic is not None:
             topic = self.SUBTOPIC_SEPARATOR.join((topic, sub_topic))
@@ -44,7 +44,8 @@ class MessageAgent(object):
         lock = threading.RLock()
         lock.acquire()
         try:
-            connection.unsubscribe(client_id, topic)
+            if _disconnect is True:
+                connection.unsubscribe(client_id, topic)
 
             topic_map = self._topics.get(topic, None)
             if topic_map is not None:
@@ -103,11 +104,3 @@ class MessageAgent(object):
                 timeToLive=ttl)
 
             connection.publish(msg)
-
-class Subscription(object):
-    """An individual subscription to a topic."""
-
-    def __init__(self, connection, client_id, topic):
-        self.connection = connection
-        self.client_id = client_id
-        self.topic = topic
