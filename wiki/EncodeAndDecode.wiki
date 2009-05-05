@@ -36,6 +36,8 @@
 || XML, XMLDocument || xml.dom.minidom.Document ||
 || Date || datetime ||
 
+----
+
 == Encoding ==
  * Use the amfast.encoder.Encoder class to encode objects.
 
@@ -73,6 +75,8 @@ encoded = encoder.encode_packet(packet_obj)
 # the buffer object.
 }}}
 
+----
+
 == Decoding ==
  * Use the amfast.decoder.Decoder class to decode objects.
 
@@ -94,6 +98,8 @@ obj = decoder.decode(encoded)
 # Decode an AMF Packet
 packet_obj = decoder.decode_packet(encoded)
 }}}
+
+----
 
 == Custom Type Maps ==
 
