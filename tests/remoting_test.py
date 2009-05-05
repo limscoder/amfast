@@ -150,7 +150,7 @@ class RemotingTestCase(unittest.TestCase):
         message = remoting.Message(target=qualified_name, response='/1',
             body=(self.arg,))
         packet = remoting.Packet(messages=[message])
-        packet.channel_set = self.channel_set
+        packet.channel = self.channel
         response = packet.invoke()
         
         self.assertEquals(1, len(response.messages))
@@ -162,7 +162,7 @@ class RemotingTestCase(unittest.TestCase):
         message = remoting.Message(target='bad_target', response='/1',
             body=(self.arg,))
         packet = remoting.Packet(messages=[message])
-        packet.channel_set = self.channel_set
+        packet.channel = self.channel
         response = packet.invoke()
 
         self.assertEquals(1, len(response.messages))
@@ -204,7 +204,7 @@ class RemotingTestCase(unittest.TestCase):
         outter_msg.body = (inner_msg, )
 
         packet = remoting.Packet(messages=[outter_msg])
-        packet.channel_set = self.channel_set
+        packet.channel = self.channel
         response = packet.invoke()
 
         # Check outer msg
