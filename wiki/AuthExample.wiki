@@ -2,9 +2,9 @@
 
 = Authentication Example =
 
-This example demonstrates using authentication with AmFast.
+This example demonstrates using authentication with !AmFast.
 
-Authentication works with both NetConnection and RemoteObject.
+Authentication works with both !NetConnection and !RemoteObject.
 
 The example is located in SVN within the [http://code.google.com/p/amfast/source/browse/trunk/examples/auth examples/auth] directory
 
