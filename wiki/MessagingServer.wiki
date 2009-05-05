@@ -230,7 +230,7 @@ channel_set.message_agent.secure = True
 
 === !AmfEndpoint ===
  * !AmfEndpoint uses !AmFast's built-in AMF encoder/decoder.
- * See EncodeAndDecode page for information about configuring Encoder and Decoder objects.
+ * See EncodeAndDecode page for information about configuring Encoder and Decoder objects and how to map custom types.
 
 {{{
 # AmFast's default Endpoint
