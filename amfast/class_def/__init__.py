@@ -231,6 +231,9 @@ class ClassDefMapper(object):
         self.mapClass(ClassDef(messaging.AcknowledgeMessage, _built_in=True))
         self.mapClass(ClassDef(messaging.ErrorMessage, _built_in=True))
 
+    def __iter__(self):
+        return self._mapped_aliases.itervalues()
+
     def mapClass(self, class_def):
         """Map a class_def implementation, so that it can be retrieved based on class attributes.
 

@@ -270,6 +270,9 @@ class ChannelSet(object):
     def checkCredentials(self, user, password):
         raise SecurityError('Authentication not implemented.');
 
+    def generateId(self):
+        return str(uuid.uuid4())
+
     def addConnection(self, connection):
         lock = threading.RLock()
         lock.acquire()
@@ -338,7 +341,7 @@ class ChannelSet(object):
         flex_msg = msg.body[0]
         flex_client_id = flex_msg.headers.get(flex_msg.FLEX_CLIENT_ID_HEADER, None)
         if flex_client_id is None:
-            flex_client_id = str(uuid.uuid4())
+            flex_client_id = self.generateId()
  
         connection = packet.channel.connect(flex_client_id)
 

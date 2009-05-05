@@ -28,7 +28,7 @@ class CodeGenerator(object):
          * extends - string, name of the class that this class inherits from. Default = None
          * implements - list or tuple, a list of interface names that this class implments. Default = None
         """
-        for class_def in class_mapper._mapped_classes.values():
+        for class_def in class_mapper:
             if class_def._built_in is True:
                 continue
 
