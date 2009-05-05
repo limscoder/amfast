@@ -1,0 +1,38 @@
+#summary Authentication example.
+
+= Authentication Example =
+
+This example demonstrates using authentication with AmFast.
+
+Authentication works with both NetConnection and RemoteObject.
+
+The example is located in SVN within the [http://code.google.com/p/amfast/source/browse/trunk/examples/auth examples/auth] directory
+
+The example has scripts for serving the application via [http://www.cherrypy.org/ CherryPy], [http://twistedmatrix.com/trac/ Twisted Web], or WSGI.
+
+Start the server and point your browser to http://localhost:8000
+
+== !CherryPy ==
+
+Use [http://www.cherrypy.org/ CherryPy] web framework to serve the example contact manager over http with the following command:
+{{{
+python auth/python/cp_server.py
+}}}
+
+== Twisted Example ==
+Use [http://twistedmatrix.com/trac/ Twisted] web framework to serve the example contact manager over http with the following command:
+{{{
+twistd -noy auth/python/cp_server.py
+}}}
+
+== WSGI Example ==
+
+Use simple WSGI to serve the example contact manager over http with the following command:
+{{{
+python auth/python/wsgi_server.py
+}}}
+
+The WSGI example does not serve the Flash file, so you will have to manually open the file in your browser:
+{{{
+auth/flex/deploy/auth.html
+}}}
