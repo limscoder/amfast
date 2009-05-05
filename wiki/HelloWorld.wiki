@@ -4,6 +4,8 @@
 
 This example demonstrates a very simple service and a Flex client.
 
+The remote method can be invoked using NetConnection or RemoteObject.
+
 The example is located in SVN within the [http://code.google.com/p/amfast/source/browse/trunk/examples/hello_world examples/hello_world] directory
 
 The example has scripts for serving the application via [http://www.cherrypy.org/ CherryPy], [http://twistedmatrix.com/trac/ Twisted Web], or WSGI.
