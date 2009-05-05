@@ -31,6 +31,8 @@ server.serve_forever()
 # Our messaging server is up and running!
 }}}
 
+----
+
 == Mapping RPC Destinations ==
  * Target objects map callables to RPC destinations.
  * Service objects are collections of Targets.
@@ -73,7 +75,7 @@ channel_set.service_mapper = service_mapper
 
 === Exposing AMF Packet and Message to Targets ===
  * AMF Packet and Message objects can be exposed to Targets using the !ExtCallableTargetClass.
- * This is useful if you need to access Packet or FlexMessage headers.
+ * This is useful if you need to access Packet or !FlexMessage headers.
 
 {{{
 from amfast import remoting
@@ -171,6 +173,8 @@ target = remoting.CallableTarget(function_exposed_to_command, OPERATION_NUMBER)
 service_mapper.command_service.mapTarget(target)
 }}}
 
+----
+
 == Producer/Consumer Messaging ==
  * Each !ChannelSet object contains a !MessageAgent object which handles Consumer subscriptions and Producer publishing.
 
@@ -217,6 +221,8 @@ target.secure = True
 # to topics.
 channel_set.message_agent.secure = True
 }}}
+
+----
 
 == Configurable Endpoints ==
  * Channel objects use Endpoint objects to encode and decode the messages they receive.
