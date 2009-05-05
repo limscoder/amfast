@@ -23,7 +23,7 @@ extensions = Feature(
 
 setup(name="AmFast",
     version = "0.3.0",
-    description = "A C extension to encode/decode Python objects with AMF0 and AMF3. Includes support for NetConnection, RemoteObject, IExternizeable, and custom type serialization.",
+    description = "Flash remoting framework. Includes support for NetConnection, RemoteObject, IExternizeable, custom type serialization, and a C-based AMF encoder/decoder.",
     url = "http://code.google.com/p/amfast/",
     author = "Dave Thompson",
     author_email = "dthomp325@gmail.com",
