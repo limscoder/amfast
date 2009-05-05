@@ -91,6 +91,42 @@ def remote_function(packet, message, arg1, arg2):
 target = remoting.ExtCallableTarget(remoting_function, 'ext_exposed_method_name')
 }}}
 
+=== Storing Session Data ===
+ * Use Connection objects to store session data.
+ * Session data is stored in ram, subclass amfast.remoting.channel.Connection if you need an alternative storage implementation.
+
+==== RemoteObject Session Data ====
+ * Connection objects are created automatically for !RemoteObject Clients.
+
+{{{
+# Use ExtCallableTarget to expose Packet and Message objects.
+def remote_function(packet, message, *args):
+    # Get Connection object from channel_set and message
+    # This only works for RemoteObject clients!!
+    connection = packet.channel.channel_set.getFlexConnection(message)
+
+    if connection.hasSessionAttr('attr_name'):
+        val = connection.getSessionAttr('attr_name')
+
+    connection.setSessionAttr('new_attr_name', 'value')
+}}}
+
+==== NetConnection Session Data ====
+ * You can also store session data for !NetConnection clients, but you will have to manually create the Connection and pass the connection id.
+
+{{{
+# To store session data with NetConnection,
+# the Connection object will need to be created manually,
+# and the connection id will have to be passed as an argument
+# or as a Packet header.
+def remote_function(packet, message, connection_id):
+    try:
+        connection = packet.channel.channel_set.getConnection(connection_id)
+    except amfast.remoting.channel.NotConnectedError:
+        connection_id = packet.channel.channel_set.generateId()
+        connection = packet.channel.connect(connection_id)
+}}}
+
 === Mapping AMF Packet Headers to Targets ===
  * AMF Packet Headers can be mapped to Targets that get invoked whenever a request Packet containing the Header is received.
 
