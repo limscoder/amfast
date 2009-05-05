@@ -3,5 +3,6 @@
 = Server Examples =
  * HelloWorld - Start here.
  * ProducerConsumer - An example using Producer/Consumer messaging.
+ * AuthExample - An example using authentication.
  * SqlAlchemy - An example using [http://sqlalchemy.org SQLAlchemy] for persistence.
  * EchoTest - An example using the Red5 project's EchoTest.
