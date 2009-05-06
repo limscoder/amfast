@@ -78,27 +78,30 @@ class AbstractMessage(object):
         if amfast.log_debug:
             amfast.logger.debug("\nInvoking FlexMessage:\n%s" % self)
 
-    def fail(self, exc):
+    def fail(self, packet, msg, exc):
         """Return an error message."""
         fault = FaultError(exc=exc)
         response = ErrorMessage(exc=fault)
-        self._matchAcknowledge(response)
+        self._matchAcknowledge(packet, msg, response)
         return response
 
     def getAcknowledgeClass(self):
         """Returns the correct class for the response message."""
         return AcknowledgeMessage
 
-    def acknowledge(self):
+    def acknowledge(self, packet, msg):
         """Return a successful result message."""
         class_ = self.getAcknowledgeClass()
         response = class_()
-        self._matchAcknowledge(response)
+        self._matchAcknowledge(packet, msg, response)
         return response
 
-    def _matchAcknowledge(self, response):
+    def _matchAcknowledge(self, packet, msg, response):
         """Syncs values between this message and it's response acknowledgement."""
         response.correlationId = self.messageId
+
+        if self.clientId is None:
+            self.clientId = packet.channel.channel_set.generateId()
         response.clientId = self.clientId
 
     def _getId(self):

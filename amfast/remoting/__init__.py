@@ -180,7 +180,7 @@ class Message(object):
     def invoke(self, request):
         """Invoke an action on an RPC message and return a response message."""
         try:
-            self.response_msg = self.acknowledge()
+            self.response_msg = self.acknowledge(request)
             if self.is_invokable:
                 self.body[0].invoke(request, self)
             elif self.target is not None and self.target != '':
@@ -189,7 +189,7 @@ class Message(object):
                 raise RemotingError("Cannot invoke message: '%s'." % self)
         except Exception, exc:
             amfast.log_exc()
-            self.response_msg = self.fail(exc)
+            self.response_msg = self.fail(request, exc)
 
         return self.response_msg
 
@@ -214,26 +214,26 @@ class Message(object):
 
         self.response_msg.body = target.invoke(request, self, self.body)
 
-    def fail(self, exc):
+    def fail(self, request, exc):
         """Return an error response message."""
         response_target = self.response + self.FAILED_TARGET
         response_message = Message(target=response_target, response='')
         
         if self.is_invokable:
-            error_val = self.body[0].fail(exc)
+            error_val = self.body[0].fail(request, self, exc)
         else:
             error_val = AsError(exc=exc)
 
         response_message.body = error_val
         return response_message
 
-    def acknowledge(self):
+    def acknowledge(self, request):
         """Return a successful response message to acknowledge an RPC message."""
         response_target = self.response + self.SUCCESS_TARGET
         response_message = Message(target=response_target, response='')
         
         if self.is_invokable:
-            response_message.body = self.body[0].acknowledge()
+            response_message.body = self.body[0].acknowledge(request, self)
 
         return response_message
 
@@ -302,7 +302,7 @@ class Packet(object):
         response = self.acknowledge()
 
         for message in self.messages:
-            response.messages.append(message.fail(exc))
+            response.messages.append(message.fail(self, exc))
         return response
 
     def acknowledge(self):

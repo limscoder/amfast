@@ -334,8 +334,11 @@ class ChannelSet(object):
         try:
             # If header does not exist,
             # connection does not exist.
-            if not hasattr(flex_msg, 'headers') or \
-                flex_msg.FLEX_CLIENT_ID_HEADER not in flex_msg.headers:
+            if not hasattr(flex_msg, 'headers') or flex_msg.headers is None:
+                return self.flexConnect(packet, msg)
+
+            flex_client_id = flex_msg.headers.get(flex_msg.FLEX_CLIENT_ID_HEADER, None)
+            if flex_client_id == 'nil' or flex_client_id is None:
                 return self.flexConnect(packet, msg)
 
             return self.getConnection(flex_msg.headers[flex_msg.FLEX_CLIENT_ID_HEADER])
