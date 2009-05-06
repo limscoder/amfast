@@ -26,8 +26,6 @@ def client_ping(packet, msg, *args):
     if (not hasattr(response, 'headers')) or response.headers is None:
         response.headers = {}
 
-    response.headers[CommandMessage.MESSAGING_VERSION] = 1
-
     # Set FlexClientId (unique to a single Flex client)
     # and create connection.
     connection = packet.channel.channel_set.getFlexConnection(packet, msg)
@@ -60,12 +58,6 @@ def logout_operation(packet, msg, *args):
 
 def subscribe_operation(packet, msg, *args):
     """Respond to a subscribe operation."""
-    # Set clientId (unique for each MessageAgent acting as a consumer).
-    # A single Flex client may have multiple clientIds.
-    ack_msg = msg.response_msg.body
-    if ack_msg.clientId is None:
-        ack_msg.clientId = packet.channel.channel_set.generateId()
-
     command = msg.body[0]
     headers = command.headers
 
@@ -77,7 +69,7 @@ def subscribe_operation(packet, msg, *args):
         if connection.authenticated is False:
             raise SecurityError("Operation requires authentication.")
 
-    channel_set.message_agent.subscribe(connection, ack_msg.clientId,
+    channel_set.message_agent.subscribe(connection, command.clientId,
         command.destination, headers.get(command.SUBTOPIC_HEADER, None),
         headers.get(command.SELECTOR_HEADER, None))
 
