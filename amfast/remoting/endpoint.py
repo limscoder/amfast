@@ -17,7 +17,7 @@ class AmfEndpoint(object):
         self.decoder = decoder
 
     def decodePacket(self, raw_packet, *args, **kwargs):
-        if amfast.log_debug:
+        if amfast.log_raw:
             if hasattr(raw_packet, "upper"):
                 # Only print this if raw_packet is a string
                 amfast.logger.debug("<rawRequestPacket>%s</rawRequestPacket>" %
@@ -28,7 +28,7 @@ class AmfEndpoint(object):
     def encodePacket(self, packet):
         raw_packet = self.encoder.encode_packet(packet)
 
-        if amfast.log_debug:
+        if amfast.log_raw:
             if hasattr(raw_packet, "upper"):
                 # Only print this if raw_packet is a string
                 amfast.logger.debug("<rawResponsePacket>%s</rawResponsePacket>" %

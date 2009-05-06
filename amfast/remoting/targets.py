@@ -1,5 +1,4 @@
 """Built in Target functions."""
-import uuid
 import base64
 
 from amfast.class_def.as_types import AsNoProxy
@@ -65,7 +64,7 @@ def subscribe_operation(packet, msg, *args):
     # A single Flex client may have multiple clientIds.
     ack_msg = msg.response_msg.body
     if ack_msg.clientId is None:
-        ack_msg.clientId = str(uuid.uuid4())
+        ack_msg.clientId = packet.channel.channel_set.generateId()
 
     command = msg.body[0]
     headers = command.headers

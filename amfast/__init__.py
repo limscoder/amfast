@@ -45,6 +45,7 @@ class NullHandler(logging.Handler):
         pass
 
 log_debug = False
+log_raw = False
 logger = logging.getLogger('AmFast')
 logger.addHandler(NullHandler())
 logger.setLevel(logging.DEBUG)

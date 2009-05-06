@@ -11,7 +11,7 @@ import pyamf_converter as pc
 class PyAmfEndpoint(object):
     """An Endpoint that can encode/decode AMF packets with PyAmf.
 
-    !!!YOU MUST MAP CLASS DEFINITIONS WITH PyAMF!!!
+    See documentation for instructions on mapping custom types.
     """
 
     def decodePacket(self, raw_packet, *args, **kwargs):
@@ -19,7 +19,7 @@ class PyAmfEndpoint(object):
         pyamf_packet = pyamf.remoting.decode(raw_packet, context)
         packet = pc.packet_to_amfast(pyamf_packet)
 
-        if amfast.log_debug:
+        if amfast.log_raw:
             if hasattr(raw_packet, "upper"):
                 # Only print this if raw_packet is a string
                 amfast.logger.debug("<rawRequestPacket>%s</rawRequestPacket>" %
@@ -34,7 +34,7 @@ class PyAmfEndpoint(object):
         stream = pyamf.remoting.encode(pyamf_packet, context)
         raw_packet = stream.getvalue()
 
-        if amfast.log_debug:
+        if amfast.log_raw:
             amfast.logger.debug("<EncodedPyAmfPacket>%s</EncodedPyAmfPacket" % pyamf_packet)
             if hasattr(raw_packet, "upper"):
                 amfast.logger.debug("<rawResponsePacket>%s</rawResponsePacket>" %

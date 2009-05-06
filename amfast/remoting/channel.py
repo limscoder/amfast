@@ -334,9 +334,8 @@ class ChannelSet(object):
         try:
             # If header does not exist,
             # connection does not exist.
-            if not hasattr(flex_msg, 'headers'):
-                return self.flexConnect(packet, msg)
-            if flex_msg.FLEX_CLIENT_ID_HEADER not in flex_msg.headers:
+            if not hasattr(flex_msg, 'headers') or \
+                flex_msg.FLEX_CLIENT_ID_HEADER not in flex_msg.headers:
                 return self.flexConnect(packet, msg)
 
             return self.getConnection(flex_msg.headers[flex_msg.FLEX_CLIENT_ID_HEADER])
@@ -346,8 +345,12 @@ class ChannelSet(object):
     def flexConnect(self, packet, msg):
         """Creates a new connection object and returns it."""
         flex_msg = msg.body[0]
+
+        if not hasattr(flex_msg, 'headers') or flex_msg.headers is None:
+            flex_msg.headers = {}
+
         flex_client_id = flex_msg.headers.get(flex_msg.FLEX_CLIENT_ID_HEADER, None)
-        if flex_client_id is None:
+        if flex_client_id == 'nil' or flex_client_id is None:
             flex_client_id = self.generateId()
  
         connection = packet.channel.connect(flex_client_id)
