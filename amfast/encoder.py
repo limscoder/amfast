@@ -27,7 +27,7 @@ class Encoder(object):
         self.use_proxies = use_proxies
         self.use_references = use_references
         self.use_legacy_xml = use_legacy_xml
-        self.include_private = False
+        self.include_private = include_private
 
         if class_def_mapper is None:
             class_def_mapper = ClassDefMapper()
