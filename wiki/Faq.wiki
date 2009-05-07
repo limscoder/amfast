@@ -11,7 +11,7 @@ There is a easy way to compile amfast on a windows box. Follow these steps:
 
 2 - Add {MinGW}\bin directory to the system PATH
 
-3 - Download and unpack amfast source code from PyPi
+3 - Download and unpack amfast source code from !PyPi
 
 3 - In the directory you've unpacked amfast type: "python setup.py build -c mingw32" and then "python setup.py install"
 
