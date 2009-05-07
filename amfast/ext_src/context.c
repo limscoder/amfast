@@ -161,7 +161,7 @@ static PyTypeObject IdxType = {
     0,                         /*tp_setattro*/
     0,                         /*tp_as_buffer*/
     Py_TPFLAGS_DEFAULT,        /*tp_flags*/
-    "Maps objects to index numbers.",           /* tp_doc */
+    "Maps objects to AMF reference indexes.",           /* tp_doc */
     0,		               /* tp_traverse */
     0,		               /* tp_clear */
     0,		               /* tp_richcompare */

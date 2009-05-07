@@ -63,7 +63,7 @@ def dummy_callable(obj):
     return []
 
 def class_def_alias(class_def):
-    """Create a ClassAlias object that uses a ClassDef for the actual operations.
+    """Create a pyamf.ClassAlias object that uses a ClassDef for the actual operations.
 
     arguments:
     ==========
@@ -91,14 +91,13 @@ def class_def_alias(class_def):
 def register_class_def(class_def):
     """Maps a ClassDef to PyAmf.
 
+    This provides the functionality of pyamf.register_class,
+    except it maps a ClassDef.
+
     arguments:
     ===========
      * class_def - amfast.class_def.ClassDef
     """
-
-    # This function takes the place
-    # of pyamf.register_class
-
     if class_def.alias in pyamf.CLASS_CACHE:
         raise ValueError("Alias '%s' is already registered." % class_def.alias)
 
@@ -117,7 +116,7 @@ def register_class_mapper(class_mapper):
             register_class_def(class_def)
 
 def packet_to_pyamf(amfast_packet):
-    """Converts a AmFast Packet to a PyAmf Envelope
+    """Converts an AmFast Packet to a PyAmf Envelope
 
     arguments:
     ==========
@@ -190,13 +189,14 @@ class ClassDefAlias(pyamf.ClassAlias):
     """
 
     def checkClass(kls, klass):
+        # Override's parent method, because
         # AmFast does not require that mapped
         # classes' __init__ methods can't
         # have required arguments.
         pass
 
     def getAttrs(self, obj, *args, **kwargs):
-        """Returns attribute names."""
+        """Returns attribute names in PyAmf format."""
         if hasattr(self.class_def, 'DYNAMIC_CLASS_DEF'):
             dynamic_attrs = self.class_def.getDynamicAttrVals(obj).keys()
         else:
@@ -205,7 +205,7 @@ class ClassDefAlias(pyamf.ClassAlias):
         return (self.class_def.static_attrs, dynamic_attrs)
 
     def getAttributes(self, obj, *args, **kwargs):
-        """Returns attribute values."""
+        """Returns attribute values in PyAmf format."""
         if hasattr(self.class_def, 'DYNAMIC_CLASS_DEF'):
             dynamic_attrs = self.class_def.getDynamicAttrVals(obj)
         else:
@@ -219,13 +219,14 @@ class ClassDefAlias(pyamf.ClassAlias):
         return (static_attrs, dynamic_attrs)
 
     def applyAttributes(self, obj, attrs, *args, **kwargs):
-        """Applies attributes to instance."""
+        """Applies attributes to an instance."""
         self.class_def.applyAttrVals(obj, attrs)
 
     def createInstance(self, *args, **kwargs):
         """Returns a new instance of the mapped class."""
         return self.class_def.getInstance()
 
+#---- Classes for dealing with ISmallMessage ----#
 class DataInputReader(object):
     """A wrapper class for pyamf.amf3.DataInput.
  
@@ -241,7 +242,6 @@ class DataInputReader(object):
     def readElement(self):
         return self.data_input.decoder.readElement()
 
-# Classes for dealing with ISmallMessage
 class PyamfAbstractSmallMsgDef(amfast_messaging.AbstractSmallMsgDef):
     """Decodes ISmallMessages with PyAmf."""
 
@@ -392,7 +392,7 @@ class SmallCommandMsg(amfast_messaging.CommandMessage):
     def __writeamf__(self, data_output):
         raise pyamf.EncodeError("__writeamf__ is not implemented for this class: %s." % self)
 
-#----- Map flex message classes -----#
+#----- Map Flex message classes with PyAmf -----#
 pyamf.unregister_class('flex.messaging.messages.AbstractMessage')
 register_class_def(class_def.ClassDef(amfast_messaging.AbstractMessage))
 

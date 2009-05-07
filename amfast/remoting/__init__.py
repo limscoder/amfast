@@ -337,10 +337,10 @@ class ServiceMapper(object):
 
     attributes
     ===========
-    packet_header_service - Service, a special service for AMF packet headers.
-    message_header_service - Service, a special service for AMF message headers.
-    command_service - Service, a special service for Flex CommandMessages.
-    default_service - Service, a special service for targets that don't have service specifiers.
+     * packet_header_service - Service, a special service for AMF packet headers.
+     * message_header_service - Service, a special service for AMF message headers.
+     * command_service - Service, a special service for Flex CommandMessages.
+     * default_service - Service, a special service for targets that don't have service specifiers.
     
     When an AMF packet or message is processed, the object checks
     the header_service Service for a target where target.name == header.name
@@ -360,6 +360,10 @@ class ServiceMapper(object):
         return self._services.itervalues()
 
     def _mapBuiltIns(self):
+        """Map default Targets required for Authentication and FlexMessaging.
+
+        Users can override the defaults, by remapping their own targets.
+        """ 
         import amfast.remoting.flex_messages as messaging
         import targets
 

@@ -44,8 +44,8 @@ class NullHandler(logging.Handler):
     def emit(self, record):
         pass
 
-log_debug = False
-log_raw = False
+log_debug = False # True to log verbose debug strings.
+log_raw = False # True to log raw AMF byte strings.
 logger = logging.getLogger('AmFast')
 logger.addHandler(NullHandler())
 logger.setLevel(logging.DEBUG)

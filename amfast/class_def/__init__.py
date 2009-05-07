@@ -14,9 +14,9 @@ class ClassDef(object):
     attributes
     ===========
      * class_ - class, the class object mapped to this definition
-     * alias - string, the amf alias name of the mapped class
+     * alias - string, the AMF alias name of the mapped class
      * static_attrs - tuple or list, a tuple of static attribute names,
-          all values must be strings or unicode
+          all values must be strings or unicode.
      * amf3 - bool, if True, this object will be encoded in AMF3.
      * encode_types - dict, keys = attribute names, values = callables.
          Callables must accept a single parameter
@@ -207,8 +207,11 @@ class ClassDefMapper(object):
         self._mapped_aliases = {}
         self._mapBuiltIns()
 
+    def __iter__(self):
+        return self._mapped_aliases.itervalues()
+
     def _mapBuiltIns(self):
-        """Map built-in ClassDefs."""
+        """Map built-in ClassDefs for default behavior."""
         from as_types import AsError
         from amfast.remoting import flex_messages as messaging
 
@@ -230,9 +233,6 @@ class ClassDefMapper(object):
         self.mapClass(ClassDef(messaging.CommandMessage, _built_in=True))
         self.mapClass(ClassDef(messaging.AcknowledgeMessage, _built_in=True))
         self.mapClass(ClassDef(messaging.ErrorMessage, _built_in=True))
-
-    def __iter__(self):
-        return self._mapped_aliases.itervalues()
 
     def mapClass(self, class_def):
         """Map a class_def implementation, so that it can be retrieved based on class attributes.
@@ -310,12 +310,6 @@ class ClassDefMapper(object):
 
 # ---- module attributes ---- #
 
-# These properties can be set on a class
-# to map attributes within the class.
-ALIAS = '_AMFAST_ALIAS'
-STATIC_ATTRS = '_AMFAST_STATIC_ATTRS'
-AMF3 = '_AMFAST_AMF3'
-
 def get_dynamic_attr_vals(obj, ignore_attrs=None, include_private=False):
     """Returns a dict of attribute values to encode.
 
@@ -341,6 +335,12 @@ def get_dynamic_attr_vals(obj, ignore_attrs=None, include_private=False):
         vals[attr] = val
 
     return vals
+
+# These properties can be set on a class
+# to map attributes within the class.
+ALIAS = '_AMFAST_ALIAS'
+STATIC_ATTRS = '_AMFAST_STATIC_ATTRS'
+AMF3 = '_AMFAST_AMF3'
 
 def assign_attrs(class_, alias=None, static_attrs=None, amf3=None):
     """

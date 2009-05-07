@@ -9,7 +9,6 @@ class Decoder(object):
     ========
      * amf3 - bool - True to decode as AMF3.
      * class_def_mapper - amfast.class_def.ClassDefMapper - The object that retrieves ClassDef objects.
-
     """ 
 
     def __init__(self, amf3=False, class_def_mapper=None):
