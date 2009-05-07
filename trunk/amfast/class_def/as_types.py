@@ -48,7 +48,7 @@ class AsNoProxy(object):
         self.source = source
 
 class AsError(amfast.AmFastError):
-    """Equivalent to: 'Error' in AS3."""
+    """Equivalent to: 'Error' in AS."""
 
     APPLICATION_ERROR = 5000
 

@@ -28,7 +28,7 @@ class_def.assign_attrs(FaultError, 'mx.rpc.Fault',
         'faultString', 'faultDetail', 'rootCause', 'content'), True)
 
 class AbstractMessage(object):
-    """Base class for all flex messages."""
+    """Base class for all FlexMessages."""
 
     DESTINATION_CLIENT_ID_HEADER = 'DSDstClientId'
     ENDPOINT_HEADER = 'DSEndpoint'

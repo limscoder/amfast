@@ -11,7 +11,25 @@ import pyamf_converter as pc
 class PyAmfEndpoint(object):
     """An Endpoint that can encode/decode AMF packets with PyAmf.
 
-    See documentation for instructions on mapping custom types.
+    How to configure custom class mapping:
+
+# When using the PyAmfEndpoint,
+# custom type mapping can be configured
+# either through AmFast, or through PyAmf.
+
+# Configure type mapping with AmFast
+class_mapper = ClassDefMapper()
+
+#... map classes ...#
+
+# Use pyamf_converter to automatically map classes
+# from a ClassDefMapper with PyAmf.
+import amfast.remoting.pyamf_converter as pyamf_converter
+pyamf_converter.register_class_mapper(class_mapper)
+
+# Configure type mapping directly with PyAmf.
+# Use the standard PyAmf way of mapping classes.
+pyamf.register_class(klass, 'alias', ....)
     """
 
     def decodePacket(self, raw_packet, *args, **kwargs):

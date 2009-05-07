@@ -3,7 +3,7 @@
 from amfast.remoting.channel import Channel
 
 class WsgiChannel(Channel):
-    """WSGI channel"""
+    """Very basic WSGI channel."""
 
     def __call__(self, environ, start_response):
         if environ['REQUEST_METHOD'] != 'POST':

@@ -21,7 +21,7 @@ def nc_auth(packet, msg, credentials):
 # into CommandMessage methods.
 
 def client_ping(packet, msg, *args):
-    """Respond to a ping request and connect to the channel."""
+    """Respond to a ping request and connect to the Channel."""
     response = msg.response_msg.body
     if (not hasattr(response, 'headers')) or response.headers is None:
         response.headers = {}
@@ -50,7 +50,7 @@ def login_operation(packet, msg, raw_creds):
     connection.setSessionAttr('flex_user', creds[0])
 
 def logout_operation(packet, msg, *args):
-    """RemoteObject style authentication."""
+    """RemoteObject style de-authentication."""
 
     connection = packet.channel.channel_set.getFlexConnection(packet, msg)
     connection.authenticated = False
@@ -86,7 +86,7 @@ def unsubscribe_operation(packet, msg, *args):
             headers.get(command.SELECTOR_HEADER, None))
 
 def disconnect_operation(packet, msg, *args):
-    """Respond to a disconnect operation."""
+    """Respond to a disconnect operation. Disconnects current Connection."""
     command = msg.body[0]
     headers = command.headers
 
@@ -96,7 +96,7 @@ def disconnect_operation(packet, msg, *args):
     del response.headers[response.FLEX_CLIENT_ID]
 
 def poll_operation(packet, msg, *args):
-    """Respond to a poll operation."""
+    """Respond to a poll operation. Returns queued messages."""
     command = msg.body[0]
     headers = command.headers
 

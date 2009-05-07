@@ -17,7 +17,15 @@ class SecurityError(ChannelError):
     pass
 
 class Subscription(object):
-    """An individual subscription to a topic."""
+    """An MessageAgent's subscription to a topic.
+
+    attributes
+    ===========
+     * connection - Connection, the connection the Subscription belongs to.
+     * client_id - string, the MessageAgent's clientId.
+     * topic - string, the name of the topic subscribed to. The
+         topic string also contains the sub-topic.
+    """
 
     def __init__(self, connection, client_id, topic):
         self.connection = connection
@@ -25,7 +33,17 @@ class Subscription(object):
         self.topic = topic
 
 class Connection(object):
-    """A client connection to a Channel. This class acts like a session."""
+    """A client connection to a Channel.
+    This class acts like a session.
+    Unique to a Flex client.
+
+    attributes
+    ===========
+     * channel - Channel, read-only, The Channel this connection uses.
+     * flex_client_id - string, read-only, The Flex client id is unique to a Flex client.
+     * last_active - int, epoch time when Connection was last accessed.
+     * authenticated - boolean, True if Connection has been authenticated. 
+    """
 
     def __init__(self, flex_client_id, channel):
         self._flex_client_id = flex_client_id # Unique for each Flex client.
@@ -73,9 +91,21 @@ class Connection(object):
     authenticated = property(_getAuthenticated, _setAuthenticated)
 
     def hasSessionAttr(self, attr):
+        """Returns True if session attribute is present.
+
+        arguments
+        ==========
+         * attr - string, name of the attribute to query.
+        """
         return attr in self.session_attrs
 
     def getSessionAttr(self, attr):
+        """Get the value of a session attribute.
+ 
+        arguments
+        ==========
+         * attr - string, name of attribute to retrieve.
+        """
         lock = threading.RLock()
         lock.acquire()
         try:
@@ -84,6 +114,13 @@ class Connection(object):
             lock.release()
 
     def delSessionAttr(self, attr):
+        """Remove a session attribute.
+
+        arguments
+        ==========
+         * attr - string, name of attribute to remove.
+        """
+
         lock = threading.RLock()
         lock.acquire()
         try:
@@ -93,6 +130,14 @@ class Connection(object):
             lock.release()
 
     def setSessionAttr(self, attr, val):
+        """Set a session attribute.
+
+        arguments
+        ==========
+         * attr - string, name of attribute to set.
+         * val - object, value to set.
+        """
+
         lock = threading.RLock()
         lock.acquire()
         try:
@@ -105,9 +150,11 @@ class Connection(object):
          self.last_active = current_time = int(time.time())
 
     def disconnect(self):
+        """Disconnects this connection."""
         self.channel.disconnect(self.flex_client_id)
 
     def getSubscriptions(self):
+        """Returns a list of subscription objects."""
         subscriptions = []
 
         # Is there a way to make a thread-safe
@@ -123,6 +170,13 @@ class Connection(object):
         return subscriptions
 
     def subscribe(self, client_id, topic):
+        """Subscribe to a topic.
+
+        arguments:
+        ===========
+         * client_id - string, MessageAgent clientId.
+         * topic - string, the topic to subscribe to.
+        """
         subscription = Subscription(self, client_id, topic)
 
         lock = threading.RLock()
@@ -139,6 +193,14 @@ class Connection(object):
         return subscription
 
     def unsubscribe(self, client_id, topic):
+        """Un-Subscribe from a topic.
+
+        arguments:
+        ===========
+         * client_id - string, MessageAgent clientId.
+         * topic - string, the topic to un-subscribe from.
+        """
+
         lock = threading.RLock()
         lock.acquire()
         try:
@@ -162,6 +224,12 @@ class Connection(object):
         return results
 
     def publish(self, msg):
+        """Add a message to the connection's message queu.
+
+        arguments
+        ==========
+         * msg, AbstractMessage, message to publish.
+        """
         lock = threading.RLock()
         lock.acquire()
         try:
@@ -187,7 +255,19 @@ class Connection(object):
             lock.release()
 
 class Channel(object):
-    """An individual channel that can send/recieve messages."""
+    """An individual channel that can send/receive messages.
+
+    attributes
+    ===========
+     * name - string, Channel name.
+     * endpoint - Endpoint, encodes and decodes messages.
+     * max_connections - int, When the number of connections exceeds this number,
+         an exception is raised when new clients attempt to connect. Set to -1
+         for no limit.
+     * connection_class - Connection, The class to use for new connections.
+     * timeout - int, If a Connection's last_active value is < current time - timeout,
+         the Connection will be disconnected.
+    """
 
     CONTENT_TYPE = 'application/x-amf'
 
@@ -210,6 +290,7 @@ class Channel(object):
     channel_set = property(_getChannelSet)
 
     def decode(self, *args, **kwargs):
+        """Decode a raw request."""
         try:
             return self.endpoint.decodePacket(*args, **kwargs)
         except amfast.AmFastError, exc:
@@ -229,6 +310,10 @@ class Channel(object):
     def connect(self, flex_client_id):
         """Add a client connection to this channel.
 
+        arguments
+        ==========
+         * flex_client_id - string, Flex client id.
+
         Returns Connection
         """
         if self.max_connections > -1 and len(self._connections) >= self.max_connections:
@@ -240,12 +325,27 @@ class Channel(object):
         return connection
 
     def disconnect(self, flex_client_id):
-        """Remove a client connection from this Channel."""
+        """Remove a client connection from this Channel.
+
+        arguments
+        ==========
+         * flex_client_id - string, Flex client id.
+        """
         self.channel_set.disconnect(flex_client_id)
 
 class ChannelSet(object):
-    """A client can access the same RPC exposed methods
-    from any of the channels in the ChannelSet.
+    """A collection of Channels.
+
+    A client can access the same RPC exposed methods
+    from any of the Channels contained in a ChannelSet.
+
+    A Channel can only belong to 1 ChannelSet.
+
+    attributes
+    ===========
+     * service_mapper - ServiceMapper, maps destinations to Targets.
+     * message_agent - MessageAgent, handles Producer/Consumer messages.
+     * clean_freq - int, number of seconds between inactive Connection/Message cleaning.
     """
 
     def __init__(self, service_mapper=None, message_agent=None, clean_freq=300):
@@ -268,12 +368,27 @@ class ChannelSet(object):
         return self._channels.itervalues()
 
     def checkCredentials(self, user, password):
+        """Determines if credentials are valid.
+
+        arguments
+        ==========
+         * user - string, username.
+         * password - string, password.
+
+        Returns True if credentials are valid.
+        Raises SecurityError if credentials are invalid.
+        """
         raise SecurityError('Authentication not implemented.');
 
     def generateId(self):
+        """Generates a unique ID for Flex clients or MessageAgent clients.
+
+        Returns string.
+        """
         return str(uuid.uuid4())
 
     def addConnection(self, connection):
+        """Add a connection to the ChannelSet."""
         lock = threading.RLock()
         lock.acquire()
         try:
@@ -282,6 +397,12 @@ class ChannelSet(object):
             lock.release()
 
     def getConnection(self, flex_client_id):
+        """Retrieve an existing connection.
+
+        arugments
+        ==========
+         * flex_client_id - string, id of client to get connection for.
+        """
         current_time = int(time.time())
 
         lock = threading.RLock()
@@ -309,7 +430,12 @@ class ChannelSet(object):
         return connection
 
     def disconnect(self, flex_client_id):
-        """Remove a client connection from this ChannelSet."""
+        """Remove a client connection from this ChannelSet.
+
+        arugments
+        ==========
+         * flex_client_id - string, id of client to get connection for.
+        """
         lock = threading.RLock()
         lock.acquire()
         try:
@@ -326,9 +452,14 @@ class ChannelSet(object):
             lock.release()
 
     def getFlexConnection(self, packet, msg):
-        """Returns a connection object for a Flex message.
+        """Returns a Connection object for a Flex message.
 
-        Creates a new connection if one does not already exist.
+        Creates a new Connection if one does not already exist.
+
+        arguments
+        ==========
+         * packet - Packet, request Packet.
+         * msg - Message, request Message.
         """
         flex_msg = msg.body[0]
         try:
@@ -346,7 +477,13 @@ class ChannelSet(object):
             return self.flexConnect(packet, msg)
 
     def flexConnect(self, packet, msg):
-        """Creates a new connection object and returns it."""
+        """Creates a new Connection object and returns it.
+
+        arguments
+        ==========
+         * packet - Packet, request Packet.
+         * msg - Message, request Message.
+        """
         flex_msg = msg.body[0]
 
         if not hasattr(flex_msg, 'headers') or flex_msg.headers is None:
@@ -365,6 +502,12 @@ class ChannelSet(object):
         return connection
 
     def mapChannel(self, channel):
+        """Add a Channel to the ChannelSet
+
+        arguments
+        ==========
+         * channel - Channel, the channel to add.
+        """
         lock = threading.RLock()
         lock.acquire()
         try:
@@ -374,6 +517,12 @@ class ChannelSet(object):
             lock.release()
 
     def unMapChannel(self, channel):
+        """Removes a Channel to the ChannelSet
+
+        arguments
+        ==========
+         * channel - Channel, the channel to remove.
+        """
         lock = threading.RLock()
         lock.acquire()
         try:
@@ -384,6 +533,13 @@ class ChannelSet(object):
             lock.release()
 
     def getChannel(self, name):
+        """Retrieves a Channel from the ChannelSet
+
+        arguments
+        ==========
+         * name - string, the name of the Channel to retrieve.
+        """
+
         lock = threading.RLock()
         lock.acquire()
         try:
@@ -393,6 +549,12 @@ class ChannelSet(object):
         return channel
 
     def clean(self):
+        """Remove inactive Connections and Messages.
+
+        Spins a new thread to do the work, but only
+        if the last clean() was performed before
+        self.clean_freq.
+        """
         current_time = int(time.time())
         cutoff = current_time - self.clean_freq
         if self._last_cleaned < cutoff:
@@ -401,6 +563,7 @@ class ChannelSet(object):
             t.start()
 
     def _clean(self, current_time):
+        """Implementation for self.clean()."""
         for connection in self._connections.values():
             cutoff = current_time - connection.channel.timeout
             if connection.last_active < cutoff:

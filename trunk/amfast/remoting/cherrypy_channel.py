@@ -6,6 +6,7 @@ from amfast.remoting.channel import Channel
 
 def amfhook():
     """Checks for POST, and stops cherrypy from processing the body."""
+
     cherrypy.request.process_request_body = False
     cherrypy.request.show_tracebacks = False
 
@@ -14,7 +15,7 @@ def amfhook():
 cherrypy.tools.amfhook = cherrypy.Tool('before_request_body', amfhook, priority=0)
 
 class CherryPyChannel(Channel):
-    """An AMF RPC channel that can be used with CherryPy."""
+    """An AMF RPC channel that can be used with CherryPy HTTP framework."""
     @cherrypy.expose
     @cherrypy.tools.amfhook()
     def processMsg(self):

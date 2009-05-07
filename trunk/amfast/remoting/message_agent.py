@@ -5,7 +5,12 @@ import threading
 import amfast.remoting.flex_messages as messaging
 
 class MessageAgent(object):
-    """Publishes messages."""
+    """Receives and publishes Producer/Consumer style messages.
+
+    attributes
+    ===========
+     * secure - bool, Set to True to require pulishers and subscribers to be authenticated.
+    """
 
     SUBTOPIC_SEPARATOR = "_;_"
 
@@ -16,7 +21,15 @@ class MessageAgent(object):
 
     def subscribe(self, connection, client_id, topic,
         sub_topic=None, selector=None):
-        """Subscribe a client to a topic and channel."""
+        """Subscribe a client to a topic.
+
+        arguments
+        ==========
+         * connection - Connection, Connection that is subscribing.
+         * client_id - string, MessageAgent clientId.
+         * topic - string, Topic to subscribe to.
+         * sub_topic - string, Sub-Topic to subscribe to. Default = None.
+        """
 
         if sub_topic is not None:
             topic = self.SUBTOPIC_SEPARATOR.join((topic, sub_topic))
@@ -36,7 +49,15 @@ class MessageAgent(object):
 
     def unsubscribe(self, connection, client_id, topic,
         sub_topic=None, selector=None, _disconnect=False):
-        """Un-Subscribe a client from a topic."""
+        """Un-Subscribe a client from a topic.
+
+        arguments
+        ==========
+         * connection - Connection, Connection that is subscribing.
+         * client_id - string, MessageAgent clientId.
+         * topic - string, Topic to un-subscribe from.
+         * sub_topic - string, Sub-Topic to un-subscribe from. Default = None.
+        """
 
         if sub_topic is not None:
             topic = self.SUBTOPIC_SEPARATOR.join((topic, sub_topic))
@@ -61,10 +82,10 @@ class MessageAgent(object):
 
         arguments:
         ===========
-        body - AbstractMessage or object.
+        body - AbstractMessage or any Python object.
         topic - string, the topic to publish to.
         sub_topic - string, the sub topic to publish to. Default = None
-        client_id - string, if provided, only publish to specific client. Default = None
+        client_id - string, if provided, only publish to specific MessageAgent client. Default = None
         ttl - int time to live in secoded. Default = 600
         """
 

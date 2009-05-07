@@ -5,7 +5,13 @@ from amfast.encoder import Encoder
 from amfast.decoder import Decoder
 
 class AmfEndpoint(object):
-    """An Endpoint that can encode/decode AMF packets"""
+    """An Endpoint that can encode/decode AMF packets.
+
+    arguments
+    ==========
+     * encoder - amfast.encoder.Encoder, object used to encode AMF Packets.
+     * decoder - amfast.decoder.Decoder, object used to decode AMF Packets.
+    """
 
     def __init__(self, encoder=None, decoder=None):
         if encoder is None:
