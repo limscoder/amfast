@@ -42,24 +42,34 @@ class SaClassDef(class_def.ClassDef):
 
         if static_attrs is None:
             static_attrs = ()
+        self.unmapped_attrs = static_attrs
+
+        self.mapped_attrs = []
+        for prop in self.mapper.iterate_properties:
+            self.mapped_attrs.append(prop.key)
+
+        # Check for duplicates
+        for attr in self.mapped_attrs:
+            if attr in self.unmapped_attrs:
+                raise class_def.ClassDefError("Mapped attributes cannot be listed in the static_attrs argument.")
 
         combined_attrs = [self.KEY_ATTR, self.LAZY_ATTR]
-        combined_attrs.extend(static_attrs)
-        for prop in self.mapper.iterate_properties:
-            if not prop.key in combined_attrs:
-                combined_attrs.append(prop.key)
+        combined_attrs.extend(self.mapped_attrs)
+        combined_attrs.extend(self.unmapped_attrs)
 
         class_def.ClassDef.__init__(self, class_, alias=alias,
             static_attrs=combined_attrs, amf3=amf3, encode_types=encode_types,
             decode_types=decode_types)
 
     def getStaticAttrVals(self, obj):
+        # Set key and lazy
         lazy_attrs = []
         vals = [self.mapper.primary_key_from_instance(obj), lazy_attrs]
 
-        attr_count = len(self.static_attrs)
-        for i in xrange(2, attr_count):
-            attr = self.static_attrs[i]
+        # Set mapped values
+        attr_count = len(self.mapped_attrs)
+        for i in xrange(0, attr_count):
+            attr = self.mapped_attrs[i]
  
             # Look at __dict__ directly,
             # otherwise SA will touch the attr
@@ -70,6 +80,9 @@ class SaClassDef(class_def.ClassDef):
                 # This attr is lazy
                 vals.append(None)
                 lazy_attrs.append(attr)
+
+        # Set un-mapped values
+        vals.extend([getattr(obj, attr, None) for attr in self.unmapped_attrs])
 
         return vals
 
