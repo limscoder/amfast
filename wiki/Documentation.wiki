@@ -1,6 +1,6 @@
 #summary Documentation
 
-= Version 0.3.* Documentation =
+= Version 0.3.`*` Documentation =
  * MessagingServer
  * EncodeAndDecode
  * ActionScriptCodeGeneration
