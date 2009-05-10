@@ -1,6 +1,6 @@
 #summary PyAmf example.
 
-= PyAmf Example =
+= !PyAmf Example =
 
 This example demonstrates using [http://pyamf.org PyAmf] to encode/decode objects.
 
