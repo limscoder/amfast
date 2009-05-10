@@ -1,5 +1,6 @@
 """Channels that can be used with WSGI."""
 
+from amfast import AmFastError
 from amfast.remoting.channel import Channel
 
 class WsgiChannel(Channel):
