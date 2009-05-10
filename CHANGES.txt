@@ -11,7 +11,7 @@ remoting
  * Built in Channels for CherryPy, Twisted Web, and straight-up WSGI.
  * Easy to configure authentication for NetConnection and RemoteObject.
  * Connection objects hold session attributes tied to Flex client id.
- * Customizeable Endpoints to encode/decode messages with external encoding/decoding libraries.
+ * Customizable Endpoints to encode/decode messages with external encoding/decoding libraries.
  * PyAmfEndpoint to encode/decode messages with pure Python, with no C compiler dependencies.
 
 encode/decode
