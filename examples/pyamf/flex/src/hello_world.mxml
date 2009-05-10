@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Application xmlns:mx="http://www.adobe.com/2006/mxml">
+	<mx:Panel width="400" height="200"
+		title="Flex -- AmFast -- HelloWorld Example">
+		<mx:Form width="100%">
+			<mx:FormItem label="remoting url:" width="100%">
+				<mx:TextInput
+					id="remotingUrl"
+					text="http://localhost:8000/amf"
+					width="100%"/>
+			</mx:FormItem>
+			
+			<mx:FormItem label="input:"
+				width="100%"
+				toolTip="Input to send to the server.">
+				<mx:TextInput id="serverInput"
+					width="100%" text="Hello World!"/>
+			</mx:FormItem>
+			
+			<mx:FormItem label="connection:"
+				width="100%"
+				toolTip="Connection type to use.">
+				<mx:HBox width="100%">
+					<mx:RadioButton
+						id="netConnectionType"
+						label="NetConnection"
+						groupName="roType"
+						selected="true" />
+					
+					<mx:RadioButton
+						id="remoteObjectType"
+						label="RemoteObject"
+						groupName="roType" />
+				</mx:HBox>
+			</mx:FormItem>
+		</mx:Form>
+		
+		<mx:HBox width="100%" horizontalAlign="center">
+			<mx:Button
+				label="Submit"
+				click="submit()"
+				toolTip="Send input to server." />
+			<mx:Button
+				label="Raise Exception"
+				click="raiseException()"
+				toolTip="Raise an exception on the server." />
+		</mx:HBox>
+	</mx:Panel>
+	
+	<mx:Script>
+		<![CDATA[
+			import flash.net.Responder;
+
+			import mx.collections.ItemResponder;
+			import mx.controls.Alert;
+			import mx.messaging.ChannelSet;
+			import mx.messaging.channels.AMFChannel;
+			import mx.rpc.AsyncToken;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			import mx.rpc.events.*;
+
+			protected var nc:NetConnection;
+			protected var ncUrl:String;
+			protected var ro:RemoteObject;
+			protected var roUrl:String;
+			
+			/**
+			 * Create a NetConnection with url from user input.
+			 */
+			protected function getNetConnection():NetConnection
+			{
+				if (remotingUrl.text == ncUrl && nc != null) {
+					// If a NetConnection already exists
+					// and the user has not changed the 
+					// URL, then return the existing nc
+					return nc;
+				}
+				
+				// Create the NetConnection
+				ncUrl = remotingUrl.text;
+				nc = new NetConnection();
+				nc.connect(ncUrl);
+				
+				return nc;
+			}
+			
+			/**
+			 * Create a RemoteObject with url from user input.
+			 */
+			protected function getRemoteObject():RemoteObject
+			{
+				if (remotingUrl.text == roUrl && ro != null) {
+					// If a RemotObject already exists
+					// and the user has not changed the 
+					// URL, then return the existing ro
+					return ro;
+				}
+				
+				// Create the AMF Channel
+				roUrl = remotingUrl.text;
+				var channel:AMFChannel = new AMFChannel("amf-channel", roUrl);
+
+				// Create a channel set and add your channel(s) to it
+				var channels:ChannelSet = new ChannelSet();
+				channels.addChannel(channel);
+
+				// Create a new remote object
+				ro = new RemoteObject("ExampleService");
+				ro.showBusyCursor = true;
+				ro.channelSet = channels;
+				
+				return ro;
+			}
+			
+			/**
+			 * Send input to server.
+			 */
+			protected function submit():void
+			{
+				if (remoteObjectType.selected) {
+					submitRo();
+				} else if (netConnectionType.selected) {
+					submitNc();
+				}
+			}
+			
+			/**
+			 * Invoke using NetConnection.
+			 */
+			protected function submitNc():void
+			{
+				var netConnection:NetConnection = getNetConnection();
+				var responder:Responder = new Responder(onResult, onFault);
+				
+				netConnection.call("ExampleService.echo", responder, serverInput.text);
+			}
+			
+			/**
+			 * Handle a NetConnection result.
+			 */
+			protected function onResult(result:*):void
+			{
+				Alert.show(String(result), "Got Result:");
+			}
+			
+			/**
+			 * Handle a NetConnection fault.
+			 */
+			protected function onFault(fault:*):void
+			{
+				Alert.show(String(fault.message), "Error:");
+			}
+			
+			/**
+			 * Invoke using RemoteObject.
+			 */
+			protected function submitRo():void
+			{
+				var remoteObj:RemoteObject = getRemoteObject();
+				var token:AsyncToken = remoteObj.echo(serverInput.text);
+				
+				token.addResponder(new ItemResponder(submitData_resultHandler,
+					submitData_faultHandler, token));
+			}
+			
+			/**
+			 * Handle a RemoteObject result.
+			 */
+			protected function submitData_resultHandler(event:ResultEvent,
+				token:AsyncToken):void
+			{
+				Alert.show(String(event.result), "Got Result:");
+			}
+			
+			/**
+			 * Handle a RemoteObject fault.
+			 */
+			protected function submitData_faultHandler(event:FaultEvent,
+				token:AsyncToken):void
+			{
+				Alert.show(String(event.fault.faultString), "Error:");
+			}
+			
+			/**
+			 * Raise an exception on the server side.
+			 */
+			protected function raiseException():void
+			{
+				if (remoteObjectType.selected) {
+					raiseExcRo();
+				} else if (netConnectionType.selected) {
+					raiseExcNc();
+				}
+			}
+			
+			/**
+			 * Raise an exception on the server side.
+			 * using a RemoteObject.
+			 */
+			protected function raiseExcRo():void
+			{
+				var remoteObj:RemoteObject = getRemoteObject();
+				var token:AsyncToken = remoteObj.raiseException();
+				
+				token.addResponder(new ItemResponder(submitData_resultHandler,
+					submitData_faultHandler, token));
+			}
+			
+			/**
+			 * Raise an exception on the server side.
+			 * using a NetConnection.
+			 */
+			protected function raiseExcNc():void
+			{
+				var netConnection:NetConnection = getNetConnection();
+				var responder:Responder = new Responder(onResult, onFault);
+				
+				netConnection.call("ExampleService.raiseException", responder);
+			}
+		]]>
+	</mx:Script>
+</mx:Application>

@@ -3,10 +3,16 @@ import uuid
 import time
 
 import amfast
-from amfast.decode import decode
 from amfast import class_def, remoting
 from amfast.class_def.as_types import AsError
 from amfast.remoting.channel import SecurityError
+
+try:
+    # Use decode module if available.
+    # Users may be using PyAmf instead.
+    from amfast.decode import decode
+except ImportError:
+    pass
 
 class FlexMessageError(remoting.RemotingError):
     """Errors raised by this module."""

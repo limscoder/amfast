@@ -1,6 +1,9 @@
 import os
 from setuptools import setup, find_packages, Feature
 
+from ez_setup import use_setuptools
+use_setuptools()
+
 from distutils.core import setup, Extension
 from distutils.command.build_ext import build_ext
 
@@ -34,6 +37,9 @@ setup(name="AmFast",
     test_suite = "tests.suite",
     packages = ['amfast', 'amfast.class_def', 'amfast.remoting'],
     features = {'extensions': extensions},
+    install_requires = {
+        'uuid': 'uuid>=1.3.0'
+    },
     classifiers = [
         "Programming Language :: Python :: 2.4",
         "Programming Language :: Python :: 2.5",
