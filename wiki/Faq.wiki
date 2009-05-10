@@ -5,7 +5,7 @@
 === How do I get the encoder/decoder extensions to compile in Windows? ===
  * This answer was provided by Warlei in a comment on my [http://limscoder.blogspot.com/2009/03/amfast-022-released.html#comments blog].
 
-There is a easy way to compile amfast on a windows box. Follow these steps:
+There is an easy way to compile amfast on a windows box. Follow these steps:
 
 1- Download and install MinGW. http://sourceforge.net/project/showfiles.php?group_id=2435
 
@@ -13,6 +13,4 @@ There is a easy way to compile amfast on a windows box. Follow these steps:
 
 3 - Download and unpack amfast source code from !PyPi
 
-3 - In the directory you've unpacked amfast type: "python setup.py build -c mingw32" and then "python setup.py install"
-
-I done this in a Windows Vista box with python 2.5.4 and other with python 2.6.1 and I had success on both cases.
+4 - In the directory you've unpacked amfast type: "python setup.py build -c mingw32" and then "python setup.py install"
