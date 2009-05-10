@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<!DOCTYPE cross-domain-policy 
+  SYSTEM "http://www.macromedia.com/xml/dtds/cross-domain-policy.dtd">
+<!--This file specifies which flash hosting domains can access remote
+resources located on this server-->
+<cross-domain-policy>
+  <!--Allow access from all.-->
+  <allow-access-from domain="*" ports="*"/>
+</cross-domain-policy>
