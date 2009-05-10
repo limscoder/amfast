@@ -1,8 +1,6 @@
 #summary Documentation
 
-NOTE: This documentation is for version 0.3.0, which will be released sometime within the next week, in the meantime, you can get 0.3.0 from the SVN Trunk.
-
-= Documentation =
+= Version 0.3.* Documentation =
  * MessagingServer
  * EncodeAndDecode
  * ActionScriptCodeGeneration
