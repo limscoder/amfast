@@ -25,7 +25,7 @@ extensions = Feature(
     ])
 
 setup(name="AmFast",
-    version = "0.3.0",
+    version = "0.3.1",
     description = "Flash remoting framework. Includes support for NetConnection, RemoteObject, IExternizeable, custom type serialization, and a C-based AMF encoder/decoder.",
     url = "http://code.google.com/p/amfast/",
     author = "Dave Thompson",
@@ -35,7 +35,7 @@ setup(name="AmFast",
     keywords = "amf amf0 amf3 flash flex pyamf",
     platforms = ["any"],
     test_suite = "tests.suite",
-    packages = ['amfast', 'amfast.class_def', 'amfast.remoting', 'ez_setup.py'],
+    packages = ['amfast', 'amfast.class_def', 'amfast.remoting', '.'],
     features = {'extensions': extensions},
     install_requires = {
         'uuid': 'uuid>=1.3.0'
