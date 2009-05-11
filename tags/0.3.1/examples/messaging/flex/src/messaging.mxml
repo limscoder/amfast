@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Application xmlns:mx="http://www.adobe.com/2006/mxml">
+	<mx:Panel width="100%" height="100%"
+		title="Flex -- AmFast -- Producer Consumer Example">
+		<mx:HBox width="100%">
+			<mx:Form>
+				<mx:FormItem label="messaging url:">
+					<mx:TextInput
+						id="messagingUrl"
+						text="http://localhost:8000/amf"
+						width="400"/>
+				</mx:FormItem>
+				
+				<mx:FormItem label="message to publish:">
+					<mx:TextInput
+						id="publishInput"
+						toolTip="Enter a message to publish."
+						text="Hello World!"
+						width="400"/>
+				</mx:FormItem>
+			</mx:Form>
+			
+			<mx:VRule />
+			
+			<mx:Form>
+				<mx:FormItem width="100%">
+					<mx:Button
+						label="Subscribe"
+						click="subscribeMessaging()"
+						toolTip="Subscribe to messages."
+						width="100%"/>
+				</mx:FormItem>
+				
+				<mx:FormItem width="100%">
+					<mx:Button
+						label="UnSubscribe"
+						click="unSubscribeMessaging()"
+						toolTip="UnSubscribe from messages."
+						width="100%"/>
+				</mx:FormItem>
+				
+				<mx:FormItem width="100%">
+					<mx:Button
+						id="publishBtn"
+						label="Publish"
+						click="publishMessage()"
+						toolTip="Publish a message."
+						enabled="false"
+						width="100%"/>
+				</mx:FormItem>
+			</mx:Form>
+		</mx:HBox>
+		
+		<mx:Label text="messages:" />
+		
+		<mx:List
+			id="msgList"
+			width="100%"
+			height="100%"
+			dataProvider="{messages}" />
+	</mx:Panel>
+	
+	<mx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.messaging.Consumer;
+			import mx.messaging.Producer;
+			import mx.messaging.ChannelSet;
+			import mx.messaging.channels.AMFChannel;
+			import mx.messaging.events.MessageEvent;
+			import mx.messaging.events.MessageFaultEvent;
+			import mx.messaging.messages.AsyncMessage;
+
+			protected var consumers:Object;
+			protected var serverUrl:String;
+			protected var producers:Object;
+			
+			[Bindable]
+			protected var messages:ArrayCollection = new ArrayCollection();
+			
+			/**
+			 * Create a message Consumer with url from user input.
+			 */
+			public function getConsumer(destination:String):Consumer
+			{
+				if (consumers == null) {
+					consumers = {};
+				}
+				
+				if (messagingUrl.text == serverUrl &&
+					consumers.hasOwnProperty(destination)) {
+					// Use existing consumer
+					return consumers[destination];
+				}
+				
+				var consumer:Consumer = new Consumer();
+				consumer.destination = destination;
+				consumers[destination] = consumer;
+				
+				// Create the AMF Channel
+				serverUrl = messagingUrl.text;
+				var channel:AMFChannel = new AMFChannel("amf-polling-channel", serverUrl);
+
+				// Create a channel set and add your channel(s) to it
+				var channels:ChannelSet = new ChannelSet();
+				channels.addChannel(channel);
+				consumer.channelSet = channels;
+					
+				return consumer;
+			}
+			
+			/**
+			 * Create a message Producer with url from user input.
+			 */
+			public function getProducer(destination:String):Producer
+			{
+				if (producers == null) {
+					producers = {};
+				}
+				
+				if (messagingUrl.text == serverUrl &&
+					producers.hasOwnProperty(destination)) {
+					// Use existing producer
+					return producers[destination];
+				}
+				
+				var producer:Producer = new Producer();
+				producer.destination = destination;
+				producers[destination] = producer;
+				
+				// Use the ChannelSet that was already created
+				// for the Consumer.
+				var consumer:Consumer = getConsumer(destination);
+				producer.channelSet = consumer.channelSet;
+				
+				return producer;
+			}
+			
+			/**
+			 * Subscribe to the 'messages' topic.
+			 */
+			protected function subscribeMessaging():void
+			{
+				var consumer:Consumer = getConsumer('messages');
+				consumer.addEventListener(MessageEvent.MESSAGE,
+					lastMsgMsgHandler, false, 0 , true);
+				consumer.addEventListener(MessageFaultEvent.FAULT,
+					faultHandler, false, 0, true);
+				consumer.subscribe();
+				
+				publishBtn.enabled = true;
+			}
+			
+			protected function unSubscribeMessaging():void
+			{
+				var consumer:Consumer = getConsumer('messages');
+				if (consumer.subscribed) {
+					consumer.unsubscribe();
+				}
+				
+				publishBtn.enabled = false;
+			}
+			
+			/**
+			 * Handle an incoming message.
+			 */
+			protected function lastMsgMsgHandler(event:MessageEvent):void
+			{
+				messages.addItem(String(event.message.body));
+			}
+			
+			/**
+			 * Handle a failed message.
+			 */ 
+			protected function faultHandler(event:MessageFaultEvent):void
+			{
+				Alert.show(event.faultString, 'Message Fault',
+					Alert.OK, this, null, null);
+			}
+			
+			/**
+			 * Publish a message.
+			 */
+			protected function publishMessage():void
+			{
+				var producer:Producer = Application.application.getProducer('messages');
+				var msg:AsyncMessage = new AsyncMessage();
+				msg.body = publishInput.text;
+				producer.send(msg);
+			}
+		]]>
+	</mx:Script>
+</mx:Application>
