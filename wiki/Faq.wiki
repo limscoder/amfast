@@ -4,6 +4,7 @@
 
 === How do I get the encoder/decoder extensions to compile in Windows? ===
  * This answer was provided by Warlei in a comment on my [http://limscoder.blogspot.com/2009/03/amfast-022-released.html#comments blog].
+ * It should work with Python 2.5 and 2.6.
 
 There is an easy way to compile amfast on a windows box. Follow these steps:
 
