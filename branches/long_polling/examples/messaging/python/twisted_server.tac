@@ -12,6 +12,9 @@ from amfast.remoting.twisted_channel import TwistedChannel
 
 import utils
 
+# Uncomment this to see debug messages
+#amfast.log_debug = True
+
 # Setup domain 
 root = vhost.NameVirtualHost()
 root.default = static.File("../flex/deploy")

@@ -278,7 +278,7 @@ class Channel(object):
 
     def __init__(self, name, max_connections=-1, endpoint=None,
         timeout=1800, connection_class=Connection, wait_interval=0,
-        check_interval=1, max_interval=120):
+        check_interval=1, max_interval=90):
         self.name = name
         self.max_connections = max_connections
         self.connection_class = connection_class
@@ -324,7 +324,7 @@ class Channel(object):
         except amfast.AmFastError, exc:
             return request.fail(exc)
 
-    def waitForMessage(self, connection):
+    def waitForMessage(self, packet, message, connection):
         """Waits for a new message.
 
         This is blocking, and should only be used

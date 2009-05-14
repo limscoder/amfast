@@ -29,6 +29,6 @@ class CherryPyChannel(Channel):
         cherrypy.response.headers['Content-Type'] = self.CONTENT_TYPE
         return self.encode(response)
 
-    def waitForMessage(self, connection):
+    def waitForMessage(self, packet, message, connection):
         cherrypy.request.timeout = 1000000
-        Channel.waitForMessage(self, connection)
+        Channel.waitForMessage(self, packet, message, connection)
