@@ -27,12 +27,13 @@ class WsgiChannel(Channel):
 
         try:
             content = self.invoke(request_packet)
+            response = self.encode(content)
         except (KeyboardInterrupt, SystemExit):
             raise
         except:
             return self.badServer(start_response, "AMF server error.")
 
-        return self.getResponse(start_response, content)
+        return self.getResponse(start_response, response)
 
     def getResponse(self, start_response, response):
         start_response('200 OK', [

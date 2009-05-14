@@ -1,3 +1,5 @@
+from twisted.internet import threads
+from twisted.web import server
 from twisted.web.resource import Resource
 
 from amfast.remoting.channel import Channel
@@ -18,8 +20,16 @@ class TwistedChannel(Resource, Channel):
             else:
                 raw_request = request.content
 
-            response = self.invoke(self.decode(raw_request))
-            request.setHeader('Content-Type', self.CONTENT_TYPE)
-            return response
-        else:
-            raise Exception("No content")
+            threads.deferToThread(self._processMsg, request, raw_request).addCallback(self._finish)
+            return server.NOT_DONE_YET
+
+    def _processMsg(self, request, raw_request):
+        response = self.invoke(self.decode(raw_request))
+        return (request, self.encode(response))
+
+    def _finish(self, data):
+        request = data[0]
+        request.setHeader('Content-Type', self.CONTENT_TYPE)
+        request.write(data[1])
+        request.finish()
+

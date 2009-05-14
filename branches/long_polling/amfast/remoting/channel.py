@@ -213,15 +213,14 @@ class Connection(object):
 
     def poll(self):
         """Returns all current messages and empties que."""
-        lock = threading.RLock()
-        lock.acquire()
-        try:
-             results = self._messages
-             self._messages = []
-        finally:
-            lock.release()
-
+        # This should be atomic right???
+        results = self._messages
+        self._messages = []
         return results
+
+    def hasMessages(self):
+        """Returns True if messages are present."""
+        return len(self._messages) > 0
 
     def publish(self, msg):
         """Add a message to the connection's message queu.
@@ -267,15 +266,25 @@ class Channel(object):
      * connection_class - Connection, The class to use for new connections.
      * timeout - int, If a Connection's last_active value is < current time - timeout,
          the Connection will be disconnected.
+     * wait_interval - int, Number of seconds to wait before sending response to client
+         when a polling request is received set to -1 for a long-polling channel.
+     * check_interval - int or float, Number of seconds to wait between message qeue checks
+         when using long-polling.
+     * max_interval - int or float, Maximum number of seconds a long-poll client can
+         stay connected when using long-polling.
     """
 
     CONTENT_TYPE = 'application/x-amf'
 
     def __init__(self, name, max_connections=-1, endpoint=None,
-        timeout=1800, connection_class=Connection):
+        timeout=1800, connection_class=Connection, wait_interval=0,
+        check_interval=1, max_interval=120):
         self.name = name
         self.max_connections = max_connections
         self.connection_class = connection_class
+        self.wait_interval = wait_interval
+        self.check_interval = check_interval
+        self.max_interval = max_interval
         self.timeout = timeout
         if endpoint is None:
             endpoint = AmfEndpoint()
@@ -289,6 +298,15 @@ class Channel(object):
         return self._channel_set
     channel_set = property(_getChannelSet)
 
+    def encode(self, *args, **kwargs):
+        """Encode a packet."""
+        try:
+            return self.endpoint.encodePacket(*args, **kwargs)
+        except amfast.AmFastError, exc:
+            # Not much we can do if packet is not decoded properly
+            amfast.log_exc()
+            raise exc
+
     def decode(self, *args, **kwargs):
         """Decode a raw request."""
         try:
@@ -301,11 +319,23 @@ class Channel(object):
     def invoke(self, request):
         """Invoke an incoming request packet."""
         try:
-            request.channel = self
-            return self.endpoint.encodePacket(request.invoke())
+            request.channel = self # so user can access channel object
+            return request.invoke()
         except amfast.AmFastError, exc:
-            amfast.log_exc()
-            return self.endpoint.encodePacket(request.fail(exc))
+            return request.fail(exc)
+
+    def waitForMessage(self, connection):
+        """Waits for a new message.
+
+        This is blocking, and should only be used
+        for Channels where each connection is a thread.
+        """
+        total = 0
+        while total < self.max_interval:
+            time.sleep(self.check_interval)
+            total += self.check_interval
+            if connection.hasMessages():
+                return
 
     def connect(self, flex_client_id):
         """Add a client connection to this channel.

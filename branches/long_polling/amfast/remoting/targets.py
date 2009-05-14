@@ -6,6 +6,8 @@ from amfast.remoting.flex_messages import CommandMessage
 from amfast.remoting.channel import ChannelError, SecurityError
 from amfast.remoting.endpoint import AmfEndpoint
 
+# ---- NetConnection Operations --- #
+
 def nc_auth(packet, msg, credentials):
     """NetConnection style authentication."""
     packet.channel.channel_set.checkCredentials(
@@ -16,9 +18,6 @@ def nc_auth(packet, msg, credentials):
     packet._authenticated = True
 
 # --- CommandMessage Operations --- #
-# TODO:
-# These should probably be made
-# into CommandMessage methods.
 
 def client_ping(packet, msg, *args):
     """Respond to a ping request and connect to the Channel."""
@@ -100,8 +99,16 @@ def poll_operation(packet, msg, *args):
     command = msg.body[0]
     headers = command.headers
 
-    connection = packet.channel.channel_set.getFlexConnection(packet, msg)
+    channel = packet.channel
+    connection = channel.channel_set.getFlexConnection(packet, msg)
+
+    if channel.wait_interval < 0:
+        # Long polling channel!!
+        channel.waitForMessage(connection)
+    elif channel.wait_interval > 0:
+        time.sleep(channel.wait_interval)
     messages = connection.poll()
+
     if isinstance(packet.channel.endpoint, AmfEndpoint):
         # Make sure messages are not encoded as an ArrayCollection
         return AsNoProxy(messages)

@@ -27,4 +27,8 @@ class CherryPyChannel(Channel):
 
         response = self.invoke(self.decode(raw_request))
         cherrypy.response.headers['Content-Type'] = self.CONTENT_TYPE
-        return response
+        return self.encode(response)
+
+    def waitForMessage(self, connection):
+        cherrypy.request.timeout = 1000000
+        Channel.waitForMessage(self, connection)
