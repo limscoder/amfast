@@ -12,20 +12,20 @@ Start the server and point your browser to http://localhost:8000
 
 == !CherryPy ==
 
-Use [http://www.cherrypy.org/ CherryPy] web framework to serve the example contact manager over http with the following command:
+Use [http://www.cherrypy.org/ CherryPy] web framework to serve the example over http with the following command:
 {{{
 python pyamf/python/cp_server.py
 }}}
 
 == Twisted Example ==
-Use [http://twistedmatrix.com/trac/ Twisted] web framework to serve the example contact manager over http with the following command:
+Use [http://twistedmatrix.com/trac/ Twisted] web framework to serve the example over http with the following command:
 {{{
-twistd -noy pyamf/python/cp_server.py
+twistd -noy pyamf/python/twisted_server.tac
 }}}
 
 == WSGI Example ==
 
-Use simple WSGI to serve the example contact manager over http with the following command:
+Use simple WSGI to serve the example over http with the following command:
 {{{
 python pyamf/python/wsgi_server.py
 }}}
