@@ -7,7 +7,7 @@ This example demonstrates using Producer/Consumer messaging with polling and lon
 
 The example is located in SVN within the [http://code.google.com/p/amfast/source/browse/trunk/examples/messaging examples/messaging] directory
 
-The example has scripts for serving the application via [http://www.cherrypy.org/ CherryPy] and [http://twistedmatrix.com/trac/ Twisted Web.
+The example has scripts for serving the application via [http://www.cherrypy.org/ CherryPy] and [http://twistedmatrix.com/trac/ Twisted Web].
 
 Start the server and point your browser to http://localhost:8000
 
