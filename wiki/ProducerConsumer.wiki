@@ -2,35 +2,23 @@
 
 = Producer/Consumer Example =
 
-This example demonstrates using Producer/Consumer messaging.
+This example demonstrates using Producer/Consumer messaging with polling and long-polling.
 
 The example is located in SVN within the [http://code.google.com/p/amfast/source/browse/trunk/examples/messaging examples/messaging] directory
 
-The example has scripts for serving the application via [http://www.cherrypy.org/ CherryPy], [http://twistedmatrix.com/trac/ Twisted Web], or WSGI.
+The example has scripts for serving the application via [http://www.cherrypy.org/ CherryPy] and [http://twistedmatrix.com/trac/ Twisted Web.
 
 Start the server and point your browser to http://localhost:8000
 
 == !CherryPy ==
 
-Use [http://www.cherrypy.org/ CherryPy] web framework to serve the example contact manager over http with the following command:
+Use [http://www.cherrypy.org/ CherryPy] web framework and WSGI to serve the example over http with the following command:
 {{{
 python messaging/python/cp_server.py
 }}}
 
 == Twisted Example ==
-Use [http://twistedmatrix.com/trac/ Twisted] web framework to serve the example contact manager over http with the following command:
+Use [http://twistedmatrix.com/trac/ Twisted] web framework to serve the example over http with the following command:
 {{{
-twistd -noy messaging/python/cp_server.py
-}}}
-
-== WSGI Example ==
-
-Use simple WSGI to serve the example contact manager over http with the following command:
-{{{
-python messaging/python/wsgi_server.py
-}}}
-
-The WSGI example does not serve the Flash file, so you will have to manually open the file in your browser:
-{{{
-messaging/flex/deploy/messaging.html
+twistd -noy messaging/python/twisted_server.tac
 }}}
