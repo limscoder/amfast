@@ -1,14 +1,16 @@
-"""Use PyAmf for encoding and decoding"""
+"""Use PyAmf for encoding and decoding."""
 
 import logging
 
 import pyamf
+from pyamf import util as pyamf_util
 import pyamf.remoting
 
 import amfast
+from endpoint import Endpoint
 import pyamf_converter as pc
 
-class PyAmfEndpoint(object):
+class PyAmfEndpoint(Endpoint):
     """An Endpoint that can encode/decode AMF packets with PyAmf.
 
     How to configure custom class mapping:
@@ -33,29 +35,62 @@ pyamf.register_class(klass, 'alias', ....)
     """
 
     def decodePacket(self, raw_packet, *args, **kwargs):
+        if amfast.log_raw:
+            self.logRaw('rawDecodePacket', raw_packet)
+
         context = pyamf.get_context(pyamf.AMF0)
         pyamf_packet = pyamf.remoting.decode(raw_packet, context)
         packet = pc.packet_to_amfast(pyamf_packet)
 
-        if amfast.log_raw:
-            if hasattr(raw_packet, "upper"):
-                # Only print this if raw_packet is a string
-                amfast.logger.debug("<rawRequestPacket>%s</rawRequestPacket>" %
-                    amfast.format_byte_string(raw_packet))
-            amfast.logger.debug("<DecodedPyAmfPacket>%s</DecodedPyAmfPacket>" % pyamf_packet)
+        if amfast.log_debug:
+            amfast.logger.debug("<decodedPyAmfPacket>%s</decodedPyAmfPacket>" % pyamf_packet)
 
         return packet
 
     def encodePacket(self, packet):
-        context = pyamf.get_context(pyamf.AMF0)
         pyamf_packet = pc.packet_to_pyamf(packet)
+        if amfast.log_debug:
+            amfast.logger.debug("<encodedPyAmfPacket>%s</encodedPyAmfPacket" % pyamf_packet)
+
+        context = pyamf.get_context(pyamf.AMF0)
         stream = pyamf.remoting.encode(pyamf_packet, context)
         raw_packet = stream.getvalue()
 
         if amfast.log_raw:
-            amfast.logger.debug("<EncodedPyAmfPacket>%s</EncodedPyAmfPacket" % pyamf_packet)
-            if hasattr(raw_packet, "upper"):
-                amfast.logger.debug("<rawResponsePacket>%s</rawResponsePacket>" %
-                    amfast.format_byte_string(raw_packet))
+            self.logRaw('rawEncodePacket', raw_packet)
 
         return raw_packet
+
+    def decode(self, raw_obj, amf3=False):
+        if amf3 is True:
+            amf_type = pyamf.AMF3
+        else:
+            amf_type = pyamf.AMF0
+
+        context = pyamf.get_context(amf_type)
+        decoder = pyamf.get_decoder(amf_type, raw_obj, context=context)
+        obj = decoder.readElement()
+
+        if amfast.log_raw:
+            self.logRaw('rawDecodeObject', raw_obj)
+
+        return obj
+
+    def encode(self, obj, amf3=False):
+        if amf3 is True:
+            amf_type = pyamf.AMF3
+        else:
+            amf_type = pyamf.AMF0
+
+        stream = pyamf_util.BufferedByteStream()
+
+        context = pyamf.get_context(amf_type)
+        encoder = pyamf.get_encoder(amf_type, stream, context=context)
+        encoder.writeElement(obj)
+
+        raw_obj = stream.getvalue()
+
+        if amfast.log_raw:
+            self.logRaw('rawEncodeObject', raw_obj)
+
+        return raw_obj

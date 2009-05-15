@@ -2,16 +2,16 @@ from twisted.internet import defer, task
 from twisted.web import server
 from twisted.web.resource import Resource
 
-from amfast.remoting.channel import Channel
+from amfast.remoting.channel import HttpChannel
 from amfast.class_def.as_types import AsNoProxy
 from amfast.remoting.endpoint import AmfEndpoint
 
-class TwistedChannel(Resource, Channel):
+class TwistedChannel(Resource, HttpChannel):
     """An AMF RPC channel that can be used with Twisted Web."""
 
     def __init__(self, name, *args, **kwargs):
         Resource.__init__(self)
-        Channel.__init__(self, name, *args, **kwargs)
+        HttpChannel.__init__(self, name, *args, **kwargs)
 
     # This attribute is added to packets
     # that are waiting for a long-poll
@@ -43,13 +43,13 @@ class TwistedChannel(Resource, Channel):
 
     def decode(self, raw_request, request):
         """Overridden to add Twisted's request object onto the packet."""
-        decoded = Channel.decode(self, raw_request)
+        decoded = HttpChannel.decode(self, raw_request)
         setattr(decoded, self.MSG_REQUEST, request)
         return decoded
 
     def invoke(self, packet):
         """Overridden to add Twisted's request object onto the response packet."""
-        response = Channel.invoke(self, packet)
+        response = HttpChannel.invoke(self, packet)
         setattr(response, self.MSG_REQUEST, getattr(packet, self.MSG_REQUEST))
         return response
 

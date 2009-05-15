@@ -92,7 +92,7 @@ def disconnect_operation(packet, msg, *args):
     connection = packet.channel.channel_set.getFlexConnection(packet, msg)
     connection.disconnect()
     response = msg.response_msg.body
-    del response.headers[response.FLEX_CLIENT_ID]
+    del response.headers[response.FLEX_CLIENT_ID_HEADER]
 
 def poll_operation(packet, msg, *args):
     """Respond to a poll operation. Returns queued messages."""
