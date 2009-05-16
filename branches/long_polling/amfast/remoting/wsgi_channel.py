@@ -14,10 +14,7 @@ class WsgiChannel(HttpChannel):
             return self.badMethod(start_response)
 
         len_str = 'CONTENT_LENGTH'
-        if len_str in environ:
-            raw_request = environ['wsgi.input'].read(int(environ[len_str]))
-        else:
-            raw_request = environ['wsgi.input']
+        raw_request = environ['wsgi.input'].read(int(environ[len_str]))
 
         try:
             request_packet = self.decode(raw_request)
@@ -92,10 +89,8 @@ class StreamingWsgiChannel(WsgiChannel):
     """WsgiChannel that opens a persistent connection with the client to serve messages."""
 
     def __call__(self, environ, start_response):
-        amfast.logRaw = True
-
         if environ['CONTENT_TYPE'] == self.CONTENT_TYPE:
-            # AMF message
+            # Regular AMF message
             return WsgiChannel.__call__(self, environ, start_response)
 
         # Create streaming message command
@@ -124,6 +119,7 @@ class StreamingWsgiChannel(WsgiChannel):
 
         try: 
             connection = self.channel_set.getConnection(msg.headers.get(msg.FLEX_CLIENT_ID_HEADER))
+            connection.connected = True
             response = msg.acknowledge()
             response.body = connection.flex_client_id
             connection.publish(response)
@@ -156,7 +152,7 @@ class StreamingWsgiChannel(WsgiChannel):
                 if stop_stream is True:
                     return
 
-                if connection.connected is False:
+                if connection.active is False:
                     stop_stream = True
                     msg = messaging.StreamingMessage.getDisconnectMsg()
                     yield messaging.StreamingMessage.prepareMsg(msg, self.endpoint)
@@ -172,9 +168,8 @@ class StreamingWsgiChannel(WsgiChannel):
                     # Send heartbeat to tell client
                     # we're still alive
                     total_time = 0
-                    yield messaging.StreamingMessage.NULL_BYTE
+                    yield chr(messaging.StreamingMessage.NULL_BYTE)
             except (KeyboardInterrupt, SystemExit):
-                connection.disconnect() # Make sure we close the connection
                 raise
             except Exception, exc:
                 amfast.log_exc()

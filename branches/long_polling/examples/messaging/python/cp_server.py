@@ -6,7 +6,7 @@ import cherrypy
 
 import amfast
 from amfast.remoting.channel import ChannelSet
-from amfast.remoting.wsgi_channel import WsgiChannel, StreamingWsgiChannel
+from amfast.remoting.wsgi_channel import WsgiChannel
 import utils
 
 class App(object):

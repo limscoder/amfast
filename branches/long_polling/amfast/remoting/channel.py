@@ -43,13 +43,14 @@ class Connection(object):
      * flex_client_id - string, read-only, The Flex client id is unique to a Flex client.
      * last_active - int, epoch time when Connection was last accessed.
      * authenticated - boolean, True if Connection has been authenticated.
-     * connected - boolean, True if Connection is connected
+     * active - boolean, True if Connection is in use
     """
 
     def __init__(self, flex_client_id, channel):
         self.authenticated = False
         self.last_active = int(time.time())
-        self.connected = True
+        self.active = True
+        self.connected = False
 
         self._flex_client_id = flex_client_id # Unique for each Flex client.
         self._channel = channel
@@ -128,8 +129,8 @@ class Connection(object):
 
     def disconnect(self):
         """Disconnects this connection."""
-        self.connected = False
-        self.channel.disconnect(self.flex_client_id)
+        self.active = False
+        self.channel.disconnect(self)
 
     def getSubscriptions(self):
         """Returns a list of subscription objects."""
@@ -210,7 +211,7 @@ class Connection(object):
         return len(self._messages) > 0
 
     def publish(self, msg):
-        """Add a message to the connection's message queu.
+        """Add a message to the connection's message qeue.
 
         arguments
         ==========
@@ -239,6 +240,27 @@ class Connection(object):
              self._messages = tmp
         finally:
             lock.release()
+
+class StreamingConnection(Connection):
+    """Publish messages directly to stream, instead of to the qeue.
+
+     attributes
+     ===========
+     * connected - boolean, True if Connection is connected and streaming
+     * heart_interval - int, Number of seconds between heart beat responses.
+     """
+    def __init__(self, flex_client_id, channel,
+        connected=False, heart_interval=30):
+
+        Connection.__init__(self, flex_client_id, channel)
+        self.connected = connected
+        self.heart_interval = heart_interval
+
+    def publish(self, msg):
+        if self.connected is True:
+            self.channel.publish(self, msg)
+        else:
+            Connection.publish(self, msg)
 
 class Channel(object):
     """An individual channel that can send/receive messages.
@@ -317,14 +339,14 @@ class Channel(object):
 
         return connection
 
-    def disconnect(self, flex_client_id):
+    def disconnect(self, connection):
         """Remove a client connection from this Channel.
 
         arguments
         ==========
          * flex_client_id - string, Flex client id.
         """
-        self.channel_set.disconnect(flex_client_id)
+        self.channel_set.disconnect(connection)
 
 class HttpChannel(Channel):
     """An individual channel that can send/receive messages over HTTP.
@@ -463,7 +485,7 @@ class ChannelSet(object):
 
         return connection
 
-    def disconnect(self, flex_client_id):
+    def disconnect(self, connection):
         """Remove a client connection from this ChannelSet.
 
         arugments
@@ -473,14 +495,13 @@ class ChannelSet(object):
         lock = threading.RLock()
         lock.acquire()
         try:
-            if flex_client_id in self._connections:
-               # Delete any subscriptions
-               connection = self._connections[flex_client_id]
-               subscriptions = connection.getSubscriptions()
-               for subscription in subscriptions:
-                   self.msg_agent.unsubscribe(subscription.connection,
-                       subscription.client_id, subscription.topic)
+           # Delete any subscriptions
+           subscriptions = connection.getSubscriptions()
+           for subscription in subscriptions:
+               self.msg_agent.unsubscribe(subscription.connection,
+                   subscription.client_id, subscription.topic)
 
+           if connection.flex_client_id in self._connections:
                del self._connections[flex_client_id]
         finally:
             lock.release()

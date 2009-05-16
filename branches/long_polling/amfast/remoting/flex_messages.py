@@ -520,6 +520,16 @@ class StreamingMessage(CommandMessage):
         hex_len = '%x' % byte_size # Turn length into a string of hex digits
         return ''.join((hex_len, chr(cls.CR_BYTE), chr(cls.LF_BYTE), raw)) # CR_BYTE marks end of size declaration, LF_BYTE marks beginning of data section.
 
+    def parseArgs(self, args):
+        if not hasattr(self, 'headers') or self.headers is None:
+            self.headers = {}
+        
+        if self.FLEX_CLIENT_ID_HEADER in args:
+            self.headers[self.FLEX_CLIENT_ID_HEADER] = args[self.FLEX_CLIENT_ID_HEADER][0]
+
+        if self.COMMAND_PARAM_NAME in args:
+            self.operation = args[self.COMMAND_PARAM_NAME][0]
+
     def parseParams(self, url_params):
         """Parses and sets attributes from URL parameters."""
         params = cgi.parse_qs(url_params, True)
