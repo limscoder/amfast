@@ -248,16 +248,20 @@ class StreamingConnection(Connection):
      ===========
      * connected - boolean, True if Connection is connected and streaming
      * heart_interval - int, Number of seconds between heart beat responses.
+     * channel_publish - bool, True if self.publish should be called.
      """
     def __init__(self, flex_client_id, channel,
-        connected=False, heart_interval=30):
+        channel_publish=True, connected=False,
+        heart_interval=10):
 
         Connection.__init__(self, flex_client_id, channel)
         self.connected = connected
         self.heart_interval = heart_interval
+        self.channel_publish = channel_publish
 
     def publish(self, msg):
-        if self.connected is True:
+        self.touch() # I touch myself, but only when no one is looking to make sure my connection stays alive
+        if self.channel_publish is True and self.connected is True:
             self.channel.publish(self, msg)
         else:
             Connection.publish(self, msg)
@@ -367,7 +371,7 @@ class HttpChannel(Channel):
 
     def __init__(self, name, max_connections=-1, endpoint=None,
         timeout=1800, connection_class=Connection, wait_interval=0,
-        check_interval=1, max_interval=90):
+        check_interval=.1, max_interval=90):
 
         Channel.__init__(self, name, max_connections, endpoint,
             timeout, connection_class)

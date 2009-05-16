@@ -3,7 +3,7 @@ import time
 
 import amfast
 from amfast import AmFastError
-from amfast.remoting.channel import HttpChannel
+from amfast.remoting.channel import HttpChannel, StreamingConnection
 import amfast.remoting.flex_messages as messaging
 
 class WsgiChannel(HttpChannel):
@@ -88,6 +88,16 @@ class WsgiChannel(HttpChannel):
 class StreamingWsgiChannel(WsgiChannel):
     """WsgiChannel that opens a persistent connection with the client to serve messages."""
 
+    WRITE_ATTR = "_write_method"
+
+    def __init__(self, name, max_connections=-1, endpoint=None,
+        timeout=1800, wait_interval=0, check_interval=1,
+        max_interval=90, thread_safe_write=True):
+        WsgiChannel.__init__(self, name, max_connections, endpoint,
+            timeout, StreamingConnection, wait_interval, check_interval, max_interval)
+
+        self.thread_safe_write = thread_safe_write # True if write() can be called from a different thread
+
     def __call__(self, environ, start_response):
         if environ['CONTENT_TYPE'] == self.CONTENT_TYPE:
             # Regular AMF message
@@ -112,63 +122,136 @@ class StreamingWsgiChannel(WsgiChannel):
         if msg.operation == msg.CLOSE_COMMAND:
             return self.stopStream(msg)
 
-        return self.badRequest('Streaming operation unknown: %s' % msg.operation)
+        return self.badRequest(start_response, 'Streaming operation unknown: %s' % msg.operation)
 
-    def startStream(self, environ, start_response, msg):
-        """Start streaming response."""
-
-        try: 
-            connection = self.channel_set.getConnection(msg.headers.get(msg.FLEX_CLIENT_ID_HEADER))
-            connection.connected = True
-            response = msg.acknowledge()
-            response.body = connection.flex_client_id
-            connection.publish(response)
+    def publish(self, connection, msg):
+        """Send response."""
+        write = getattr(connection, self.WRITE_ATTR)
+        try:
+            bytes = messaging.StreamingMessage.prepareMsg(msg, self.endpoint)
         except (KeyboardInterrupt, SystemExit):
             raise
         except Exception, exc:
             amfast.log_exc()
             return self.badServer(start_response, "AMF server error.")
 
-        start_response('200 OK', [
+        try:
+            write(bytes)
+        except:
+            connection.disconnect()
+
+    def disconnect(self, connection):
+        WsgiChannel.disconnect(self, connection)
+        connection.connected = False
+
+    def startStream(self, environ, start_response, msg):
+        """Start streaming response."""
+
+        try: 
+            connection = self.channel_set.getConnection(msg.headers.get(msg.FLEX_CLIENT_ID_HEADER))
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception, exc:
+            amfast.log_exc()
+            return self.badServer(start_response, "AMF server error.")
+
+        write = start_response('200 OK', [
             ('Content-Type', self.CONTENT_TYPE)
         ])
 
-        return self.waitForMessages(msg, connection)
+        try:
+            # Set write method, so we can write to it later on
+            connection.connected = True
+            setattr(connection, self.WRITE_ATTR, write)
+            if self.thread_safe_write is True:
+                connection.channel_publish = True
+            else:
+                connection.channel_publish = False
+
+            response = msg.acknowledge()
+            response.body = connection.flex_client_id
+            connection.publish(response)
+
+            if self.thread_safe_write is True:
+                return self.startBeat(connection)
+            else:
+                # WSGI servers that can't do
+                # thread-safe write(), must poll
+                # for messages.
+                return self.waitForMessages(msg, connection)
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception, exc:
+            amfast.log_exc()
+            connection.disconnect()
+            return []
 
     def stopStream(self, msg):
         """Stop streaming connection."""
         connection = self.channel_set.getConnection(msg.headers.get(msg.FLEX_CLIENT_ID_HEADER))
         connection.disconnect()
 
-    def waitForMessages(self, msg, connection):
-        """Generator function that returns a message when one becomes available."""
-        stop_stream = False
-        total_time = 0
+    def startBeat(self, connection):
+        write = getattr(connection, self.WRITE_ATTR)
+
         while True:
-            time.sleep(self.check_interval)
-            total_time += self.check_interval
-
             try:
-                if stop_stream is True:
-                    return
-
-                if connection.active is False:
+                time.sleep(connection.heart_interval)
+            
+                if connection.active is False or connection.connected is False:
                     stop_stream = True
                     msg = messaging.StreamingMessage.getDisconnectMsg()
-                    yield messaging.StreamingMessage.prepareMsg(msg, self.endpoint)
+                    try:
+                        write(messaging.StreamingMessage.prepareMsg(msg, self.endpoint))
+                    except:
+                        pass
+                    return []
+                else:
+                    try:
+                        write(chr(messaging.StreamingMessage.NULL_BYTE))
+                    except:
+                        connection.disconnect()
+            except (KeyboardInterrupt, SystemExit):
+                raise
+            except Exception, exc:
+                amfast.log_exc()
+                connection.disconnect()
 
-                # Make sure connection stays active
-                connection.touch()
+    def waitForMessages(self, msg, connection):
+        """Generator function that returns a message when one becomes available."""
+        write = getattr(connection, self.WRITE_ATTR)
+
+        total_time = 0
+        while True:
+            try:
+                time.sleep(self.check_interval)
+                total_time += self.check_interval
+
+                if connection.active is False or connection.connected is False:
+                    stop_stream = True
+                    msg = messaging.StreamingMessage.getDisconnectMsg()
+                    try:
+                        write(messaging.StreamingMessage.prepareMsg(msg, self.endpoint))
+                    except:
+                        pass
+                    return []
 
                 if connection.hasMessages():
                     while connection.hasMessages():
                         msg = connection.popMessage()
-                        yield messaging.StreamingMessage.prepareMsg(msg, self.endpoint)
-                elif total_time > self.max_interval:
+                        try:
+                            write(messaging.StreamingMessage.prepareMsg(msg, self.endpoint))
+                        except:
+                            connection.disconnect()
+                            break
+                elif total_time > connection.heart_interval:
                     # Send heartbeat to tell client
                     # we're still alive
                     total_time = 0
-                    yield chr(messaging.StreamingMessage.NULL_BYTE)
+                    try:
+                        write(chr(messaging.StreamingMessage.NULL_BYTE))
+                    except:
+                        connection.disconnect()
             except (KeyboardInterrupt, SystemExit):
                 raise
             except Exception, exc:

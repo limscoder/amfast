@@ -82,11 +82,28 @@ class TwistedChannel(Resource, HttpChannel):
         # from self.invoke.
         setattr(packet.response, self.MSG_NOT_COMPLETE, True)
 
-        looper = task.LoopingCall(None)
+        request = getatte(packet, self.MSG_REQUEST)
 
+        # Add a flag so we can tell if we lost the client
+        disconnect_flag = "_DISCONNECTED"
+        request._connectionLost = request.connectionLost
+        def _connection_lost(reason):
+            setattr(request, disconnect_flag, True)
+            return request._connectionLost(reason)
+        request.connectionLost = _connection_lost
+
+        looper = task.LoopingCall(None)
         total = [0] # Lame hack to be able to increment within closure. There has to be a better way...
         def _checkMsgs():
             """Keep calling this method until we find messages."""
+
+            if connection.active is False or hasattr(request, disconnect_flag):
+                # Connection was closed.
+                # Let's get out of here.
+                looper.stop()
+                delattr(packet.response, self.MSG_NOT_COMPLETE)
+                self.checkComplete(packet.response, request)
+                return
 
             if not connection.hasMessages() and not total[0] > self.max_interval:
                 # We're still looking for a message.
@@ -107,7 +124,7 @@ class TwistedChannel(Resource, HttpChannel):
             message.response_msg.body.body = messages
  
             delattr(packet.response, self.MSG_NOT_COMPLETE)
-            self.checkComplete(packet.response, getattr(packet, self.MSG_REQUEST))
+            self.checkComplete(packet.response, request)
 
         looper.f = _checkMsgs
         looper.start(self.check_interval)
@@ -116,8 +133,7 @@ class StreamingTwistedChannel(TwistedChannel):
     """Handles streaming http connections."""
 
     def __init__(self, name, max_connections=-1, endpoint=None,
-        timeout=1800, wait_interval=0,
-        check_interval=1, max_interval=90):
+        timeout=1800, wait_interval=0, check_interval=1, max_interval=90):
         TwistedChannel.__init__(self, name, max_connections, endpoint,
             timeout, StreamingConnection, wait_interval, check_interval, max_interval)
 
@@ -170,8 +186,7 @@ class StreamingTwistedChannel(TwistedChannel):
         connection.disconnect()
 
     def publish(self, connection, msg):
-        """Send response."""
-        connection.touch() # Keep connection alive
+        """Write message."""
         request = getattr(connection, self.MSG_REQUEST)
         request.write(messaging.StreamingMessage.prepareMsg(msg, self.endpoint))
 
