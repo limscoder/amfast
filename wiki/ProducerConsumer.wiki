@@ -2,7 +2,7 @@
 
 = Producer/Consumer Example =
 
-This example demonstrates using Producer/Consumer messaging with polling and long-polling.
+This example demonstrates using Producer/Consumer messaging with HTTP polling and HTTP long-polling channels.
 
 The example is located in SVN within the [http://code.google.com/p/amfast/source/browse/trunk/examples/messaging examples/messaging] directory
 
