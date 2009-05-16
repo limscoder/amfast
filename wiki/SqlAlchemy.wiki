@@ -14,7 +14,7 @@ Start the server and point your browser to http://localhost:8000
 
 Use [http://www.cherrypy.org/ CherryPy] web framework to serve the example contact manager over http with the following command:
 {{{
-python addressbook/python/cp_server.py
+python addressbook/python/twisted_server.tac
 }}}
 
 == Twisted Example ==
