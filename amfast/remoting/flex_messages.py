@@ -504,7 +504,7 @@ class StreamingMessage(CommandMessage):
     NULL_BYTE = 0
 
     @classmethod
-    def getDisconnectMethod(cls):
+    def getDisconnectMsg(cls):
         msg = CommandMessage()
         msg.operation = CommandMessage.DISCONNECT_OPERATION
         return msg

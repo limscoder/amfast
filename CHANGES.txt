@@ -1,6 +1,17 @@
 CHANGES
 ========
 
+0.3.2
+======
+
+remoting
+---------
+ * Added http long-polling and http streaming channels.
+
+0.3.1
+======
+ * Added ez_setup.py script for installing uuid.
+
 0.3.0
 ======
 
