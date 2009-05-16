@@ -4,20 +4,21 @@
 
 This example demonstrates using Producer/Consumer messaging with polling and long-polling.
 
-
 The example is located in SVN within the [http://code.google.com/p/amfast/source/browse/trunk/examples/messaging examples/messaging] directory
 
 The example has scripts for serving the application via [http://www.cherrypy.org/ CherryPy] and [http://twistedmatrix.com/trac/ Twisted Web].
 
-Start the server and point your browser to http://localhost:8000
+Start the server and open two browser windows to http://localhost:8000
 
-Click the 'Subscribe' button to start receiving messsages.
+Click the 'Subscribe' button to start receiving messages.
 
 Click the 'Publish' button to send a message.
 
+When a message is published, it should appear in both browser windows.
+
 The default 'amf' url uses polling. Change the url to 'longPoll' to use long-polling.
 
-If you change the url, you must unsubscribe and re-subscribe to start receiving messages from the new url.
+If you change the url, you must un-subscribe and re-subscribe to start receiving messages from the new url.
 
 == !CherryPy ==
 
