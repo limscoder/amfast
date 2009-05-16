@@ -252,7 +252,7 @@ class StreamingConnection(Connection):
      """
     def __init__(self, flex_client_id, channel,
         channel_publish=True, connected=False,
-        heart_interval=10):
+        heart_interval=30):
 
         Connection.__init__(self, flex_client_id, channel)
         self.connected = connected
@@ -376,9 +376,14 @@ class HttpChannel(Channel):
         Channel.__init__(self, name, max_connections, endpoint,
             timeout, connection_class)
 
-        self.wait_interval = wait_interval
+        self._wait_interval = wait_interval
         self.check_interval = check_interval
         self.max_interval = max_interval
+
+    # wait_interval should be read-only
+    def _getWaitInterval(self):
+        return self._wait_interval
+    wait_interval = property(_getWaitInterval)
 
     def waitForMessage(self, packet, message, connection):
         """Waits for a new message.
