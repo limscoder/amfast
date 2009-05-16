@@ -3,6 +3,9 @@
 To run, execute the following command:
     twistd -noy twisted_server.tac
 """
+import logging
+import sys
+
 from twisted.application import service, strports
 from twisted.web import static, server, resource, vhost
 
@@ -10,10 +13,11 @@ import amfast
 from amfast.remoting.channel import ChannelSet
 from amfast.remoting.twisted_channel import TwistedChannel
 
-import utils
-
 # Uncomment this to see debug messages
 #amfast.log_debug = True
+handler = logging.StreamHandler(sys.stdout)
+handler.setLevel(logging.DEBUG)
+amfast.logger.addHandler(handler)
 
 # Setup domain 
 root = vhost.NameVirtualHost()
@@ -37,7 +41,6 @@ channel_set.mapChannel(polling_channel)
 # is reached.
 long_poll_channel = TwistedChannel('long-poll-channel', wait_interval=-1)
 channel_set.mapChannel(long_poll_channel)
-utils.setup_channel_set(channel_set)
 
 # Setup channels
 root.putChild('amf', polling_channel)

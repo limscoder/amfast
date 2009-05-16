@@ -13,6 +13,7 @@ class TwistedChannel(Resource, HttpChannel):
     def __init__(self, name, max_connections=-1, endpoint=None,
         timeout=1800, connection_class=Connection, wait_interval=0,
         check_interval=1, max_interval=90):
+
         Resource.__init__(self)
         HttpChannel.__init__(self, name, max_connections, endpoint,
             timeout, connection_class, wait_interval, check_interval, max_interval)
@@ -82,7 +83,7 @@ class TwistedChannel(Resource, HttpChannel):
         # from self.invoke.
         setattr(packet.response, self.MSG_NOT_COMPLETE, True)
 
-        request = getatte(packet, self.MSG_REQUEST)
+        request = getattr(packet, self.MSG_REQUEST)
 
         # Add a flag so we can tell if we lost the client
         disconnect_flag = "_DISCONNECTED"

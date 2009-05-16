@@ -1,13 +1,14 @@
 """An example server using the CherryPy web framework."""
 import os
 import optparse
+import logging
+import sys
 
 import cherrypy
 
 import amfast
 from amfast.remoting.channel import ChannelSet
 from amfast.remoting.wsgi_channel import WsgiChannel
-import utils
 
 class App(object):
     """Base web app."""
@@ -27,6 +28,9 @@ if __name__ == '__main__':
     (options, args) = parser.parse_args()
 
     amfast.log_debug = options.log_debug
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setLevel(logging.DEBUG)
+    amfast.logger.addHandler(handler)
 
     cp_options = {
         'global':
@@ -55,7 +59,6 @@ if __name__ == '__main__':
     # is reached.
     long_poll_channel = WsgiChannel('long-poll-channel', wait_interval=-1)
     channel_set.mapChannel(long_poll_channel)
-    utils.setup_channel_set(channel_set)
 
     app = App()
     cherrypy.tree.graft(polling_channel, '/amf')
