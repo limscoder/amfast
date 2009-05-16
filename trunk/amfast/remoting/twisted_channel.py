@@ -144,9 +144,18 @@ class StreamingTwistedChannel(TwistedChannel):
 
     def startStream(self, msg, request):
         """Get this stream rolling!"""
+
         connection = self.channel_set.getConnection(msg.headers.get(msg.FLEX_CLIENT_ID_HEADER))
         setattr(connection, self.MSG_REQUEST, request)
         connection.connected = True
+
+        # Make sure connection gets cleaned up
+        # when connection is lost.
+        request._connectionLost = request.connectionLost
+        def _connection_lost(reason):
+            connection.disconnect()
+            return request._connectionLost(reason)
+        request.connectionLost = _connection_lost
 
         # Acknowledge connection
         response = msg.acknowledge()
@@ -185,6 +194,7 @@ class StreamingTwistedChannel(TwistedChannel):
         looper = task.LoopingCall(None)
         def _beat():
             """Keep calling this method as long as the connection is alive."""
+
             if connection.connected is False or connection.active is False:
                 looper.stop()
                 return

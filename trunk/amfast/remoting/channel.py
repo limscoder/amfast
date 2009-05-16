@@ -498,11 +498,11 @@ class ChannelSet(object):
            # Delete any subscriptions
            subscriptions = connection.getSubscriptions()
            for subscription in subscriptions:
-               self.msg_agent.unsubscribe(subscription.connection,
+               self.message_agent.unsubscribe(subscription.connection,
                    subscription.client_id, subscription.topic)
 
            if connection.flex_client_id in self._connections:
-               del self._connections[flex_client_id]
+               del self._connections[connection.flex_client_id]
         finally:
             lock.release()
 

@@ -70,7 +70,8 @@ class MessageAgent(object):
 
             topic_map = self._topics.get(topic, None)
             if topic_map is not None:
-               del topic_map[client_id]
+               if client_id in topic_map:
+                   del topic_map[client_id]
 
                if len(topic_map) < 1:
                    del self._topics[topic]
