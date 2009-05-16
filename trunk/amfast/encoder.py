@@ -35,9 +35,12 @@ class Encoder(object):
 
         self.buffer = buffer
 
-    def _getContext(self):
+    def _getContext(self, amf3=None):
+        if amf3 is None:
+            amf3 = self.amf3
+
         kwargs = {
-            'amf3': self.amf3,
+            'amf3': amf3,
             'use_collections': self.use_collections,
             'use_proxies': self.use_proxies,
             'use_references': self.use_references,
@@ -51,10 +54,10 @@ class Encoder(object):
 
         return EncoderContext(**kwargs);
 
-    def encode(self, val):
+    def encode(self, val, amf3=None):
         """Encode a value to AMF."""
-        return encode(val, self._getContext())
+        return encode(val, self._getContext(amf3))
 
-    def encode_packet(self, val):
+    def encode_packet(self, val, amf3=None):
         """Encode an AMF packet."""
-        return encode_packet(val, self._getContext())
+        return encode_packet(val, self._getContext(amf3))

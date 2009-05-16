@@ -42,14 +42,18 @@ class Connection(object):
      * channel - Channel, read-only, The Channel this connection uses.
      * flex_client_id - string, read-only, The Flex client id is unique to a Flex client.
      * last_active - int, epoch time when Connection was last accessed.
-     * authenticated - boolean, True if Connection has been authenticated. 
+     * authenticated - boolean, True if Connection has been authenticated.
+     * active - boolean, True if Connection is in use
     """
 
     def __init__(self, flex_client_id, channel):
+        self.authenticated = False
+        self.last_active = int(time.time())
+        self.active = True
+        self.connected = False
+
         self._flex_client_id = flex_client_id # Unique for each Flex client.
         self._channel = channel
-        self._authenticated = False
-        self._last_active = int(time.time())
         self._messages = []
         self._subscriptions = {}
         self._session_attrs = {}
@@ -63,32 +67,6 @@ class Connection(object):
     def _getFlexClientId(self):
         return self._flex_client_id
     flex_client_id = property(_getFlexClientId)
-
-    # last_active needs to be thread-safe.
-    def _getLastActive(self):
-        return self._last_active
-
-    def _setLastActive(self, val):
-        lock = threading.RLock()
-        lock.acquire()
-        try:
-            self._last_active = val
-        finally:
-            lock.release() 
-    last_active = property(_getLastActive, _setLastActive)
-
-    # authenticated needs to be thread-safe.
-    def _getAuthenticated(self):
-        return self._authenticated
-
-    def _setAuthenticated(self, val):
-        lock = threading.RLock()
-        lock.acquire()
-        try:
-            self._authenticated = val
-        finally:
-            lock.release()
-    authenticated = property(_getAuthenticated, _setAuthenticated)
 
     def hasSessionAttr(self, attr):
         """Returns True if session attribute is present.
@@ -147,11 +125,12 @@ class Connection(object):
 
     def touch(self):
          """Updates last_active to the current time."""
-         self.last_active = current_time = int(time.time())
+         self.last_active = int(time.time())
 
     def disconnect(self):
         """Disconnects this connection."""
-        self.channel.disconnect(self.flex_client_id)
+        self.active = False
+        self.channel.disconnect(self)
 
     def getSubscriptions(self):
         """Returns a list of subscription objects."""
@@ -213,18 +192,26 @@ class Connection(object):
 
     def poll(self):
         """Returns all current messages and empties que."""
-        lock = threading.RLock()
-        lock.acquire()
-        try:
-             results = self._messages
-             self._messages = []
-        finally:
-            lock.release()
+        results = self._messages
+        self._messages = []
 
         return results
 
+    def popMessage(self):
+        """Remove and return a single message from the qeue."""
+        lock = threading.RLock()
+        lock.acquire()
+        try:
+            return self._messages.pop(0)
+        finally:
+            lock.release()
+
+    def hasMessages(self):
+        """Returns True if messages are present."""
+        return len(self._messages) > 0
+
     def publish(self, msg):
-        """Add a message to the connection's message queu.
+        """Add a message to the connection's message qeue.
 
         arguments
         ==========
@@ -254,6 +241,27 @@ class Connection(object):
         finally:
             lock.release()
 
+class StreamingConnection(Connection):
+    """Publish messages directly to stream, instead of to the qeue.
+
+     attributes
+     ===========
+     * connected - boolean, True if Connection is connected and streaming
+     * heart_interval - int, Number of seconds between heart beat responses.
+     """
+    def __init__(self, flex_client_id, channel,
+        connected=False, heart_interval=30):
+
+        Connection.__init__(self, flex_client_id, channel)
+        self.connected = connected
+        self.heart_interval = heart_interval
+
+    def publish(self, msg):
+        if self.connected is True:
+            self.channel.publish(self, msg)
+        else:
+            Connection.publish(self, msg)
+
 class Channel(object):
     """An individual channel that can send/receive messages.
 
@@ -267,9 +275,8 @@ class Channel(object):
      * connection_class - Connection, The class to use for new connections.
      * timeout - int, If a Connection's last_active value is < current time - timeout,
          the Connection will be disconnected.
-    """
 
-    CONTENT_TYPE = 'application/x-amf'
+    """
 
     def __init__(self, name, max_connections=-1, endpoint=None,
         timeout=1800, connection_class=Connection):
@@ -289,6 +296,15 @@ class Channel(object):
         return self._channel_set
     channel_set = property(_getChannelSet)
 
+    def encode(self, *args, **kwargs):
+        """Encode a packet."""
+        try:
+            return self.endpoint.encodePacket(*args, **kwargs)
+        except amfast.AmFastError, exc:
+            # Not much we can do if packet is not decoded properly
+            amfast.log_exc()
+            raise exc
+
     def decode(self, *args, **kwargs):
         """Decode a raw request."""
         try:
@@ -301,11 +317,10 @@ class Channel(object):
     def invoke(self, request):
         """Invoke an incoming request packet."""
         try:
-            request.channel = self
-            return self.endpoint.encodePacket(request.invoke())
+            request.channel = self # so user can access channel object
+            return request.invoke()
         except amfast.AmFastError, exc:
-            amfast.log_exc()
-            return self.endpoint.encodePacket(request.fail(exc))
+            return request.fail(exc)
 
     def connect(self, flex_client_id):
         """Add a client connection to this channel.
@@ -324,14 +339,55 @@ class Channel(object):
 
         return connection
 
-    def disconnect(self, flex_client_id):
+    def disconnect(self, connection):
         """Remove a client connection from this Channel.
 
         arguments
         ==========
          * flex_client_id - string, Flex client id.
         """
-        self.channel_set.disconnect(flex_client_id)
+        self.channel_set.disconnect(connection)
+
+class HttpChannel(Channel):
+    """An individual channel that can send/receive messages over HTTP.
+
+    attributes
+    ===========
+     * wait_interval - int, Number of seconds to wait before sending response to client
+         when a polling request is received. Set to -1 to configure channel as a
+         long-polling channel.
+     * check_interval - int or float, Number of seconds to wait between message
+         qeue checks when checking for new messages. Internal polling interval.
+     * max_interval - int or float, Maximum number of seconds a long-poll client should
+         stay connected when using long-polling.
+    """
+
+    # Content type for amf messages
+    CONTENT_TYPE = 'application/x-amf'
+
+    def __init__(self, name, max_connections=-1, endpoint=None,
+        timeout=1800, connection_class=Connection, wait_interval=0,
+        check_interval=1, max_interval=90):
+
+        Channel.__init__(self, name, max_connections, endpoint,
+            timeout, connection_class)
+
+        self.wait_interval = wait_interval
+        self.check_interval = check_interval
+        self.max_interval = max_interval
+
+    def waitForMessage(self, packet, message, connection):
+        """Waits for a new message.
+
+        This is blocking, and should only be used
+        for Channels where each connection is a thread.
+        """
+        total = 0
+        while total < self.max_interval:
+            time.sleep(self.check_interval)
+            total += self.check_interval
+            if connection.hasMessages():
+                return
 
 class ChannelSet(object):
     """A collection of Channels.
@@ -429,7 +485,7 @@ class ChannelSet(object):
 
         return connection
 
-    def disconnect(self, flex_client_id):
+    def disconnect(self, connection):
         """Remove a client connection from this ChannelSet.
 
         arugments
@@ -439,14 +495,13 @@ class ChannelSet(object):
         lock = threading.RLock()
         lock.acquire()
         try:
-            if flex_client_id in self._connections:
-               # Delete any subscriptions
-               connection = self._connections[flex_client_id]
-               subscriptions = connection.getSubscriptions()
-               for subscription in subscriptions:
-                   self.msg_agent.unsubscribe(subscription.connection,
-                       subscription.client_id, subscription.topic)
+           # Delete any subscriptions
+           subscriptions = connection.getSubscriptions()
+           for subscription in subscriptions:
+               self.msg_agent.unsubscribe(subscription.connection,
+                   subscription.client_id, subscription.topic)
 
+           if connection.flex_client_id in self._connections:
                del self._connections[flex_client_id]
         finally:
             lock.release()
