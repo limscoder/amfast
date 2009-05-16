@@ -3,6 +3,9 @@
 To run, execute the following command:
     twistd -noy twisted_server.tac
 """
+import logging
+import sys
+
 from twisted.application import service, strports
 from twisted.web import static, server, resource, vhost
 
@@ -10,7 +13,13 @@ import amfast
 from amfast.remoting.channel import ChannelSet
 from amfast.remoting.twisted_channel import StreamingTwistedChannel
 
-import utils
+# Uncomment this like to log debug messages
+#amfast.log_debug = True
+
+# Send log messages to STDOUT
+handler = logging.StreamHandler(sys.stdout)
+handler.setLevel(logging.DEBUG)
+amfast.logger.addHandler(handler)
 
 # Setup domain 
 root = vhost.NameVirtualHost()
@@ -22,7 +31,6 @@ root.addHost(domain, static.File("../flex/deploy"))
 channel_set = ChannelSet()
 stream_channel = StreamingTwistedChannel('streaming-channel')
 channel_set.mapChannel(stream_channel)
-utils.setup_channel_set(channel_set)
 
 # Setup channels
 root.putChild('amf', stream_channel)

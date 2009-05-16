@@ -1,13 +1,20 @@
-"""An example server using the CherryPy web framework."""
+"""An example server using the CherryPy web framework.
+
+This example uses a WsgiChannel, grafted onto the CherryPy tree.
+
+To run the example execute the command:
+    python cp_server.py
+"""
 import os
 import optparse
+import logging
+import sys
 
 import cherrypy
 
 import amfast
 from amfast.remoting.channel import ChannelSet
-from amfast.remoting.cherrypy_channel import CherryPyChannel
-import utils
+from amfast.remoting.wsgi_channel import StreamingWsgiChannel
 
 class App(object):
     """Base web app."""
@@ -27,6 +34,11 @@ if __name__ == '__main__':
     (options, args) = parser.parse_args()
 
     amfast.log_debug = options.log_debug
+   
+    # Send log messages to STDOUT
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setLevel(logging.DEBUG)
+    amfast.logger.addHandler(handler)
 
     cp_options = {
         'global':
@@ -42,12 +54,11 @@ if __name__ == '__main__':
     }
 
     channel_set = ChannelSet()
-    polling_channel = CherryPyChannel('amf-polling-channel')
-    channel_set.mapChannel(polling_channel)
-    utils.setup_channel_set(channel_set)
+    stream_channel = StreamingWsgiChannel('stream-channel')
+    channel_set.mapChannel(stream_channel)
 
     app = App()
-    app.amf = polling_channel.processMsg
+    cherrypy.tree.graft(stream_channel, '/amf')
     cherrypy.quickstart(app, '/', config=cp_options)
 
     print "Serving on %s:%s" % (options.domain, options.port)
