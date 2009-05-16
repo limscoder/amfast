@@ -133,8 +133,8 @@
 				// Publish new coordinates
 				if (master) {
 					var coords:Object = {
-						'x': event.stageX,
-						'y': event.stageY
+						'x': circle.x,
+						'y': circle.y
 					}
 					
 					var producer:Producer = getProducer();
@@ -154,7 +154,7 @@
 				// master anymore.
 				var producer:Producer = getProducer();
 				var msg:AsyncMessage = new AsyncMessage();
-				msg.body = {'master': producer.clientId};
+				msg.body = {'master': getConsumer().clientId};
 				producer.send(msg);
 				
 				master = true;
@@ -269,10 +269,12 @@
 				// Check message for MASTER flag
 				if (event.message.body.hasOwnProperty('master')) {
 					// Flag that another client has taken over.
-					if (event.message.body.master == getProducer().clientId) {
+					if (event.message.body.master == getConsumer().clientId) {
 						master = true;
+						masterBtn.enabled = false;
 					} else {
 						master = false;
+						masterBtn.enabled = true;
 					}
 					return;
 				}

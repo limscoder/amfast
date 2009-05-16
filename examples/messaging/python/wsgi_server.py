@@ -11,9 +11,17 @@ import utils
 class App(object):
     def __init__(self):
         self.channel_set = ChannelSet()
+
+        # Clients connect every x seconds
+        # to polling channels to check for messages.
+        # If messages are available, they are
+        # returned to the client.
         polling_channel = WsgiChannel('amf-polling-channel')
         self.channel_set.mapChannel(polling_channel)
         utils.setup_channel_set(self.channel_set)
+
+        # long-polling can be used with WsgiChannels
+        # as well, but only if the server is Threaded.
 
     def __call__(self, environ, start_response):
         path = environ['PATH_INFO'].replace('/', '')

@@ -1176,7 +1176,9 @@ static PyObject* decode_packet(DecoderObj *context)
     } else if (amf_version == FLASH_9) {
         client_type = PyObject_GetAttrString(packet_class, "FLASH_9");
     } else {
-        PyErr_SetString(amfast_DecodeError, "Unknown client type.");
+        char error_str[100];
+        sprintf(error_str, "Unknown client type: %X", amf_version);
+        PyErr_SetString(amfast_DecodeError, error_str);
         Py_DECREF(packet_class);
         return NULL;
     }

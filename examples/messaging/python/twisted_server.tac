@@ -12,6 +12,9 @@ from amfast.remoting.twisted_channel import TwistedChannel
 
 import utils
 
+# Uncomment this to see debug messages
+#amfast.log_debug = True
+
 # Setup domain 
 root = vhost.NameVirtualHost()
 root.default = static.File("../flex/deploy")
@@ -20,12 +23,25 @@ root.addHost(domain, static.File("../flex/deploy"))
 
 # Setup ChannelSet
 channel_set = ChannelSet()
+
+# Clients connect every x seconds
+# to polling channels to check for messages.
+# If messages are available, they are
+# returned to the client.
 polling_channel = TwistedChannel('amf-polling-channel')
 channel_set.mapChannel(polling_channel)
+
+# Long-poll channels do not return
+# a response to the client until
+# a message is available, or channel.max_interval
+# is reached.
+long_poll_channel = TwistedChannel('long-poll-channel', wait_interval=-1)
+channel_set.mapChannel(long_poll_channel)
 utils.setup_channel_set(channel_set)
 
 # Setup channels
 root.putChild('amf', polling_channel)
+root.putChild('longPoll', long_poll_channel)
 
 # Setup server
 port = 8000

@@ -6,7 +6,7 @@ import cherrypy
 
 import amfast
 from amfast.remoting.channel import ChannelSet
-from amfast.remoting.cherrypy_channel import CherryPyChannel
+from amfast.remoting.wsgi_channel import WsgiChannel
 import utils
 
 class App(object):
@@ -42,12 +42,24 @@ if __name__ == '__main__':
     }
 
     channel_set = ChannelSet()
-    polling_channel = CherryPyChannel('amf-polling-channel')
+    # Clients connect every x seconds
+    # to polling channels to check for messages.
+    # If messages are available, they are
+    # returned to the client.
+    polling_channel = WsgiChannel('amf-polling-channel')
     channel_set.mapChannel(polling_channel)
+
+    # Long-poll channels do not return
+    # a response to the client until
+    # a message is available, or channel.max_interval
+    # is reached.
+    long_poll_channel = WsgiChannel('long-poll-channel', wait_interval=-1)
+    channel_set.mapChannel(long_poll_channel)
     utils.setup_channel_set(channel_set)
 
     app = App()
-    app.amf = polling_channel.processMsg
+    cherrypy.tree.graft(polling_channel, '/amf')
+    cherrypy.tree.graft(long_poll_channel, '/longPoll')
     cherrypy.quickstart(app, '/', config=cp_options)
 
     print "Serving on %s:%s" % (options.domain, options.port)

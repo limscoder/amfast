@@ -1,6 +1,7 @@
 """Equivalent to Flex mx.messaging.messages package."""
 import uuid
 import time
+import cgi
 
 import amfast
 from amfast import class_def, remoting
@@ -478,3 +479,78 @@ class_def.assign_attrs(ErrorMessage, 'flex.messaging.messages.ErrorMessage',
     ('body', 'clientId', 'destination', 'headers',
         'messageId', 'timestamp', 'timeToLive', 'correlationId', 'faultCode',
         'faultString', 'faultDetail', 'rootCause', 'extendedData'), True)
+
+class StreamingMessage(CommandMessage):
+    """A command message delivered over an HTTP streaming channel."""
+
+    # streaming command key
+    COMMAND_PARAM_NAME = 'command'
+
+    # open a streaming connection
+    OPEN_COMMAND = 'open'
+
+    # close streaming connection
+    CLOSE_COMMAND = 'close'
+
+    # stream id
+    ID_PARAM_NAME = 'streamId'
+
+    # stream version
+    VERSION_PARAM_NAME = 'version'
+
+    # Bytes for encoding message
+    CR_BYTE = 13
+    LF_BYTE = 10
+    NULL_BYTE = 0
+
+    @classmethod
+    def getDisconnectMethod(cls):
+        msg = CommandMessage()
+        msg.operation = CommandMessage.DISCONNECT_OPERATION
+        return msg
+
+    @classmethod
+    def prepareMsg(cls, msg, endpoint):
+        return cls.getMsgBytes(endpoint.encode(msg, amf3=True))
+
+    @classmethod
+    def getMsgBytes(cls, raw):
+        """Add size information to raw AMF encoding for streaming."""
+        byte_size = len(raw)
+        hex_len = '%x' % byte_size # Turn length into a string of hex digits
+        return ''.join((hex_len, chr(cls.CR_BYTE), chr(cls.LF_BYTE), raw)) # CR_BYTE marks end of size declaration, LF_BYTE marks beginning of data section.
+
+    def parseArgs(self, args):
+        if not hasattr(self, 'headers') or self.headers is None:
+            self.headers = {}
+        
+        if self.FLEX_CLIENT_ID_HEADER in args:
+            self.headers[self.FLEX_CLIENT_ID_HEADER] = args[self.FLEX_CLIENT_ID_HEADER][0]
+
+        if self.COMMAND_PARAM_NAME in args:
+            self.operation = args[self.COMMAND_PARAM_NAME][0]
+
+    def parseParams(self, url_params):
+        """Parses and sets attributes from URL parameters."""
+        params = cgi.parse_qs(url_params, True)
+        self.operation = params.get(self.COMMAND_PARAM_NAME)[0]
+
+    def parseBody(self, body):
+        if not hasattr(self, 'headers') or self.headers is None:
+            self.headers = {}
+
+        params = cgi.parse_qsl(body, True)
+        for param in params:
+            if param[0] == self.FLEX_CLIENT_ID_HEADER:
+                self.headers[self.FLEX_CLIENT_ID_HEADER] = param[1]
+
+    def acknowledge(self, *args, **kwargs):
+        """Return a successful result message."""
+        class_ = self.getAcknowledgeClass()
+        response = class_()
+        self._matchAcknowledge(response)
+        return response
+
+    def _matchAcknowledge(self, response, *args, **kwargs):
+        """Syncs values between this message and it's response acknowledgement."""
+        response.correlationId = self.operation

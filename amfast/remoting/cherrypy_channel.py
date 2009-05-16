@@ -2,7 +2,7 @@
 
 import cherrypy
 
-from amfast.remoting.channel import Channel
+from amfast.remoting.channel import HttpChannel
 
 def amfhook():
     """Checks for POST, and stops cherrypy from processing the body."""
@@ -14,8 +14,24 @@ def amfhook():
         raise cherrypy.HTTPError(405, "AMF request must use 'POST' method.");
 cherrypy.tools.amfhook = cherrypy.Tool('before_request_body', amfhook, priority=0)
 
-class CherryPyChannel(Channel):
-    """An AMF RPC channel that can be used with CherryPy HTTP framework."""
+class CherryPyChannel(HttpChannel):
+    """An AMF RPC channel that can be used with CherryPy HTTP framework.
+
+    CherryPyChannel is deprecated.
+    Please use WsgiChannel instead.
+    A WsgiChannel instance can be mounted to a URL
+    within CherryPy with the command cherrypy.tree.graft.
+
+    """
+
+    def __init__(self, *args, **kwargs):
+        raise DeprecationWarning("""CherryPyChannel is deprecated.
+Please use WsgiChannel instead.
+A WsgiChannel instance can be mounted to a URL
+within CherryPy with the command cherrypy.tree.graft.
+""")
+        Channel.__init__(self, *args, **kwargs)
+
     @cherrypy.expose
     @cherrypy.tools.amfhook()
     def processMsg(self):
@@ -27,4 +43,8 @@ class CherryPyChannel(Channel):
 
         response = self.invoke(self.decode(raw_request))
         cherrypy.response.headers['Content-Type'] = self.CONTENT_TYPE
-        return response
+        return self.encode(response)
+
+    def waitForMessage(self, packet, message, connection):
+        cherrypy.request.timeout = 1000000
+        Channel.waitForMessage(self, packet, message, connection)

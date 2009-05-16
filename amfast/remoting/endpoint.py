@@ -4,7 +4,13 @@ import amfast
 from amfast.encoder import Encoder
 from amfast.decoder import Decoder
 
-class AmfEndpoint(object):
+class Endpoint(object):
+    def logRaw(label, raw):
+        if hasattr(raw, "upper"):
+            amfast.logger.debug("<%s>%s</%s>" %
+                    (label, amfast.format_byte_string(raw_packet), label))
+
+class AmfEndpoint(Endpoint):
     """An Endpoint that can encode/decode AMF packets.
 
     arguments
@@ -23,21 +29,33 @@ class AmfEndpoint(object):
         self.decoder = decoder
 
     def decodePacket(self, raw_packet, *args, **kwargs):
+        """Decode an AMF packet."""
         if amfast.log_raw:
-            if hasattr(raw_packet, "upper"):
-                # Only print this if raw_packet is a string
-                amfast.logger.debug("<rawRequestPacket>%s</rawRequestPacket>" %
-                    amfast.format_byte_string(raw_packet))
+            self.logRaw('rawDecodePacket', raw_packet)
 
         return self.decoder.decode_packet(raw_packet)
 
     def encodePacket(self, packet):
+        """Encode an AMF packet."""
         raw_packet = self.encoder.encode_packet(packet)
 
         if amfast.log_raw:
-            if hasattr(raw_packet, "upper"):
-                # Only print this if raw_packet is a string
-                amfast.logger.debug("<rawResponsePacket>%s</rawResponsePacket>" %
-                    amfast.format_byte_string(raw_packet))
+            self.logRaw('rawEncodePacket', raw_packet)
 
         return raw_packet
+
+    def decode(self, raw_obj, amf3=None):
+        """Decode an AMF object."""
+        if amfast.log_raw:
+            self.logRaw('rawDecodeObject', raw_obj)
+
+        return self.decoder.decode(raw_obj, amf3)
+
+    def encode(self, obj, amf3=None):
+        """Encode an AMF object."""
+        raw_obj = self.encoder.encode(obj, amf3)
+
+        if amfast.log_raw:
+            self.logRaw('rawEncodeObject', raw_obj)
+
+        return raw_obj
