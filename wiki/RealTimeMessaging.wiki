@@ -2,7 +2,7 @@
 
 = Real-time messaging Example =
 
-This example demonstrates using Producer/Consumer messaging with an HTTP streaming channel to achieve real-time messaging.
+This example demonstrates using Producer/Consumer messaging with an HTTP streaming channel to achieve real-time messaging. A 'master' client can drag a circular object around the screen, and the movements of the object will be replicated to all other subscribed clients.
 
 The example is located in SVN within the [http://code.google.com/p/amfast/source/browse/trunk/examples/streaming examples/streaming] directory
 
