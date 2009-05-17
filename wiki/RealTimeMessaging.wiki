@@ -16,8 +16,6 @@ When the 'master' client drags the yellow circle around the screen, the new posi
 
 Click the 'Master' button to become the master client.
 
-Click the 'Publish' button to send a message.
-
 If you change the messaging url, you must un-subscribe and re-subscribe to start receiving messages from the new url.
 
 == !CherryPy ==
