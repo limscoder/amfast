@@ -18,6 +18,10 @@
 						text="Hello World!"
 						width="400"/>
 				</mx:FormItem>
+				
+				<mx:FormItem label="subscribed:">
+					<mx:Label text="{subscribed? 'yes':'no'}"/>
+				</mx:FormItem>
 			</mx:Form>
 			
 			<mx:VRule />
@@ -45,7 +49,7 @@
 						label="Publish"
 						click="publishMessage()"
 						toolTip="Publish a message."
-						enabled="false"
+						enabled="{subscribed}"
 						width="100%"/>
 				</mx:FormItem>
 			</mx:Form>
@@ -71,68 +75,81 @@
 			import mx.messaging.events.MessageEvent;
 			import mx.messaging.events.MessageFaultEvent;
 			import mx.messaging.messages.AsyncMessage;
-
-			protected var consumers:Object;
+			
+			protected const TOPIC:String = 'messages';
+			
+			protected var channelSet:ChannelSet;
+			protected var consumer:Consumer;
+			protected var producer:Producer;
 			protected var serverUrl:String;
-			protected var producers:Object;
+			[Bindable]
+			protected var subscribed:Boolean = false;
 			
 			[Bindable]
 			protected var messages:ArrayCollection = new ArrayCollection();
 			
 			/**
-			 * Create a message Consumer with url from user input.
+			 * Create the AMF Channels
+			 * that messages will be
+			 * sent and recieved from.
 			 */
-			public function getConsumer(destination:String):Consumer
+			protected function getChannelSet():ChannelSet
 			{
-				if (consumers == null) {
-					consumers = {};
+				if (channelSet != null && serverUrl == messagingUrl.text)
+				{
+					// User has not changed URL.
+					// Use existing channelSet.
+					return channelSet;
 				}
 				
-				if (messagingUrl.text == serverUrl &&
-					consumers.hasOwnProperty(destination)) {
-					// Use existing consumer
-					return consumers[destination];
-				}
-				
-				var consumer:Consumer = new Consumer();
-				consumer.destination = destination;
-				consumers[destination] = consumer;
-				
-				// Create the AMF Channel
 				serverUrl = messagingUrl.text;
-				var channel:AMFChannel = new AMFChannel("amf-polling-channel", serverUrl);
-
-				// Create a channel set and add your channel(s) to it
-				var channels:ChannelSet = new ChannelSet();
-				channels.addChannel(channel);
-				consumer.channelSet = channels;
-					
+				var channel:AMFChannel = new AMFChannel("streaming-channel", serverUrl);
+				
+				// Create a channel set and add channel(s) to it
+				channelSet = new ChannelSet();
+				channelSet.addChannel(channel);
+				
+				return channelSet;
+			}
+			
+			/**
+			 * Create a Consumer with url from user input.
+			 */
+			protected function getConsumer():Consumer
+			{
+				if (consumer != null && consumer.channelSet == channelSet) {
+					// URL has not changed since
+					// last time, return
+					// existing consumer
+					return consumer;
+				}
+				
+				// Create a new Consumer
+				// and set it's destination
+				// name to the topic we want
+				// to subscribe to.
+				consumer = new Consumer();
+				consumer.destination = TOPIC;
+				consumer.channelSet = getChannelSet();
+				
 				return consumer;
 			}
 			
 			/**
 			 * Create a message Producer with url from user input.
 			 */
-			public function getProducer(destination:String):Producer
+			protected function getProducer():Producer
 			{
-				if (producers == null) {
-					producers = {};
+				if (producer != null && producer.channelSet == channelSet) {
+					// URL has not changed since
+					// last time, return
+					// existing consumer
+					return producer;
 				}
 				
-				if (messagingUrl.text == serverUrl &&
-					producers.hasOwnProperty(destination)) {
-					// Use existing producer
-					return producers[destination];
-				}
-				
-				var producer:Producer = new Producer();
-				producer.destination = destination;
-				producers[destination] = producer;
-				
-				// Use the ChannelSet that was already created
-				// for the Consumer.
-				var consumer:Consumer = getConsumer(destination);
-				producer.channelSet = consumer.channelSet;
+				producer = new Producer();
+				producer.destination = TOPIC;
+				producer.channelSet = getChannelSet();
 				
 				return producer;
 			}
@@ -142,30 +159,30 @@
 			 */
 			protected function subscribeMessaging():void
 			{
-				var consumer:Consumer = getConsumer('messages');
+				var consumer:Consumer = getConsumer();
 				consumer.addEventListener(MessageEvent.MESSAGE,
-					lastMsgMsgHandler, false, 0 , true);
+					consumer_msgHandler, false, 0 , true);
 				consumer.addEventListener(MessageFaultEvent.FAULT,
 					faultHandler, false, 0, true);
 				consumer.subscribe();
 				
-				publishBtn.enabled = true;
+				subscribed = true;
 			}
 			
 			protected function unSubscribeMessaging():void
 			{
-				var consumer:Consumer = getConsumer('messages');
+				var consumer:Consumer = getConsumer();
 				if (consumer.subscribed) {
 					consumer.unsubscribe();
 				}
 				
-				publishBtn.enabled = false;
+				subscribed = false;
 			}
 			
 			/**
 			 * Handle an incoming message.
 			 */
-			protected function lastMsgMsgHandler(event:MessageEvent):void
+			protected function consumer_msgHandler(event:MessageEvent):void
 			{
 				messages.addItem(String(event.message.body));
 			}
@@ -180,11 +197,11 @@
 			}
 			
 			/**
-			 * Publish a message.
+			 * Publish a message to all clients.
 			 */
 			protected function publishMessage():void
 			{
-				var producer:Producer = Application.application.getProducer('messages');
+				var producer:Producer = getProducer();
 				var msg:AsyncMessage = new AsyncMessage();
 				msg.body = publishInput.text;
 				producer.send(msg);

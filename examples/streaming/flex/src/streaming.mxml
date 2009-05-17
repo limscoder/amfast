@@ -11,6 +11,10 @@
 						width="400"/>
 				</mx:FormItem>
 				
+				<mx:FormItem label="subscribed:">
+					<mx:Label text="{subscribed? 'yes':'no'}"/>
+				</mx:FormItem>
+				
 				<mx:FormItem label="status:">
 					<mx:Label text="{master? 'master':'slave'}"/>
 				</mx:FormItem>
@@ -32,6 +36,7 @@
 						label="UnSubscribe"
 						click="unSubscribeMessaging()"
 						toolTip="UnSubscribe from messages."
+						enabled="{subscribed}"
 						width="100%"/>
 				</mx:FormItem>
 				
@@ -39,6 +44,7 @@
 					<mx:Button
 						id="closeBtn"
 						label="Close Connection"
+						click="disconnect()"
 						toolTip="Close streaming connection."
 						enabled="false"
 						width="100%"/>
@@ -88,13 +94,14 @@
 			protected const TOPIC:String = 'coordinates';
 			
 			protected var channelSet:ChannelSet;
-			[Bindable]
 			protected var consumer:Consumer;
 			protected var producer:Producer;
 			protected var serverUrl:String;
 			protected var circle:Sprite;
 			[Bindable]
 			protected var master:Boolean = false;
+			[Bindable]
+			protected var subscribed:Boolean = false;
 			
 			/**
 			 * Draw a circle that we can drag around.
@@ -243,6 +250,7 @@
 					
 				// Subscribe to receive messages
 				consumer.subscribe();
+				subscribed = true;
 				
 				if (!master) {
 					masterBtn.enabled = true;
@@ -257,8 +265,8 @@
 					consumer.unsubscribe();
 				}
 				
+				subscribed = false;
 				masterBtn.enabled = false;
-				closeBtn.enabled = false;
 			}
 			
 			/**
@@ -294,6 +302,19 @@
 			{
 				Alert.show(event.faultString, 'Message Fault',
 					Alert.OK, this, null, null);
+			}
+			
+			/**
+			 * Disconnect from channel.
+			 */
+			protected function disconnect():void
+			{
+				var channelSet:ChannelSet = getChannelSet();
+				channelSet.disconnectAll();
+				
+				subscribed = false;
+				masterBtn.enabled = false;
+				closeBtn.enabled = false;
 			}
 		]]>
 	</mx:Script>
