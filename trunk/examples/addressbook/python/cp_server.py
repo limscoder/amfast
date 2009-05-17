@@ -6,7 +6,7 @@ import cherrypy
 
 import amfast
 from amfast.remoting.channel import ChannelSet
-from amfast.remoting.cherrypy_channel import CherryPyChannel
+from amfast.remoting.wsgi_channel import WsgiChannel
 import utils
 
 class App(object):
@@ -42,12 +42,12 @@ if __name__ == '__main__':
     }
 
     channel_set = ChannelSet()
-    rpc_channel = CherryPyChannel('amf-channel')
+    rpc_channel = WsgiChannel('amf-channel')
     channel_set.mapChannel(rpc_channel)
     utils.setup_channel_set(channel_set)
 
     app = App()
-    app.amf = rpc_channel.processMsg
+    cherrypy.tree.graft(rpc_channel, '/amf')
     cherrypy.quickstart(app, '/', config=cp_options)
 
     print "Serving on %s:%s" % (options.domain, options.port)

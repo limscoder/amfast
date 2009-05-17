@@ -25,12 +25,11 @@ class CherryPyChannel(HttpChannel):
     """
 
     def __init__(self, *args, **kwargs):
-        raise DeprecationWarning("""CherryPyChannel is deprecated.
-Please use WsgiChannel instead.
-A WsgiChannel instance can be mounted to a URL
-within CherryPy with the command cherrypy.tree.graft.
-""")
-        Channel.__init__(self, *args, **kwargs)
+        print "CherryPyChannel is deprecated." \
+            "Use WsgiChannel instead." \
+            "A WsgiChannel instance can be mounted to a URL" \
+            "within CherryPy with the command cherrypy.tree.graft."
+        HttpChannel.__init__(self, *args, **kwargs)
 
     @cherrypy.expose
     @cherrypy.tools.amfhook()
