@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Application xmlns:mx="http://www.adobe.com/2006/mxml">
+	<mx:Panel width="100%" height="100%"
+		title="Flex -- AmFast -- Producer Consumer Example">
+		<mx:HBox width="100%">
+			<mx:Form>
+				<mx:FormItem label="messaging url:">
+					<mx:TextInput
+						id="messagingUrl"
+						text="http://localhost:8000/amf"
+						width="400"/>
+				</mx:FormItem>
+				
+				<mx:FormItem label="message to publish:">
+					<mx:TextInput
+						id="publishInput"
+						toolTip="Enter a message to publish."
+						text="Hello World!"
+						width="400"/>
+				</mx:FormItem>
+				
+				<mx:FormItem label="subscribed:">
+					<mx:Label text="{subscribed? 'yes':'no'}"/>
+				</mx:FormItem>
+			</mx:Form>
+			
+			<mx:VRule />
+			
+			<mx:Form>
+				<mx:FormItem width="100%">
+					<mx:Button
+						label="Subscribe"
+						click="subscribeMessaging()"
+						toolTip="Subscribe to messages."
+						width="100%"/>
+				</mx:FormItem>
+				
+				<mx:FormItem width="100%">
+					<mx:Button
+						label="UnSubscribe"
+						click="unSubscribeMessaging()"
+						toolTip="UnSubscribe from messages."
+						width="100%"/>
+				</mx:FormItem>
+				
+				<mx:FormItem width="100%">
+					<mx:Button
+						id="publishBtn"
+						label="Publish"
+						click="publishMessage()"
+						toolTip="Publish a message."
+						enabled="{subscribed}"
+						width="100%"/>
+				</mx:FormItem>
+			</mx:Form>
+		</mx:HBox>
+		
+		<mx:Label text="messages:" />
+		
+		<mx:List
+			id="msgList"
+			width="100%"
+			height="100%"
+			dataProvider="{messages}" />
+	</mx:Panel>
+	
+	<mx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.messaging.Consumer;
+			import mx.messaging.Producer;
+			import mx.messaging.ChannelSet;
+			import mx.messaging.channels.AMFChannel;
+			import mx.messaging.events.MessageEvent;
+			import mx.messaging.events.MessageFaultEvent;
+			import mx.messaging.messages.AsyncMessage;
+			
+			protected const TOPIC:String = 'messages';
+			
+			protected var channelSet:ChannelSet;
+			protected var consumer:Consumer;
+			protected var producer:Producer;
+			protected var serverUrl:String;
+			[Bindable]
+			protected var subscribed:Boolean = false;
+			
+			[Bindable]
+			protected var messages:ArrayCollection = new ArrayCollection();
+			
+			/**
+			 * Create the AMF Channels
+			 * that messages will be
+			 * sent and recieved from.
+			 */
+			protected function getChannelSet():ChannelSet
+			{
+				if (channelSet != null && serverUrl == messagingUrl.text)
+				{
+					// User has not changed URL.
+					// Use existing channelSet.
+					return channelSet;
+				}
+				
+				serverUrl = messagingUrl.text;
+				var channel:AMFChannel = new AMFChannel("streaming-channel", serverUrl);
+				
+				// Create a channel set and add channel(s) to it
+				channelSet = new ChannelSet();
+				channelSet.addChannel(channel);
+				
+				return channelSet;
+			}
+			
+			/**
+			 * Create a Consumer with url from user input.
+			 */
+			protected function getConsumer():Consumer
+			{
+				if (consumer != null && consumer.channelSet == channelSet) {
+					// URL has not changed since
+					// last time, return
+					// existing consumer
+					return consumer;
+				}
+				
+				// Create a new Consumer
+				// and set it's destination
+				// name to the topic we want
+				// to subscribe to.
+				consumer = new Consumer();
+				consumer.destination = TOPIC;
+				consumer.channelSet = getChannelSet();
+				
+				return consumer;
+			}
+			
+			/**
+			 * Create a message Producer with url from user input.
+			 */
+			protected function getProducer():Producer
+			{
+				if (producer != null && producer.channelSet == channelSet) {
+					// URL has not changed since
+					// last time, return
+					// existing consumer
+					return producer;
+				}
+				
+				producer = new Producer();
+				producer.destination = TOPIC;
+				producer.channelSet = getChannelSet();
+				
+				return producer;
+			}
+			
+			/**
+			 * Subscribe to the 'messages' topic.
+			 */
+			protected function subscribeMessaging():void
+			{
+				var consumer:Consumer = getConsumer();
+				consumer.addEventListener(MessageEvent.MESSAGE,
+					consumer_msgHandler, false, 0 , true);
+				consumer.addEventListener(MessageFaultEvent.FAULT,
+					faultHandler, false, 0, true);
+				consumer.subscribe();
+				
+				subscribed = true;
+			}
+			
+			protected function unSubscribeMessaging():void
+			{
+				var consumer:Consumer = getConsumer();
+				if (consumer.subscribed) {
+					consumer.unsubscribe();
+				}
+				
+				subscribed = false;
+			}
+			
+			/**
+			 * Handle an incoming message.
+			 */
+			protected function consumer_msgHandler(event:MessageEvent):void
+			{
+				messages.addItem(String(event.message.body));
+			}
+			
+			/**
+			 * Handle a failed message.
+			 */ 
+			protected function faultHandler(event:MessageFaultEvent):void
+			{
+				Alert.show(event.faultString, 'Message Fault',
+					Alert.OK, this, null, null);
+			}
+			
+			/**
+			 * Publish a message to all clients.
+			 */
+			protected function publishMessage():void
+			{
+				var producer:Producer = getProducer();
+				var msg:AsyncMessage = new AsyncMessage();
+				msg.body = publishInput.text;
+				producer.send(msg);
+			}
+		]]>
+	</mx:Script>
+</mx:Application>
