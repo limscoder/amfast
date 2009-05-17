@@ -250,9 +250,10 @@ class RemotingTestCase(unittest.TestCase):
         outter_msg.body = (inner_msg, )
 
         packet = remoting.Packet(messages=[outter_msg])
-        encoded_packet = self.channel.endpoint.encodePacket(packet)
-        decoded_packet = self.channel.endpoint.decodePacket(encoded_packet)
-        encoded_response = self.channel.invoke(decoded_packet)
+        encoded_packet = self.channel.encode(packet)
+        decoded_packet = self.channel.decode(encoded_packet)
+        response = self.channel.invoke(decoded_packet)
+        encoded_response = self.channel.encode(response)
         response = self.channel.endpoint.decodePacket(encoded_response)
 
         # Check outer msg

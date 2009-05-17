@@ -195,24 +195,8 @@ static PyObject* Ref_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
     return (PyObject *)self;
 }
 
-static int Ref_check(PyObject *self)
-{
-    PyObject *class = PyObject_GetAttrString(context_mod, "Ref");
-    if (class == NULL)
-        return 0;
-
-    int result = PyObject_IsInstance(self, class);
-    Py_DECREF(class);
-    return result;
-}
-
 static int Ref_init(PyObject *self_raw, PyObject *args, PyObject *kwargs)
 {
-    if (Ref_check(self_raw) == 0) {
-        PyErr_SetString(amfast_ContextError, "__init__ argument must be amfast.context.Ref");
-        return -1;
-    }
-
     RefObj *self = (RefObj*)self_raw;
 
     self->refs = PyDict_New();
@@ -449,11 +433,6 @@ static int Decoder_initIdx(DecoderObj *self)
 
 static int Decoder_init(PyObject *self_raw, PyObject *args, PyObject *kwargs)
 {
-    if (Decoder_check(self_raw) == 0) {
-        PyErr_SetString(amfast_ContextError, "__init__ argument must be amfast.context.DecoderContext");
-        return -1;
-    }
-
     DecoderObj *self = (DecoderObj*)self_raw;
 
     static char *kwlist[] = {"buffer", "class_def_mapper", "amf3", NULL};
@@ -611,13 +590,15 @@ static PyObject* Decoder_copy(DecoderObj *self, int amf3)
  */
 static int Decoder_check(PyObject *self)
 {
-    PyObject *class = PyObject_GetAttrString(context_mod, "DecoderContext");
-    if (class == NULL)
+    if (!PyObject_HasAttrString(self, "class_def_mapper")) {
         return 0;
+    }
 
-    int result = PyObject_IsInstance(self, class);
-    Py_DECREF(class);
-    return result;
+    if (PyObject_HasAttrString(self, "use_collections")) {
+        return 0;
+    }
+
+    return 1;
 }
 
 /* 
@@ -889,11 +870,6 @@ static int Encoder_initRef(EncoderObj *self)
 
 static int Encoder_init(PyObject *self_raw, PyObject *args, PyObject *kwargs)
 {
-    if (Encoder_check(self_raw) == 0) {
-        PyErr_SetString(amfast_ContextError, "__init__ argument must be amfast.context.EncoderContext");
-        return -1;
-    }
-
     EncoderObj *self = (EncoderObj*)self_raw;
 
     static char *kwlist[] = {"buffer", "class_def_mapper", "amf3", "use_collections",
@@ -1097,13 +1073,15 @@ static PyObject* Encoder_copy(EncoderObj *self, int amf3, int new_buf)
  */
 static int Encoder_check(PyObject *self)
 {
-    PyObject *class = PyObject_GetAttrString(context_mod, "EncoderContext");
-    if (class == NULL)
+    if (!PyObject_HasAttrString(self, "class_def_mapper")) {
         return 0;
+    }
 
-    int result = PyObject_IsInstance(self, class);
-    Py_DECREF(class);
-    return result;
+    if (!PyObject_HasAttrString(self, "use_collections")) {
+        return 0;
+    }
+
+    return 1;
 }
 
 /* 
