@@ -22,7 +22,7 @@ class Decoder(object):
     def _getContext(self, input, amf3=None):
         if amf3 is None:
             amf3 = self.amf3
-        return DecoderContext(input, amf3=amf3, class_def_mapper=self.class_def_mapper);
+        return DecoderContext(input, amf3=amf3, class_def_mapper=self.class_def_mapper)
 
     def decode(self, val, amf3=None):
         """Decode a string or file-like-object from AMF."""
