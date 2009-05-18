@@ -57,7 +57,7 @@ if __name__ == '__main__':
     # a response to the client until
     # a message is available, or channel.max_interval
     # is reached.
-    long_poll_channel = WsgiChannel('long-poll-channel', wait_interval=-1)
+    long_poll_channel = WsgiChannel('long-poll-channel', wait_interval=10)
     channel_set.mapChannel(long_poll_channel)
 
     app = App()
