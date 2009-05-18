@@ -104,20 +104,10 @@ def poll_operation(packet, msg, *args):
     channel = packet.channel
     connection = channel.channel_set.getFlexConnection(packet, msg)
 
-    if channel.wait_interval < 0:
+    if not connection.hasMessages() and channel.wait_interval != 0:
         # Long polling channel, don't return response
         # until a message is available.
-        if not connection.hasMessages():
-            # Only wait for messages,
-            # if message qeue is currently empty
-            #
-            # Let the channel handle the implementation,
-            # because implementation will be different for
-            # Async servers (Twisted) and threaded servers (everything else)
-            channel.waitForMessage(packet, msg, connection)
-    elif channel.wait_interval > 0:
-        # TODO: make this non-blocking for async servers
-        time.sleep(channel.wait_interval)
+        channel.waitForMessage(packet, msg, connection)
     messages = connection.poll()
 
     if isinstance(packet.channel.endpoint, AmfEndpoint):

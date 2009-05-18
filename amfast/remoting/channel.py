@@ -362,8 +362,6 @@ class HttpChannel(Channel):
          long-polling channel.
      * check_interval - int or float, Number of seconds to wait between message
          qeue checks when checking for new messages. Internal polling interval.
-     * max_interval - int or float, Maximum number of seconds a long-poll client should
-         stay connected when using long-polling.
     """
 
     # Content type for amf messages
@@ -371,14 +369,13 @@ class HttpChannel(Channel):
 
     def __init__(self, name, max_connections=-1, endpoint=None,
         timeout=1800, connection_class=Connection, wait_interval=0,
-        check_interval=.1, max_interval=90):
+        check_interval=0.1):
 
         Channel.__init__(self, name, max_connections, endpoint,
             timeout, connection_class)
 
         self._wait_interval = wait_interval
         self.check_interval = check_interval
-        self.max_interval = max_interval
 
     # wait_interval should be read-only
     def _getWaitInterval(self):
@@ -392,11 +389,19 @@ class HttpChannel(Channel):
         for Channels where each connection is a thread.
         """
         total = 0
-        while total < self.max_interval:
-            time.sleep(self.check_interval)
-            total += self.check_interval
+        while True:
+            if connection.active is False:
+                return
+
             if connection.hasMessages():
                 return
+
+            if self.wait_interval > 0 and total > self.wait_interval:
+                # Max wait interval reached.
+                return
+
+            time.sleep(self.check_interval)
+            total += self.check_interval
 
 class ChannelSet(object):
     """A collection of Channels.

@@ -11,12 +11,11 @@ class TwistedChannel(Resource, HttpChannel):
     """An AMF RPC channel that can be used with Twisted Web."""
 
     def __init__(self, name, max_connections=-1, endpoint=None,
-        timeout=1800, connection_class=Connection, wait_interval=0,
-        check_interval=1, max_interval=90):
+        timeout=1800, connection_class=Connection, wait_interval=0, check_interval=0.1):
 
         Resource.__init__(self)
         HttpChannel.__init__(self, name, max_connections, endpoint,
-            timeout, connection_class, wait_interval, check_interval, max_interval)
+            timeout, connection_class, wait_interval, check_interval)
 
     # This attribute is added to packets
     # that are waiting for a long-poll
@@ -97,7 +96,6 @@ class TwistedChannel(Resource, HttpChannel):
         total = [0] # Lame hack to be able to increment within closure. There has to be a better way...
         def _checkMsgs():
             """Keep calling this method until we find messages."""
-
             if connection.active is False or hasattr(request, disconnect_flag):
                 # Connection was closed.
                 # Let's get out of here.
@@ -106,13 +104,14 @@ class TwistedChannel(Resource, HttpChannel):
                 self.checkComplete(packet.response, request)
                 return
 
-            if not connection.hasMessages() and not total[0] > self.max_interval:
-                # We're still looking for a message.
-                total[0] += self.check_interval
-                return
+            if not connection.hasMessages():
+                if self.wait_interval < 0 or total[0] < self.wait_interval:
+                    # Keep waiting for a message.
+                    total[0] += self.check_interval
+                    return
 
             # At least one message is present
-            # or we've hit max_interval
+            # or we've hit wait_interval
             looper.stop()
 
             # Get messages and add them
@@ -134,9 +133,9 @@ class StreamingTwistedChannel(TwistedChannel):
     """Handles streaming http connections."""
 
     def __init__(self, name, max_connections=-1, endpoint=None,
-        timeout=1800, wait_interval=0, check_interval=1, max_interval=90):
+        timeout=1800, wait_interval=0, check_interval=1):
         TwistedChannel.__init__(self, name, max_connections, endpoint,
-            timeout, StreamingConnection, wait_interval, check_interval, max_interval)
+            timeout, StreamingConnection, wait_interval, check_interval)
 
     def render_POST(self, request):
         """Process and incoming AMF packet."""
@@ -163,7 +162,7 @@ class StreamingTwistedChannel(TwistedChannel):
         """Get this stream rolling!"""
 
         connection = self.channel_set.getConnection(msg.headers.get(msg.FLEX_CLIENT_ID_HEADER))
-        setattr(connection, self.MSG_REQUEST, request)
+        connection.setSessionAttr(self.MSG_REQUEST, request)
         connection.connected = True
 
         # Make sure connection gets cleaned up
@@ -188,7 +187,7 @@ class StreamingTwistedChannel(TwistedChannel):
 
     def publish(self, connection, msg):
         """Write message."""
-        request = getattr(connection, self.MSG_REQUEST)
+        request = connection.getSessionAttr(self.MSG_REQUEST)
         request.write(messaging.StreamingMessage.prepareMsg(msg, self.endpoint))
 
     def disconnect(self, connection):
@@ -196,14 +195,14 @@ class StreamingTwistedChannel(TwistedChannel):
         TwistedChannel.disconnect(self, connection)
         connection.connected = False
 
-        if not hasattr(connection, self.MSG_REQUEST):
+        if not connection.hasSessionAttr(self.MSG_REQUEST):
             return
 
-        request = getattr(connection, self.MSG_REQUEST)
+        request = connection.getSessionAttr(self.MSG_REQUEST)
         msg = messaging.StreamingMessage.getDisconnectMsg()
         request.write(messaging.StreamingMessage.prepareMsg(msg, self.endpoint))
         request.finish()
-        delattr(connection, self.MSG_REQUEST)
+        connection.delSessionAttr(self.MSG_REQUEST)
 
     def startBeat(self, connection, request):
         # Send out heart beat.

@@ -91,10 +91,9 @@ class StreamingWsgiChannel(WsgiChannel):
     WRITE_ATTR = "_write_method"
 
     def __init__(self, name, max_connections=-1, endpoint=None,
-        timeout=1800, wait_interval=0, check_interval=1,
-        max_interval=90, thread_safe_write=True):
+        timeout=1800, wait_interval=0,  thread_safe_write=True):
         WsgiChannel.__init__(self, name, max_connections, endpoint,
-            timeout, StreamingConnection, wait_interval, check_interval, max_interval)
+            timeout, StreamingConnection, wait_interval, check_interval)
 
         self.thread_safe_write = thread_safe_write # True if write() can be called from a different thread
 
@@ -126,7 +125,7 @@ class StreamingWsgiChannel(WsgiChannel):
 
     def publish(self, connection, msg):
         """Send response."""
-        write = getattr(connection, self.WRITE_ATTR)
+        write = connection.getSessionAttr(self.WRITE_ATTR)
         try:
             bytes = messaging.StreamingMessage.prepareMsg(msg, self.endpoint)
         except (KeyboardInterrupt, SystemExit):
@@ -143,6 +142,8 @@ class StreamingWsgiChannel(WsgiChannel):
     def disconnect(self, connection):
         WsgiChannel.disconnect(self, connection)
         connection.connected = False
+        if connection.hasSessionAttr(self.WRITE_ATTR):
+            connection.delSessionAttr(self.WRITE_ATTR)
 
     def startStream(self, environ, start_response, msg):
         """Start streaming response."""
@@ -162,7 +163,7 @@ class StreamingWsgiChannel(WsgiChannel):
         try:
             # Set write method, so we can write to it later on
             connection.connected = True
-            setattr(connection, self.WRITE_ATTR, write)
+            connection.getSessionAttr(self.WRITE_ATTR, write)
             if self.thread_safe_write is True:
                 connection.channel_publish = True
             else:
@@ -178,7 +179,7 @@ class StreamingWsgiChannel(WsgiChannel):
                 # WSGI servers that can't do
                 # thread-safe write(), must poll
                 # for messages.
-                return self.waitForMessages(msg, connection)
+                return self.writeWait(msg, connection)
         except (KeyboardInterrupt, SystemExit):
             raise
         except Exception, exc:
@@ -192,7 +193,7 @@ class StreamingWsgiChannel(WsgiChannel):
         connection.disconnect()
 
     def startBeat(self, connection):
-        write = getattr(connection, self.WRITE_ATTR)
+        write = connection.getSessionAttr(self.WRITE_ATTR)
 
         while True:
             try:
@@ -217,9 +218,9 @@ class StreamingWsgiChannel(WsgiChannel):
                 amfast.log_exc()
                 connection.disconnect()
 
-    def waitForMessages(self, msg, connection):
+    def writeWait(self, msg, connection):
         """Generator function that returns a message when one becomes available."""
-        write = getattr(connection, self.WRITE_ATTR)
+        write = connection.getSessionAttr(self.WRITE_ATTR)
 
         total_time = 0
         while True:
