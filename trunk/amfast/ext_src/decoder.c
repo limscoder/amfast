@@ -1461,6 +1461,8 @@ static PyObject* decode_AMF3(DecoderObj *context)
            return deserialize_xml_AMF3(context);
         case BYTE_ARRAY_TYPE:
             return deserialize_byte_array_AMF3(context);
+        case AMF3_AMF0:
+            return decode_AMF3(context);
         default:
             break;
     }
