@@ -4,6 +4,8 @@
 
 This example demonstrates using Producer/Consumer messaging with an HTTP streaming channel to achieve real-time messaging. The application displays a circular object. A 'master' client can drag the object around the screen, and the movements of the object will be replicated to all other subscribed clients.
 
+[http://ccp.arl.arizona.edu/dthompso/amfast/circle_sprite_demo.htm Example demo]
+
 The example is located in SVN within the [http://code.google.com/p/amfast/source/browse/trunk/examples/streaming examples/streaming] directory
 
 The example has scripts for serving the application via [http://www.cherrypy.org/ CherryPy] and [http://twistedmatrix.com/trac/ Twisted Web].
