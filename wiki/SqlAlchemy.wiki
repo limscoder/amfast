@@ -4,6 +4,8 @@
 
 This example demonstrates persisting data with [http://www.sqlite.org/ SqlLite] and [http://www.sqlalchemy.org/ SqlAlchemy].
 
+[http://ccp.arl.arizona.edu/dthompso/amfast/contacts_demo.htm Example demo]
+
 The example is located in SVN within the [http://code.google.com/p/amfast/source/browse/trunk/examples/addressbook examples/addressbook] directory
 
 The example has scripts for serving the application via [http://www.cherrypy.org/ CherryPy], [http://twistedmatrix.com/trac/ Twisted Web], or WSGI.
