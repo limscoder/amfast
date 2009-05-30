@@ -4,6 +4,8 @@
 
 This example demonstrates using Producer/Consumer messaging with HTTP polling and HTTP long-polling channels. The application is a very simple chat client.
 
+[http://ccp.arl.arizona.edu/dthompso/amfast/chat_demo.htm Example demo]
+
 The example is located in SVN within the [http://code.google.com/p/amfast/source/browse/trunk/examples/messaging examples/messaging] directory
 
 The example has scripts for serving the application via [http://www.cherrypy.org/ CherryPy] and [http://twistedmatrix.com/trac/ Twisted Web].
