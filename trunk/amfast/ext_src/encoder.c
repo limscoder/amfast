@@ -1994,12 +1994,7 @@ static PyObject* py_encode(PyObject *self, PyObject *args, PyObject *kwargs)
 
     int result;
     if (enc_context->amf3 == Py_True) {
-        // Write AMF3 type marker
-        if (Encoder_writeByte(enc_context, AMF3_AMF0) != 1) {
-            result = 0;
-        } else {
-            result = encode_AMF3(enc_context, value);
-        }
+        result = encode_AMF3(enc_context, value);
     } else {
         result = encode_AMF0(enc_context, value);
     }

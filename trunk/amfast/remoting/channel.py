@@ -75,7 +75,7 @@ class Connection(object):
         ==========
          * attr - string, name of the attribute to query.
         """
-        return attr in self.session_attrs
+        return attr in self._session_attrs
 
     def getSessionAttr(self, attr):
         """Get the value of a session attribute.
