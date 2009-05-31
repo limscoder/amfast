@@ -110,6 +110,7 @@ class CallableTarget(Target):
         """Calls self.callable and passes *args."""
         if amfast.log_debug:
             amfast.logger.debug(self._invokeStr(args))
+
         return self.callable(*args)
 
 class ExtCallableTarget(CallableTarget):
@@ -124,6 +125,7 @@ class ExtCallableTarget(CallableTarget):
     def invoke(self, packet, msg, args):
         if amfast.log_debug:
             amfast.logger.debug(self._invokeStr(args))
+
         return self.callable(packet, msg, *args)
 
 class Header(object):
@@ -172,10 +174,15 @@ class Message(object):
 
     def _isInvokable(self):
         """If True, the message's body can invoke itself."""
-        if self.target != 'null':
-            return False
-        return True
+        if self.target == 'null':
+            return True
+        return False
     is_invokable = property(_isInvokable)
+
+    def _isFlexMsg(self):
+        """If True, the message's body is a Flex message."""
+        return hasattr(self.body, 'FLEX_CLIENT_ID_HEADER')
+    is_flex_msg = property(_isFlexMsg)
 
     def invoke(self, request):
         """Invoke an action on an RPC message and return a response message."""
@@ -226,6 +233,15 @@ class Message(object):
 
         response_message.body = error_val
         return response_message
+
+    def convertFail(self, exc):
+        """Convert a successful message into a failure."""
+        self.target.replace(self.SUCCESS_TARGET, self.FAILED_TARGET)
+        
+        if self.is_flex_msg:
+            self.body = self.body.convertFail(exc=exc)
+        else:
+            self.body = AsError(exc=exc)
 
     def acknowledge(self, request):
         """Return a successful response message to acknowledge an RPC message."""

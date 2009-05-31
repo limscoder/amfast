@@ -11,7 +11,8 @@ class TwistedChannel(Resource, HttpChannel):
     """An AMF RPC channel that can be used with Twisted Web."""
 
     def __init__(self, name, max_connections=-1, endpoint=None,
-        timeout=1800, connection_class=Connection, wait_interval=0, check_interval=0.1):
+        timeout=1800, connection_class=Connection, wait_interval=0,
+        check_interval=0.1):
 
         Resource.__init__(self)
         HttpChannel.__init__(self, name, max_connections, endpoint,
@@ -25,13 +26,12 @@ class TwistedChannel(Resource, HttpChannel):
     # This attribute is added to store
     # Twisted's request var on the packet,
     # so that it can be available to targets.
-    MSG_REQUEST = '_msg_request'
+    TWISTED_REQUEST = '_twisted_request'
 
     def render_POST(self, request):
         """Process and incoming AMF packet."""
         if request.content:
-            len_str = 'Content-Length'
-            content_len = request.getHeader(len_str)
+            content_len = request.getHeader('Content-Length')
             raw_request = request.content.read(int(content_len))
 
             d = defer.Deferred()
@@ -46,8 +46,42 @@ class TwistedChannel(Resource, HttpChannel):
     def decode(self, raw_request, request):
         """Overridden to add Twisted's request object onto the packet."""
         decoded = HttpChannel.decode(self, raw_request)
-        setattr(decoded, self.MSG_REQUEST, request)
+        setattr(decoded, self.TWISTED_REQUEST, request)
         return decoded
+
+    def getDeferred(self, msg):
+        """Returns a Deferred object if a message contains a Deferred in its body,
+        or False if message is not deferred.
+        """
+        if msg.is_flex_msg:
+            body = msg.body.body
+            if isinstance(body, defer.Deferred):
+                return body
+        else:
+            body = msg.body
+            if isinstance(body, defer.Deferred):
+                return body
+        return False
+
+    def completeDeferreds(self, results, response, request, deferred_msgs):
+        """A response's deferred methods have completed."""
+        for i, result in enumerate(results):
+            msg = deferred_msgs[i]
+
+            if result[0] is False:
+                # Invokation failed
+                msg.convertFail(result[1].value)
+            else:
+                if msg.is_flex_msg:
+                    msg.body.body = result[1]
+                else:
+                    msg.body = result[1]
+ 
+        d = defer.Deferred()
+        d.addCallbacks(self.encode, self.fail, errbackArgs=(request,))
+        d.addCallbacks(self.finish, self.fail, callbackArgs=(request,),
+            errbackArgs=(request,))
+        d.callback(response) 
 
     def checkComplete(self, response, request):
         """Checks to determine if the response message is ready
@@ -56,7 +90,22 @@ class TwistedChannel(Resource, HttpChannel):
         """
 
         if hasattr(response, self.MSG_NOT_COMPLETE):
-            # Message is waiting on something
+            # Response is waiting for a message to be published.
+            return
+
+        # Check for deferred messages
+        deferreds = []
+        deferred_msgs = []
+        for msg in response.messages:
+            deferred = self.getDeferred(msg)
+            if deferred is not False:
+                deferreds.append(deferred)
+                deferred_msgs.append(msg)
+
+        if len(deferreds) > 0:
+            dl = defer.DeferredList(deferreds)
+            dl.addCallbacks(self.completeDeferreds, self.fail,
+                callbackArgs=(response, request, deferred_msgs), errbackArgs=(request,))
             return
 
         # Message is complete, encode and return
@@ -82,7 +131,7 @@ class TwistedChannel(Resource, HttpChannel):
         # from self.invoke.
         setattr(packet.response, self.MSG_NOT_COMPLETE, True)
 
-        request = getattr(packet, self.MSG_REQUEST)
+        request = getattr(packet, self.TWISTED_REQUEST)
 
         # Add a flag so we can tell if we lost the client
         disconnect_flag = "_DISCONNECTED"
@@ -138,7 +187,7 @@ class StreamingTwistedChannel(TwistedChannel):
             timeout, StreamingConnection, wait_interval, check_interval)
 
     def render_POST(self, request):
-        """Process and incoming AMF packet."""
+        """Process an incoming AMF packet."""
 
         if request.getHeader('Content-Type') == self.CONTENT_TYPE:
             # Regular AMF message
@@ -162,7 +211,7 @@ class StreamingTwistedChannel(TwistedChannel):
         """Get this stream rolling!"""
 
         connection = self.channel_set.getConnection(msg.headers.get(msg.FLEX_CLIENT_ID_HEADER))
-        connection.setSessionAttr(self.MSG_REQUEST, request)
+        connection.setSessionAttr(self.TWISTED_REQUEST, request)
         connection.connected = True
 
         # Make sure connection gets cleaned up
@@ -187,7 +236,7 @@ class StreamingTwistedChannel(TwistedChannel):
 
     def publish(self, connection, msg):
         """Write message."""
-        request = connection.getSessionAttr(self.MSG_REQUEST)
+        request = connection.getSessionAttr(self.TWISTED_REQUEST)
         request.write(messaging.StreamingMessage.prepareMsg(msg, self.endpoint))
 
     def disconnect(self, connection):
@@ -195,14 +244,14 @@ class StreamingTwistedChannel(TwistedChannel):
         TwistedChannel.disconnect(self, connection)
         connection.connected = False
 
-        if not connection.hasSessionAttr(self.MSG_REQUEST):
+        if not connection.hasSessionAttr(self.TWISTED_REQUEST):
             return
 
-        request = connection.getSessionAttr(self.MSG_REQUEST)
+        request = connection.getSessionAttr(self.TWISTED_REQUEST)
         msg = messaging.StreamingMessage.getDisconnectMsg()
         request.write(messaging.StreamingMessage.prepareMsg(msg, self.endpoint))
         request.finish()
-        connection.delSessionAttr(self.MSG_REQUEST)
+        connection.delSessionAttr(self.TWISTED_REQUEST)
 
     def startBeat(self, connection, request):
         # Send out heart beat.

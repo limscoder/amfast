@@ -92,6 +92,14 @@ class AbstractMessage(object):
         self._matchAcknowledge(packet, msg, response)
         return response
 
+    def convertFail(self, exc):
+        """Convert this message to an error."""
+        fault = FaultError(exc=exc)
+        headers = getattr(self, 'headers', None)
+        return ErrorMessage(self, clientId=self.clientId, destination=self.destination,
+            headers=headers, timeToLive=self.timeToLive, timestamp=self.timestamp,
+            messageId=self.messageId, correlationId=self.correlationId, exc=fault)
+
     def getAcknowledgeClass(self):
         """Returns the correct class for the response message."""
         return AcknowledgeMessage
