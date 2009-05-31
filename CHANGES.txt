@@ -1,11 +1,14 @@
 CHANGES
 ========
 
+0.3.3
+======
+ * Allow Target objects to return twisted.defer.Deferred objects when using TwistedChannel.
+ * Eliminated Channel.max_interval. Set Channel.wait_interval to a non-zero value instead.
+ * Ignore 0x11 AMF3 marker byte during AMF3 decoding. 
+
 0.3.2
 ======
-
-remoting
----------
  * Added http long-polling and http streaming channels.
 
 0.3.1
