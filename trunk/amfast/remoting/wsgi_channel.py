@@ -3,11 +3,26 @@ import time
 
 import amfast
 from amfast import AmFastError
-from amfast.remoting.channel import HttpChannel, StreamingConnection
+from amfast.remoting.channel import HttpChannel, Connection, StreamingConnection, ChannelError
 import amfast.remoting.flex_messages as messaging
 
 class WsgiChannel(HttpChannel):
     """WSGI app channel."""
+
+    def __init__(self, name, max_connections=-1, endpoint=None,
+        timeout=1800, connection_class=Connection, wait_interval=0,
+        check_interval=0.1):
+
+        if wait_interval < 0:
+            # There is no reliable way to detect
+            # when a client has disconnected,
+            # so if wait_interval < 0, threads will
+            # wait forever.
+            raise ChannelError('wait_interval < 0 is not supported by WsgiChannel')
+            
+        HttpChannel.__init__(self, name, max_connections=max_connections,
+            endpoint=endpoint, timeout=timeout, connection_class=connection_class,
+            wait_interval=wait_interval, check_interval=check_interval)
 
     def __call__(self, environ, start_response):
         if environ['REQUEST_METHOD'] != 'POST':
