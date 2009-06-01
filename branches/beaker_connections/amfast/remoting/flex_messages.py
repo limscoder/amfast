@@ -37,6 +37,9 @@ class_def.assign_attrs(FaultError, 'mx.rpc.Fault',
 class AbstractMessage(object):
     """Base class for all FlexMessages."""
 
+    AUTH_KEY = '_authenticated'
+    AUTH_USER_KEY = '_authenticated_user'
+
     DESTINATION_CLIENT_ID_HEADER = 'DSDstClientId'
     ENDPOINT_HEADER = 'DSEndpoint'
     FLEX_CLIENT_ID_HEADER = 'DSId'
@@ -302,7 +305,7 @@ class RemotingMessage(AbstractMessage):
                 remoting.Service.SEPARATOR.join((self.destination, self.operation)))
 
         if target.secure is True:
-            if connection.authenticated is False:
+            if self.AUTH_KEY not in connection or connection[self.AUTH_KEY] is False:
                 raise SecurityError("Operation requires authentication.")
 
         msg.response_msg.body.body = target.invoke(packet, msg, self.body)
@@ -335,7 +338,7 @@ class AsyncMessage(AbstractMessage):
         connection = channel_set.getFlexConnection(packet, msg)
 
         if channel_set.message_agent.secure is True:
-            if connection.authenticated is False:
+            if self.AUTH_KEY not in connection or connection[self.AUTH_KEY] is False:
                 raise SecurityError("Operation requires authentication.")
 
         channel_set.message_agent.publish(self,

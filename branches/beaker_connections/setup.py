@@ -38,7 +38,8 @@ setup(name="AmFast",
     packages = ['amfast', 'amfast.class_def', 'amfast.remoting', '.'],
     features = {'extensions': extensions},
     install_requires = {
-        'uuid': 'uuid>=1.3.0'
+        'uuid': 'uuid>=1.3.0',
+        'Beaker': 'Beaker>=1.3.0'
     },
     classifiers = [
         "Programming Language :: Python :: 2.4",

@@ -2,7 +2,7 @@ from twisted.internet import defer, task
 from twisted.web import server
 from twisted.web.resource import Resource
 
-from amfast.remoting.channel import HttpChannel, Connection, StreamingConnection
+from amfast.remoting.channel import HttpChannel
 from amfast.class_def.as_types import AsNoProxy
 from amfast.remoting.endpoint import AmfEndpoint
 import amfast.remoting.flex_messages as messaging
@@ -11,12 +11,11 @@ class TwistedChannel(Resource, HttpChannel):
     """An AMF RPC channel that can be used with Twisted Web."""
 
     def __init__(self, name, max_connections=-1, endpoint=None,
-        timeout=1800, connection_class=Connection, wait_interval=0,
-        check_interval=0.1):
+        wait_interval=0, check_interval=0.1):
 
         Resource.__init__(self)
         HttpChannel.__init__(self, name, max_connections, endpoint,
-            timeout, connection_class, wait_interval, check_interval)
+            wait_interval, check_interval)
 
     # This attribute is added to packets
     # that are waiting for a long-poll

@@ -21,10 +21,6 @@ def nc_auth(packet, msg, credentials):
 
 def client_ping(packet, msg, *args):
     """Respond to a ping request and connect to the Channel."""
-    response = msg.response_msg.body
-    if (not hasattr(response, 'headers')) or response.headers is None:
-        response.headers = {}
-
     # Set FlexClientId (unique to a single Flex client)
     # and create connection.
     connection = packet.channel.channel_set.getFlexConnection(packet, msg)
@@ -35,25 +31,30 @@ def login_operation(packet, msg, raw_creds):
     cred_str = base64.decodestring(raw_creds)
 
     command = msg.body[0]
+
+    # Convert encoded string
     if hasattr(command, 'headers') and \
         command.CREDENTIALS_CHARSET_HEADER in command.headers:
-        # Convert encoded string
-        cred_str = unicode(cred_str, command.headers[command.CREDENTIALS_CHARSET_HEADER])
-
+        charset = command.headers[command.CREDENTIALS_CHARSET_HEADER]
+    else:
+        charset = 'UTF-8'
+    cred_str = unicode(cred_str, charset)
     creds = cred_str.split(':')
     
     channel_set = packet.channel.channel_set
     channel_set.checkCredentials(creds[0], creds[1])
     connection = channel_set.getFlexConnection(packet, msg)
-    connection.authenticated = True
-    connection.setSessionAttr('flex_user', creds[0])
+    connection[command.AUTH_KEY] = True
+    connection[command.AUTH_USER_KEY] = creds[0]
+    connection.save()
 
 def logout_operation(packet, msg, *args):
     """RemoteObject style de-authentication."""
 
     connection = packet.channel.channel_set.getFlexConnection(packet, msg)
-    connection.authenticated = False
-    connection.delSessionAttr('flex_user')
+    del connection[CommandMessage.AUTH_KEY]
+    del connection[CommandMessage.AUTH_USER_KEY]
+    connection.save()
 
 def subscribe_operation(packet, msg, *args):
     """Respond to a subscribe operation."""
