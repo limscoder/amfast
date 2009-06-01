@@ -1,5 +1,5 @@
 import os
-from setuptools import setup, find_packages, Feature
+from setuptools import setup, Feature
 
 from ez_setup import use_setuptools
 use_setuptools()
@@ -35,7 +35,7 @@ setup(name="AmFast",
     keywords = "amf amf0 amf3 flash flex pyamf",
     platforms = ["any"],
     test_suite = "tests.suite",
-    packages = ['amfast', 'amfast.class_def', 'amfast.remoting', '.'],
+    packages = ['amfast', 'amfast.class_def', 'amfast.remoting'],
     features = {'extensions': extensions},
     install_requires = {
         'uuid': 'uuid>=1.3.0'
