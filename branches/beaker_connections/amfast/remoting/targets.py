@@ -65,11 +65,11 @@ def subscribe_operation(packet, msg, *args):
     channel_set = packet.channel.channel_set
     connection = channel_set.getFlexConnection(packet, msg)
 
-    if channel_set.message_agent.secure is True:
+    if channel_set.secure_messages is True:
         if connection.authenticated is False:
             raise SecurityError("Operation requires authentication.")
 
-    channel_set.message_agent.subscribe(connection, command.clientId,
+    channel_set.subscribe(connection, command.clientId,
         command.destination, headers.get(command.SUBTOPIC_HEADER, None),
         headers.get(command.SELECTOR_HEADER, None))
 
@@ -81,7 +81,7 @@ def unsubscribe_operation(packet, msg, *args):
     channel_set = packet.channel.channel_set
     connection = channel_set.getFlexConnection(packet, msg)
     if connection is not None:
-        channel_set.message_agent.unsubscribe(connection, command.clientId,
+        channel_set.unsubscribe(connection, command.clientId,
             command.destination, headers.get(command.SUBTOPIC_HEADER, None),
             headers.get(command.SELECTOR_HEADER, None))
 
@@ -91,7 +91,7 @@ def disconnect_operation(packet, msg, *args):
     headers = command.headers
 
     connection = packet.channel.channel_set.getFlexConnection(packet, msg)
-    connection.disconnect()
+    packet.channel.channel_set.disconnect(connection, channel)
     response = msg.response_msg.body
 
     if hasattr(response, 'headers') and response.FLEX_CLIENT_ID_HEADER in response.headers:

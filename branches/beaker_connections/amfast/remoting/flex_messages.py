@@ -6,7 +6,6 @@ import cgi
 import amfast
 from amfast import class_def, remoting
 from amfast.class_def.as_types import AsError
-from amfast.remoting.channel import SecurityError
 
 try:
     # Use decode module if available.
@@ -305,7 +304,8 @@ class RemotingMessage(AbstractMessage):
                 remoting.Service.SEPARATOR.join((self.destination, self.operation)))
 
         if target.secure is True:
-            if self.AUTH_KEY not in connection or connection[self.AUTH_KEY] is False:
+            if connection.get(self.AUTH_KEY, False) is not True:
+                from amfast.remoting.channel import SecurityError
                 raise SecurityError("Operation requires authentication.")
 
         msg.response_msg.body.body = target.invoke(packet, msg, self.body)
@@ -337,12 +337,13 @@ class AsyncMessage(AbstractMessage):
         channel_set = packet.channel.channel_set
         connection = channel_set.getFlexConnection(packet, msg)
 
-        if channel_set.message_agent.secure is True:
-            if self.AUTH_KEY not in connection or connection[self.AUTH_KEY] is False:
+        if channel_set.secure_messages is True:
+            if connection.get(self.AUTH_KEY, False) is not True:
+                from amfast.remoting.channel import SecurityError
                 raise SecurityError("Operation requires authentication.")
 
-        channel_set.message_agent.publish(self,
-            self.destination, self.headers.get(self.SUBTOPIC_HEADER, None))
+        channel_set.publish(self, self.destination,
+            self.headers.get(self.SUBTOPIC_HEADER, None))
 
 class_def.assign_attrs(AsyncMessage, 'flex.messaging.messages.AsyncMessage',
     ('body', 'clientId', 'destination', 'headers',
