@@ -16,6 +16,8 @@ class MessageAgent(object):
 
     def __init__(self, secure=False):
         self.secure = secure
+
+        self._lock = threading.RLock()
         self._topics = {} # Messages will be published by topic
         self._clients = {} # Messages will be retrieved by client
 
@@ -34,18 +36,18 @@ class MessageAgent(object):
         if sub_topic is not None:
             topic = self.SUBTOPIC_SEPARATOR.join((topic, sub_topic))
 
-        lock = threading.RLock()
-        lock.acquire()
+        subscription = connection.subscribe(client_id, topic)
+
+        self._lock.acquire()
         try:
             topic_map = self._topics.get(topic, None)
             if topic_map is None:
                 topic_map = {}
                 self._topics[topic] = topic_map
 
-            connection.subscribe(client_id, topic)
             topic_map[client_id] = connection
         finally:
-            lock.release()
+            self._lock.release()
 
     def unsubscribe(self, connection, client_id, topic,
         sub_topic=None, selector=None, _disconnect=False):
@@ -62,12 +64,11 @@ class MessageAgent(object):
         if sub_topic is not None:
             topic = self.SUBTOPIC_SEPARATOR.join((topic, sub_topic))
 
-        lock = threading.RLock()
-        lock.acquire()
-        try:
-            if _disconnect is True:
-                connection.unsubscribe(client_id, topic)
+        if _disconnect is False:
+            connection.unsubscribe(client_id, topic)
 
+        self._lock.acquire()
+        try:
             topic_map = self._topics.get(topic, None)
             if topic_map is not None:
                if client_id in topic_map:
@@ -76,7 +77,7 @@ class MessageAgent(object):
                if len(topic_map) < 1:
                    del self._topics[topic]
         finally:
-            lock.release()
+            self._lock.release()
 
     def publish(self, body, topic, sub_topic=None, client_id=None, ttl=600):
         """Publish a message.

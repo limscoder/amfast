@@ -203,6 +203,8 @@ class ClassDefMapper(object):
         * class_def_attr - string, an attribute with this name will be added
             mapped classes. Default = '_amf_alias'
         """
+
+        self._lock = threading.RLock()
         self._mapped_classes = {}
         self._mapped_aliases = {}
         self._mapBuiltIns()
@@ -244,13 +246,12 @@ class ClassDefMapper(object):
         if not hasattr(class_def, 'CLASS_DEF'):
             raise ClassDefError("class_def argument must be a ClassDef object.")
 
-        lock = threading.RLock()
-        lock.acquire()
+        self._lock.acquire()
         try:
             self._mapped_classes[class_def.class_] = class_def
             self._mapped_aliases[class_def.alias] = class_def
         finally:
-            lock.release()
+            self._lock.release()
 
     def getClassDefByClass(self, class_):
         """Get a ClassDef.
@@ -261,14 +262,7 @@ class ClassDefMapper(object):
         ==========
          * class_ - class, the class to find a ClassDef for.
         """
-        lock = threading.RLock()
-        lock.acquire()
-        try:
-            result = self._mapped_classes.get(class_, None)
-        finally:
-            lock.release()
-
-        return result
+        return self._mapped_classes.get(class_, None)
 
     def getClassDefByAlias(self, alias):
         """Get a ClassDef.
@@ -279,14 +273,7 @@ class ClassDefMapper(object):
         ==========
          * alias - string, the alias to find a ClassDef for.
         """
-        lock = threading.RLock()
-        lock.acquire()
-        try:
-            result = self._mapped_aliases.get(alias, None)
-        finally:
-            lock.release()
-
-        return result
+        return self._mapped_aliases.get(alias, None)
 
     def unmapClass(self, class_):
         """Unmap a class definition.
@@ -295,8 +282,7 @@ class ClassDefMapper(object):
         ==========
          * class_ - class, the class to remove a ClassDef for.
         """
-        lock = threading.RLock()
-        lock.acquire()
+        self._lock.acquire()
         try:
             for alias, klass in self._mapped_aliases.iteritems():
                 if class_ == klass:
@@ -306,7 +292,7 @@ class ClassDefMapper(object):
             if class_id in self._mapped_classes:
                 del self._mapped_classes[class_id]
         finally:
-            lock.release()
+            self._lock.release()
 
 # ---- module attributes ---- #
 

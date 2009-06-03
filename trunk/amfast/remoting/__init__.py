@@ -371,6 +371,7 @@ class ServiceMapper(object):
     def __init__(self):
         self._services = {} # used internally to keep track of Service objects.
         self._mapBuiltIns()
+        self._lock = threading.RLock()
 
     def __iter__(self):
         return self._services.itervalues()
@@ -418,12 +419,7 @@ class ServiceMapper(object):
         ==========
          * service - Service, the service to map.
         """
-        lock = threading.RLock()
-        lock.acquire()
-        try:
-            self._services[service.name] = service
-        finally:
-            lock.release()
+        self._services[service.name] = service
 
     def unMapService(self, service):
         """Un-maps a service
@@ -432,13 +428,12 @@ class ServiceMapper(object):
         ==========
          * service - Service, the service to un-map.
         """
-        lock = threading.RLock()
-        lock.acquire()
+        self._lock.acquire()
         try:
             if service.name in self._services:
                 del self._services[service.name]
         finally:
-            lock.release()
+            self._lock.release()
 
     def getTarget(self, service_name, target_name):
         """Get a Target
@@ -450,8 +445,7 @@ class ServiceMapper(object):
          * service_name - string, the service name.
          * target_name - string, the target name.
         """
-        lock = threading.RLock()
-        lock.acquire()
+        self._lock.acquire()
         try:
             service = self.getService(service_name)
             if service is None:
@@ -459,7 +453,7 @@ class ServiceMapper(object):
             else:
                 target = service.getTarget(target_name)
         finally:
-            lock.release()
+            self._lock.release()
 
         return target
 
@@ -472,11 +466,4 @@ class ServiceMapper(object):
         ==========
          * service_name - string, the service name.
         """
-        lock = threading.RLock()
-        lock.acquire()
-        try:
-            service = self._services.get(service_name, None)
-        finally:
-            lock.release()
-
-        return service
+        return self._services.get(service_name, None)

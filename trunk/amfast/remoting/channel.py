@@ -13,6 +13,9 @@ class ChannelError(amfast.AmFastError):
 class NotConnectedError(ChannelError):
     pass
 
+class TimeOutError(ChannelError):
+    pass
+
 class SecurityError(ChannelError):
     pass
 
@@ -52,6 +55,7 @@ class Connection(object):
         self.active = True
         self.connected = False
 
+        self._lock = threading.RLock()
         self._flex_client_id = flex_client_id # Unique for each Flex client.
         self._channel = channel
         self._messages = []
@@ -84,12 +88,7 @@ class Connection(object):
         ==========
          * attr - string, name of attribute to retrieve.
         """
-        lock = threading.RLock()
-        lock.acquire()
-        try:
-            return self._session_attrs[attr]
-        finally:
-            lock.release()
+        return self._session_attrs[attr]
 
     def delSessionAttr(self, attr):
         """Remove a session attribute.
@@ -98,14 +97,12 @@ class Connection(object):
         ==========
          * attr - string, name of attribute to remove.
         """
-
-        lock = threading.RLock()
-        lock.acquire()
+        self._lock.acquire()
         try:
             if attr in self._session_attrs:
                 del self._session_attrs[attr]
         finally:
-            lock.release()
+            self._lock.release()
 
     def setSessionAttr(self, attr, val):
         """Set a session attribute.
@@ -115,13 +112,7 @@ class Connection(object):
          * attr - string, name of attribute to set.
          * val - object, value to set.
         """
-
-        lock = threading.RLock()
-        lock.acquire()
-        try:
-            self._session_attrs[attr] = val
-        finally:
-            lock.release()
+        self._session_attrs[attr] = val
 
     def touch(self):
          """Updates last_active to the current time."""
@@ -134,17 +125,17 @@ class Connection(object):
 
     def getSubscriptions(self):
         """Returns a list of subscription objects."""
+
         subscriptions = []
 
         # Is there a way to make a thread-safe
         # generator for this? ...don't think so.
-        lock = threading.RLock()
-        lock.acquire()
+        self._lock.acquire()
         try:
             for client_subscriptions in self._subscriptions.values():
                 subscriptions.extend(client_subscriptions.values())
         finally:
-            lock.release()
+            self._lock.release()
 
         return subscriptions
 
@@ -158,8 +149,7 @@ class Connection(object):
         """
         subscription = Subscription(self, client_id, topic)
 
-        lock = threading.RLock()
-        lock.acquire()
+        self._lock.acquire()
         try:
             client_subscriptions = self._subscriptions.get(client_id, None)
             if client_subscriptions is None:
@@ -167,7 +157,7 @@ class Connection(object):
                 self._subscriptions[client_id] = client_subscriptions
             client_subscriptions[topic] = subscription
         finally:
-            lock.release()
+            self._lock.release()
 
         return subscription
 
@@ -180,15 +170,17 @@ class Connection(object):
          * topic - string, the topic to un-subscribe from.
         """
 
-        lock = threading.RLock()
-        lock.acquire()
+        self._lock.acquire()
         try:
             client_subscriptions = self._subscriptions.get(client_id, None)
             if client_subscriptions is not None:
                 if topic in client_subscriptions:
                     del client_subscriptions[topic]
+
+                if len(client_subscriptions) < 1:
+                    del self._subscriptions[client_id]
         finally:
-            lock.release()
+            self._lock.release()
 
     def poll(self):
         """Returns all current messages and empties que."""
@@ -199,12 +191,7 @@ class Connection(object):
 
     def popMessage(self):
         """Remove and return a single message from the qeue."""
-        lock = threading.RLock()
-        lock.acquire()
-        try:
-            return self._messages.pop(0)
-        finally:
-            lock.release()
+        return self._messages.pop()
 
     def hasMessages(self):
         """Returns True if messages are present."""
@@ -217,12 +204,7 @@ class Connection(object):
         ==========
          * msg, AbstractMessage, message to publish.
         """
-        lock = threading.RLock()
-        lock.acquire()
-        try:
-            self._messages.append(msg)
-        finally:
-            lock.release()
+        self._messages.append(msg)
 
     def clean(self, current_time=None):
         """Remove all expired messages."""
@@ -230,8 +212,7 @@ class Connection(object):
             current_time = int(time.time())
 
         tmp = []
-        lock = threading.RLock()
-        lock.acquire()
+        self._lock.acquire()
         try:
              for msg in self._messages:
                  if msg.isExpired(current_time):
@@ -239,7 +220,7 @@ class Connection(object):
                  tmp.append(msg)
              self._messages = tmp
         finally:
-            lock.release()
+            self._lock.release()
 
 class StreamingConnection(Connection):
     """Publish messages directly to stream, instead of to the qeue.
@@ -286,12 +267,14 @@ class Channel(object):
         timeout=1800, connection_class=Connection):
         self.name = name
         self.max_connections = max_connections
+        self.connection_count = 0
         self.connection_class = connection_class
         self.timeout = timeout
         if endpoint is None:
             endpoint = AmfEndpoint()
         self.endpoint = endpoint
-        
+       
+        self._lock = threading.RLock() 
         self._channel_set = None
 
     def _getChannelSet(self):
@@ -335,11 +318,24 @@ class Channel(object):
 
         Returns Connection
         """
-        if self.max_connections > -1 and len(self._connections) >= self.max_connections:
+        if self.max_connections > -1 and self.connection_count >= self.max_connections:
             raise ChannelError("Channel '%s' is not accepting connections." % self.name)
 
+        try:
+            self._channel_set.getConnection(flex_client_id)
+        except NotConnectedError:
+            pass
+        else:
+            raise ChannelError('Client ID is already connected.')
+ 
+        self._lock.acquire()
+        try:
+            self.connection_count += 1
+        finally:
+            self._lock.release()
+
         connection = self.connection_class(flex_client_id, self)
-        self._channel_set.addConnection(self.connection_class(flex_client_id, self))
+        self._channel_set.addConnection(connection)
 
         return connection
 
@@ -350,6 +346,12 @@ class Channel(object):
         ==========
          * flex_client_id - string, Flex client id.
         """
+        self._lock.acquire()
+        try:
+            self.connection_count -= 1
+        finally:
+            self._lock.release()
+
         self.channel_set.disconnect(connection)
 
 class HttpChannel(Channel):
@@ -429,13 +431,16 @@ class ChannelSet(object):
             message_agent = MessageAgent()
         self.message_agent = message_agent
 
+        self._lock = threading.RLock()
         self._channels = {}
         self._connections = {}
         self.clean_freq = clean_freq
         self._last_cleaned = int(time.time())
 
     def __iter__(self):
-        return self._channels.itervalues()
+        # To make thread safe
+        channel_vals = self._channels.values()
+        return channel_vals.__iter__
 
     def checkCredentials(self, user, password):
         """Determines if credentials are valid.
@@ -459,12 +464,7 @@ class ChannelSet(object):
 
     def addConnection(self, connection):
         """Add a connection to the ChannelSet."""
-        lock = threading.RLock()
-        lock.acquire()
-        try:
-            self._connections[connection.flex_client_id] = connection
-        finally:
-            lock.release()
+        self._connections[connection.flex_client_id] = connection
 
     def getConnection(self, flex_client_id):
         """Retrieve an existing connection.
@@ -475,8 +475,7 @@ class ChannelSet(object):
         """
         current_time = int(time.time())
 
-        lock = threading.RLock()
-        lock.acquire()
+        self._lock.acquire()
         try:
             connection = self._connections.get(flex_client_id, None)
 
@@ -485,12 +484,14 @@ class ChannelSet(object):
 
             cutoff_time = current_time - connection.channel.timeout
             if connection.last_active < cutoff_time:
-                connection.disconnect()
-                raise NotConnectedError('Client is not connected.')
+                raise TimeOutError('Connection is timed out.')
             
             connection.touch()
+        except TimeOutError:
+            connection.disconnect()
+            raise NotConnectedError('Client is not connected.')
         finally:
-            lock.release()
+            self._lock.release()
 
         # Clean up dead connections and subscriptions
         # TODO: there's got to be a better way to do this
@@ -506,19 +507,19 @@ class ChannelSet(object):
         ==========
          * flex_client_id - string, id of client to get connection for.
         """
-        lock = threading.RLock()
-        lock.acquire()
-        try:
-           # Delete any subscriptions
-           subscriptions = connection.getSubscriptions()
-           for subscription in subscriptions:
-               self.message_agent.unsubscribe(subscription.connection,
-                   subscription.client_id, subscription.topic)
+        subscriptions = connection.getSubscriptions()
 
-           if connection.flex_client_id in self._connections:
-               del self._connections[connection.flex_client_id]
+        # Delete any subscriptions
+        for subscription in subscriptions:
+           self.message_agent.unsubscribe(subscription.connection,
+               subscription.client_id, subscription.topic, _disconnect=True)
+
+        self._lock.acquire()
+        try:
+            if connection.flex_client_id in self._connections:
+                del self._connections[connection.flex_client_id]
         finally:
-            lock.release()
+            self._lock.release()
 
     def getFlexConnection(self, packet, msg):
         """Returns a Connection object for a Flex message.
@@ -577,13 +578,12 @@ class ChannelSet(object):
         ==========
          * channel - Channel, the channel to add.
         """
-        lock = threading.RLock()
-        lock.acquire()
+        self._lock.acquire()
         try:
             self._channels[channel.name] = channel
             channel._channel_set = self
         finally:
-            lock.release()
+            self._lock.release()
 
     def unMapChannel(self, channel):
         """Removes a Channel to the ChannelSet
@@ -592,14 +592,13 @@ class ChannelSet(object):
         ==========
          * channel - Channel, the channel to remove.
         """
-        lock = threading.RLock()
-        lock.acquire()
+        self._lock.acquire()
         try:
             if channel.name in self._channels:
                 channel._channel_set = None
                 del self._channels[channel.name]
         finally:
-            lock.release()
+            self._lock.release()
 
     def getChannel(self, name):
         """Retrieves a Channel from the ChannelSet
@@ -608,14 +607,7 @@ class ChannelSet(object):
         ==========
          * name - string, the name of the Channel to retrieve.
         """
-
-        lock = threading.RLock()
-        lock.acquire()
-        try:
-            channel = self._channels[name]
-        finally:
-            lock.release()
-        return channel
+        return self._channels[name]
 
     def clean(self):
         """Remove inactive Connections and Messages.
