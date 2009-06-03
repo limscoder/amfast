@@ -20,7 +20,7 @@ class App(object):
     """Base web app."""
     @cherrypy.expose
     def index(self):
-        raise cherrypy.HTTPRedirect('/messaging.html')
+        raise cherrypy.HTTPRedirect('/streaming.html')
 
 if __name__ == '__main__':
     usage = """usage: %s [options]""" % __file__
