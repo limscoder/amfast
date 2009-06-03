@@ -8,6 +8,7 @@ import round_trip_test
 import remoting_test
 import buffer_test
 import context_test
+import messaging_test
 
 def suite():
     return unittest.TestSuite((
@@ -18,7 +19,8 @@ def suite():
         round_trip_test.suite(),
         remoting_test.suite(),
         buffer_test.suite(),
-        context_test.suite()
+        context_test.suite(),
+        messaging_test.suite()
     ))
 
 if __name__ == '__main__':
