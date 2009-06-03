@@ -106,7 +106,7 @@ class StreamingWsgiChannel(WsgiChannel):
     WRITE_ATTR = "_write_method"
 
     def __init__(self, name, max_connections=-1, endpoint=None,
-        timeout=1800, wait_interval=0,  thread_safe_write=True):
+        timeout=1800, wait_interval=0, check_interval=0.1, thread_safe_write=True):
         WsgiChannel.__init__(self, name, max_connections, endpoint,
             timeout, StreamingConnection, wait_interval, check_interval)
 
@@ -178,7 +178,7 @@ class StreamingWsgiChannel(WsgiChannel):
         try:
             # Set write method, so we can write to it later on
             connection.connected = True
-            connection.getSessionAttr(self.WRITE_ATTR, write)
+            connection.setSessionAttr(self.WRITE_ATTR, write)
             if self.thread_safe_write is True:
                 connection.channel_publish = True
             else:
