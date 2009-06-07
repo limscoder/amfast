@@ -95,7 +95,7 @@ target = remoting.ExtCallableTarget(remoting_function, 'ext_exposed_method_name'
 
 === Storing Session Data ===
  * Use Connection objects to store session data.
- * Session data is stored in ram, subclass amfast.remoting.channel.Connection if you need an alternative storage implementation.
+ * Session data is stored in ram.
 
 ==== !RemoteObject Session Data ====
  * Connection objects are created automatically for !RemoteObject Clients.
