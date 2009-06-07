@@ -1,6 +1,11 @@
 CHANGES
 ========
 
+0.3.4
+======
+ * Fixed some thread synchronization issues.
+ * Improved long polling performance for threaded channels. 
+
 0.3.3
 ======
  * Allow Target objects to return twisted.defer.Deferred objects when using TwistedChannel.
