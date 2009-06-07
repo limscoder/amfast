@@ -49,11 +49,12 @@ class Connection(object):
      * active - boolean, True if Connection is in use
     """
 
+    NOTIFY_KEY = '_notify'
+
     def __init__(self, flex_client_id, channel):
         self.authenticated = False
         self.last_active = int(time.time())
         self.active = True
-        self.connected = False
 
         self._lock = threading.RLock()
         self._flex_client_id = flex_client_id # Unique for each Flex client.
@@ -61,6 +62,11 @@ class Connection(object):
         self._messages = []
         self._subscriptions = {}
         self._session_attrs = {}
+
+        # Version 0.4 will use Beaker to store session data.
+        # all 'new' attributes should be keyed to help compatibility
+        # with upgrade to version 0.4.
+        self.setSessionAttr(self.NOTIFY_KEY, False)
 
     # channel should be read only
     def _getChannel(self):
@@ -206,6 +212,11 @@ class Connection(object):
         """
         self._messages.append(msg)
 
+        notify_func = self.getSessionAttr(self.NOTIFY_KEY)
+        if notify_func is not False:
+            # Notify that a message has been published
+            notify_func()
+
     def clean(self, current_time=None):
         """Remove all expired messages."""
         if current_time is None:
@@ -222,31 +233,6 @@ class Connection(object):
         finally:
             self._lock.release()
 
-class StreamingConnection(Connection):
-    """Publish messages directly to stream, instead of to the qeue.
-
-     attributes
-     ===========
-     * connected - boolean, True if Connection is connected and streaming
-     * heart_interval - int, Number of seconds between heart beat responses.
-     * channel_publish - bool, True if self.publish should be called.
-     """
-    def __init__(self, flex_client_id, channel,
-        channel_publish=True, connected=False,
-        heart_interval=30):
-
-        Connection.__init__(self, flex_client_id, channel)
-        self.connected = connected
-        self.heart_interval = heart_interval
-        self.channel_publish = channel_publish
-
-    def publish(self, msg):
-        self.touch() # I touch myself, but only when no one is looking to make sure my connection stays alive
-        if self.channel_publish is True and self.connected is True:
-            self.channel.publish(self, msg)
-        else:
-            Connection.publish(self, msg)
-
 class Channel(object):
     """An individual channel that can send/receive messages.
 
@@ -257,18 +243,15 @@ class Channel(object):
      * max_connections - int, When the number of connections exceeds this number,
          an exception is raised when new clients attempt to connect. Set to -1
          for no limit.
-     * connection_class - Connection, The class to use for new connections.
      * timeout - int, If a Connection's last_active value is < current time - timeout,
          the Connection will be disconnected.
 
     """
 
-    def __init__(self, name, max_connections=-1, endpoint=None,
-        timeout=1800, connection_class=Connection):
+    def __init__(self, name, max_connections=-1, endpoint=None, timeout=1800):
         self.name = name
         self.max_connections = max_connections
         self.connection_count = 0
-        self.connection_class = connection_class
         self.timeout = timeout
         if endpoint is None:
             endpoint = AmfEndpoint()
@@ -334,7 +317,7 @@ class Channel(object):
         finally:
             self._lock.release()
 
-        connection = self.connection_class(flex_client_id, self)
+        connection = Connection(flex_client_id, self)
         self._channel_set.addConnection(connection)
 
         return connection
@@ -362,27 +345,17 @@ class HttpChannel(Channel):
      * wait_interval - int, Number of seconds to wait before sending response to client
          when a polling request is received. Set to -1 to configure channel as a
          long-polling channel.
-     * check_interval - int or float, Number of seconds to wait between message
-         qeue checks when checking for new messages. Internal polling interval.
     """
 
     # Content type for amf messages
     CONTENT_TYPE = 'application/x-amf'
 
     def __init__(self, name, max_connections=-1, endpoint=None,
-        timeout=1800, connection_class=Connection, wait_interval=0,
-        check_interval=0.1):
+        timeout=1800, wait_interval=0):
 
-        Channel.__init__(self, name, max_connections, endpoint,
-            timeout, connection_class)
+        Channel.__init__(self, name, max_connections, endpoint, timeout)
 
-        self._wait_interval = wait_interval
-        self.check_interval = check_interval
-
-    # wait_interval should be read-only
-    def _getWaitInterval(self):
-        return self._wait_interval
-    wait_interval = property(_getWaitInterval)
+        self.wait_interval = wait_interval
 
     def waitForMessage(self, packet, message, connection):
         """Waits for a new message.
@@ -390,20 +363,14 @@ class HttpChannel(Channel):
         This is blocking, and should only be used
         for Channels where each connection is a thread.
         """
-        total = 0
-        while True:
-            if connection.active is False:
-                return
+        event = threading.Event()
+        connection.setSessionAttr(connection.NOTIFY_KEY, event.set)
+        if (self.wait_interval > -1):
+            event.wait(self.wait_interval)
 
-            if connection.hasMessages():
-                return
-
-            if self.wait_interval > 0 and total > self.wait_interval:
-                # Max wait interval reached.
-                return
-
-            time.sleep(self.check_interval)
-            total += self.check_interval
+        # Event.set has been called,
+        # or timeout has been reached
+        connection.setSessionAttr(connection.NOTIFY_KEY, False)
 
 class ChannelSet(object):
     """A collection of Channels.

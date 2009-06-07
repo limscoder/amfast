@@ -1,28 +1,34 @@
 """Channels that can be used with WSGI."""
 import time
+import threading
 
 import amfast
 from amfast import AmFastError
-from amfast.remoting.channel import HttpChannel, Connection, StreamingConnection, ChannelError
+from amfast.remoting.channel import HttpChannel, Connection, ChannelError
 import amfast.remoting.flex_messages as messaging
 
 class WsgiChannel(HttpChannel):
     """WSGI app channel."""
 
     def __init__(self, name, max_connections=-1, endpoint=None,
-        timeout=1800, connection_class=Connection, wait_interval=0,
-        check_interval=0.1):
+        timeout=1800, wait_interval=0):
 
         if wait_interval < 0:
-            # There is no reliable way to detect
-            # when a client has disconnected,
-            # so if wait_interval < 0, threads will
-            # wait forever.
+            # The only reliable way to detect
+            # when a client has disconnected with
+            # WSGI is that the 'write' function will fail.
+            #
+            # With long-polling, nothing is written
+            # until a message is published to a client,
+            # so we are unable to detect if we are
+            # waiting for a message for a disconnected client.
+            #
+            # wait_interval must be non-negative to avoid
+            # zombie threads.
             raise ChannelError('wait_interval < 0 is not supported by WsgiChannel')
             
         HttpChannel.__init__(self, name, max_connections=max_connections,
-            endpoint=endpoint, timeout=timeout, connection_class=connection_class,
-            wait_interval=wait_interval, check_interval=check_interval)
+            endpoint=endpoint, timeout=timeout, wait_interval=wait_interval)
 
     def __call__(self, environ, start_response):
         if environ['REQUEST_METHOD'] != 'POST':
@@ -103,20 +109,18 @@ class WsgiChannel(HttpChannel):
 class StreamingWsgiChannel(WsgiChannel):
     """WsgiChannel that opens a persistent connection with the client to serve messages."""
 
-    WRITE_ATTR = "_write_method"
-
     def __init__(self, name, max_connections=-1, endpoint=None,
-        timeout=1800, wait_interval=0, check_interval=0.1, thread_safe_write=True):
+        timeout=1800, wait_interval=0, heart_interval=5):
         WsgiChannel.__init__(self, name, max_connections, endpoint,
-            timeout, StreamingConnection, wait_interval, check_interval)
+            timeout, wait_interval)
 
-        self.thread_safe_write = thread_safe_write # True if write() can be called from a different thread
+        self.heart_interval = heart_interval
 
     def __call__(self, environ, start_response):
         if environ['CONTENT_TYPE'] == self.CONTENT_TYPE:
             # Regular AMF message
             return WsgiChannel.__call__(self, environ, start_response)
-
+        
         # Create streaming message command
         try:
             msg = messaging.StreamingMessage()
@@ -138,28 +142,6 @@ class StreamingWsgiChannel(WsgiChannel):
 
         return self.badRequest(start_response, 'Streaming operation unknown: %s' % msg.operation)
 
-    def publish(self, connection, msg):
-        """Send response."""
-        write = connection.getSessionAttr(self.WRITE_ATTR)
-        try:
-            bytes = messaging.StreamingMessage.prepareMsg(msg, self.endpoint)
-        except (KeyboardInterrupt, SystemExit):
-            raise
-        except Exception, exc:
-            amfast.log_exc()
-            return self.badServer(start_response, "AMF server error.")
-
-        try:
-            write(bytes)
-        except:
-            connection.disconnect()
-
-    def disconnect(self, connection):
-        WsgiChannel.disconnect(self, connection)
-        connection.connected = False
-        if connection.hasSessionAttr(self.WRITE_ATTR):
-            connection.delSessionAttr(self.WRITE_ATTR)
-
     def startStream(self, environ, start_response, msg):
         """Start streaming response."""
 
@@ -176,25 +158,84 @@ class StreamingWsgiChannel(WsgiChannel):
         ])
 
         try:
-            # Set write method, so we can write to it later on
-            connection.connected = True
-            connection.setSessionAttr(self.WRITE_ATTR, write)
-            if self.thread_safe_write is True:
-                connection.channel_publish = True
-            else:
-                connection.channel_publish = False
-
+            # Send acknowledge message
             response = msg.acknowledge()
             response.body = connection.flex_client_id
-            connection.publish(response)
 
-            if self.thread_safe_write is True:
-                return self.startBeat(connection)
-            else:
-                # WSGI servers that can't do
-                # thread-safe write(), must poll
-                # for messages.
-                return self.writeWait(msg, connection)
+            try:
+                bytes = messaging.StreamingMessage.prepareMsg(response, self.endpoint)
+                write(bytes)
+            except (KeyboardInterrupt, SystemExit):
+                raise
+            except Exception, exc:
+                amfast.log_exc()
+                return []
+
+            # Start heart beat
+            timer = threading.Timer(self.heart_interval, self.beat, (connection, ))
+            timer.start()
+
+            # Wait for new messages.
+            event = threading.Event()
+            connection.setSessionAttr(connection.NOTIFY_KEY, event.set)
+            while True:
+                if connection.active is not True:
+                    # Connection is no longer active
+                    connection.setSessionAttr(connection.NOTIFY_KEY, False)
+                    msg = messaging.StreamingMessage.getDisconnectMsg()
+                    try:
+                        write(messaging.StreamingMessage.prepareMsg(msg, self.endpoint))
+                    except:
+                        # Client may have already disconnected
+                        pass
+                    # Stop stream
+                    return []
+ 
+                # Block until new message
+                event.wait()
+
+                # Message has been published,
+                # or it's time for a heart beat
+                connection.setSessionAttr(connection.NOTIFY_KEY, False)
+                new_msg = connection.hasMessages()
+                if new_msg is True:
+                    # Send message
+                    while new_msg is True:
+                        msg = connection.popMessage()
+
+                        try:
+                            bytes = messaging.StreamingMessage.prepareMsg(msg, self.endpoint)
+                        except (KeyboardInterrupt, SystemExit):
+                            raise
+                        except Exception, exc:
+                            amfast.log_exc()
+                            connection.disconnect()
+                            break
+
+                        try:
+                            write(bytes)
+                        except (KeyboardInterrupt, SystemExit):
+                            raise
+                        except:
+                            # Client has disconnected
+                            connection.disconnect()
+                            return []
+
+                        new_msg = connection.hasMessages()
+                else:
+                    # Send heart beat
+                    try:
+                        write(chr(messaging.StreamingMessage.NULL_BYTE))
+                    except (KeyboardInterrupt, SystemExit):
+                        raise
+                    except:
+                        # Client has disconnected
+                        connection.disconnect()
+                        return []
+
+                # Create new event to trigger new messages or heart beats
+                event = threading.Event()
+                connection.setSessionAttr(connection.NOTIFY_KEY, event.set)
         except (KeyboardInterrupt, SystemExit):
             raise
         except Exception, exc:
@@ -202,74 +243,24 @@ class StreamingWsgiChannel(WsgiChannel):
             connection.disconnect()
             return []
 
+    def beat(self, connection):
+        """Send a heart beat."""
+        if connection.active is not True:
+            # Client is disconnected
+            return
+
+        notify_func = connection.getSessionAttr(connection.NOTIFY_KEY)
+        if notify_func is not False:
+            notify_func()
+
+        # Create timer for next beat
+        timer = threading.Timer(self.heart_interval, self.beat, (connection, ))
+        timer.start()
+
     def stopStream(self, msg):
-        """Stop streaming connection."""
+        """Stop a streaming connection."""
         connection = self.channel_set.getConnection(msg.headers.get(msg.FLEX_CLIENT_ID_HEADER))
         connection.disconnect()
-
-    def startBeat(self, connection):
-        write = connection.getSessionAttr(self.WRITE_ATTR)
-
-        while True:
-            try:
-                time.sleep(connection.heart_interval)
-            
-                if connection.active is False or connection.connected is False:
-                    stop_stream = True
-                    msg = messaging.StreamingMessage.getDisconnectMsg()
-                    try:
-                        write(messaging.StreamingMessage.prepareMsg(msg, self.endpoint))
-                    except:
-                        pass
-                    return []
-                else:
-                    try:
-                        write(chr(messaging.StreamingMessage.NULL_BYTE))
-                    except:
-                        connection.disconnect()
-            except (KeyboardInterrupt, SystemExit):
-                raise
-            except Exception, exc:
-                amfast.log_exc()
-                connection.disconnect()
-
-    def writeWait(self, msg, connection):
-        """Generator function that returns a message when one becomes available."""
-        write = connection.getSessionAttr(self.WRITE_ATTR)
-
-        total_time = 0
-        while True:
-            try:
-                time.sleep(self.check_interval)
-                total_time += self.check_interval
-
-                if connection.active is False or connection.connected is False:
-                    stop_stream = True
-                    msg = messaging.StreamingMessage.getDisconnectMsg()
-                    try:
-                        write(messaging.StreamingMessage.prepareMsg(msg, self.endpoint))
-                    except:
-                        pass
-                    return []
-
-                if connection.hasMessages():
-                    while connection.hasMessages():
-                        msg = connection.popMessage()
-                        try:
-                            write(messaging.StreamingMessage.prepareMsg(msg, self.endpoint))
-                        except:
-                            connection.disconnect()
-                            break
-                elif total_time > connection.heart_interval:
-                    # Send heartbeat to tell client
-                    # we're still alive
-                    total_time = 0
-                    try:
-                        write(chr(messaging.StreamingMessage.NULL_BYTE))
-                    except:
-                        connection.disconnect()
-            except (KeyboardInterrupt, SystemExit):
-                raise
-            except Exception, exc:
-                amfast.log_exc()
-                connection.disconnect()
+        notify_func = connection.getSessionAttr(connect.NOTIFY_KEY)
+        if notify_func is not False:
+            notify_func()
