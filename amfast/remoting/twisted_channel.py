@@ -1,22 +1,14 @@
-from twisted.internet import defer, task
+from twisted.internet import defer, task, reactor
 from twisted.web import server
 from twisted.web.resource import Resource
 
-from amfast.remoting.channel import HttpChannel, Connection, StreamingConnection
+from amfast.remoting.channel import HttpChannel, Connection
 from amfast.class_def.as_types import AsNoProxy
 from amfast.remoting.endpoint import AmfEndpoint
 import amfast.remoting.flex_messages as messaging
 
 class TwistedChannel(Resource, HttpChannel):
-    """An AMF RPC channel that can be used with Twisted Web."""
-
-    def __init__(self, name, max_connections=-1, endpoint=None,
-        timeout=1800, connection_class=Connection, wait_interval=0,
-        check_interval=0.1):
-
-        Resource.__init__(self)
-        HttpChannel.__init__(self, name, max_connections, endpoint,
-            timeout, connection_class, wait_interval, check_interval)
+    """An AMF messaging channel that can be used with Twisted Web."""
 
     # This attribute is added to packets
     # that are waiting for a long-poll
@@ -28,8 +20,15 @@ class TwistedChannel(Resource, HttpChannel):
     # so that it can be available to targets.
     TWISTED_REQUEST = '_twisted_request'
 
+    def __init__(self, name, max_connections=-1, endpoint=None,
+        timeout=1200, wait_interval=0):
+
+        Resource.__init__(self)
+        HttpChannel.__init__(self, name, max_connections, endpoint,
+            timeout, wait_interval)
+
     def render_POST(self, request):
-        """Process and incoming AMF packet."""
+        """Process an incoming AMF packet."""
         if request.content:
             content_len = request.getHeader('Content-Length')
             raw_request = request.content.read(int(content_len))
@@ -90,7 +89,8 @@ class TwistedChannel(Resource, HttpChannel):
         """
 
         if hasattr(response, self.MSG_NOT_COMPLETE):
-            # Response is waiting for a message to be published.
+            # long-poll operation.
+            # response is waiting for a message to be published.
             return
 
         # Check for deferred messages
@@ -133,35 +133,22 @@ class TwistedChannel(Resource, HttpChannel):
 
         request = getattr(packet, self.TWISTED_REQUEST)
 
-        # Add a flag so we can tell if we lost the client
-        disconnect_flag = "_DISCONNECTED"
-        request._connectionLost = request.connectionLost
+        # Remove notify function if client drops connection.
+        _connectionLost = request.connectionLost
         def _connection_lost(reason):
-            setattr(request, disconnect_flag, True)
-            return request._connectionLost(reason)
+            connection.setSessionAttr(connection.NOTIFY_KEY, False)
+            _connectionLost(reason)
+            request.finish()
         request.connectionLost = _connection_lost
 
-        looper = task.LoopingCall(None)
-        total = [0] # Lame hack to be able to increment within closure. There has to be a better way...
-        def _checkMsgs():
-            """Keep calling this method until we find messages."""
-            if connection.active is False or hasattr(request, disconnect_flag):
-                # Connection was closed.
-                # Let's get out of here.
-                looper.stop()
-                delattr(packet.response, self.MSG_NOT_COMPLETE)
-                self.checkComplete(packet.response, request)
+        # This function gets called when a message is published,
+        # or wait_interval is reached.
+        def _notify():
+            if request.finished is True:
+                # Someone else has already called this function
                 return
 
-            if not connection.hasMessages():
-                if self.wait_interval < 0 or total[0] < self.wait_interval:
-                    # Keep waiting for a message.
-                    total[0] += self.check_interval
-                    return
-
-            # At least one message is present
-            # or we've hit wait_interval
-            looper.stop()
+            connection.setSessionAttr(connection.NOTIFY_KEY, False)
 
             # Get messages and add them
             # to the response message
@@ -175,16 +162,21 @@ class TwistedChannel(Resource, HttpChannel):
             delattr(packet.response, self.MSG_NOT_COMPLETE)
             self.checkComplete(packet.response, request)
 
-        looper.f = _checkMsgs
-        looper.start(self.check_interval)
+        connection.setSessionAttr(connection.NOTIFY_KEY, _notify)
+
+        # Notify when wait_interval is reached
+        if self.wait_interval > -1:
+            reactor.callLater(self.wait_interval, _notify)
 
 class StreamingTwistedChannel(TwistedChannel):
     """Handles streaming http connections."""
 
     def __init__(self, name, max_connections=-1, endpoint=None,
-        timeout=1800, wait_interval=0, check_interval=1):
+        timeout=1200, wait_interval=0, heart_interval=5):
         TwistedChannel.__init__(self, name, max_connections, endpoint,
-            timeout, StreamingConnection, wait_interval, check_interval)
+            timeout, wait_interval)
+
+        self.heart_interval = heart_interval
 
     def render_POST(self, request):
         """Process an incoming AMF packet."""
@@ -212,15 +204,26 @@ class StreamingTwistedChannel(TwistedChannel):
 
         connection = self.channel_set.getConnection(msg.headers.get(msg.FLEX_CLIENT_ID_HEADER))
         connection.setSessionAttr(self.TWISTED_REQUEST, request)
-        connection.connected = True
 
-        # Make sure connection gets cleaned up
-        # when connection is lost.
-        request._connectionLost = request.connectionLost
+        # Remove notify function if client drops connection.
+        _connectionLost = request.connectionLost
         def _connection_lost(reason):
             connection.disconnect()
-            return request._connectionLost(reason)
+            connection.setSessionAttr(connection.NOTIFY_KEY, False)
+            _connectionLost(reason)
         request.connectionLost = _connection_lost
+
+        # This function gets called when a message is published.
+        def _notify():
+            if connection.active is not True:
+                # Connection is disconnected
+                connection.setSessionAttr(connection.NOTIFY_KEY, False)
+                return
+
+            while connection.hasMessages():
+                msg = connection.popMessage()
+                request.write(messaging.StreamingMessage.prepareMsg(msg, self.endpoint))
+        connection.setSessionAttr(connection.NOTIFY_KEY, _notify)
 
         # Acknowledge connection
         response = msg.acknowledge()
@@ -229,20 +232,17 @@ class StreamingTwistedChannel(TwistedChannel):
 
         self.startBeat(connection, request)
 
+    def sendMsg(self, request, msg):
+        """Send a message to the client."""
+        request.write(messaging.StreamingMessage.prepareMsg(msg, self.endpoint))
+
     def stopStream(self, msg, request):
-        """Get this stream rolling!"""
         connection = self.channel_set.getConnection(msg.headers.get(msg.FLEX_CLIENT_ID_HEADER))
         connection.disconnect()
-
-    def publish(self, connection, msg):
-        """Write message."""
-        request = connection.getSessionAttr(self.TWISTED_REQUEST)
-        request.write(messaging.StreamingMessage.prepareMsg(msg, self.endpoint))
 
     def disconnect(self, connection):
         """Close response."""
         TwistedChannel.disconnect(self, connection)
-        connection.connected = False
 
         if not connection.hasSessionAttr(self.TWISTED_REQUEST):
             return
@@ -251,19 +251,17 @@ class StreamingTwistedChannel(TwistedChannel):
         msg = messaging.StreamingMessage.getDisconnectMsg()
         request.write(messaging.StreamingMessage.prepareMsg(msg, self.endpoint))
         request.finish()
-        connection.delSessionAttr(self.TWISTED_REQUEST)
 
     def startBeat(self, connection, request):
         # Send out heart beat.
         looper = task.LoopingCall(None)
         def _beat():
             """Keep calling this method as long as the connection is alive."""
-
-            if connection.connected is False or connection.active is False:
+            if connection.active is not True:
                 looper.stop()
                 return
             
             request.write(chr(messaging.StreamingMessage.NULL_BYTE))
 
         looper.f = _beat
-        looper.start(connection.heart_interval)
+        looper.start(self.heart_interval)

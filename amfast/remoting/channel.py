@@ -248,7 +248,7 @@ class Channel(object):
 
     """
 
-    def __init__(self, name, max_connections=-1, endpoint=None, timeout=1800):
+    def __init__(self, name, max_connections=-1, endpoint=None, timeout=1200):
         self.name = name
         self.max_connections = max_connections
         self.connection_count = 0
@@ -595,6 +595,6 @@ class ChannelSet(object):
         for connection in self._connections.values():
             cutoff = current_time - connection.channel.timeout
             if connection.last_active < cutoff:
-                self.disconnect(connection.flex_client_id)
+                self.disconnect(connection)
             else:
                 connection.clean(current_time)
