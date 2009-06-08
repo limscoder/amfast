@@ -11,7 +11,7 @@ class WsgiChannel(HttpChannel):
     """WSGI app channel."""
 
     def __init__(self, name, max_connections=-1, endpoint=None,
-        timeout=1800, wait_interval=0):
+        timeout=1200, wait_interval=0):
 
         if wait_interval < 0:
             # The only reliable way to detect
@@ -110,7 +110,7 @@ class StreamingWsgiChannel(WsgiChannel):
     """WsgiChannel that opens a persistent connection with the client to serve messages."""
 
     def __init__(self, name, max_connections=-1, endpoint=None,
-        timeout=1800, wait_interval=0, heart_interval=5):
+        timeout=1200, wait_interval=0, heart_interval=30):
         WsgiChannel.__init__(self, name, max_connections, endpoint,
             timeout, wait_interval)
 
