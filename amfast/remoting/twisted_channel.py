@@ -143,10 +143,15 @@ class TwistedChannel(Resource, HttpChannel):
 
         # This function gets called when a message is published,
         # or wait_interval is reached.
+        timeout_call = None
         def _notify():
-            if request.finished is True:
-                # Someone else has already called this function
+            if request.finished:
+                # Someone else has already called this function,
+                # or twisted has finished the request for some other reason.
                 return
+
+            if timeout_call is not None and timeout_call.active():
+                timeout_call.cancel()
 
             connection.setSessionAttr(connection.NOTIFY_KEY, False)
 
@@ -166,7 +171,7 @@ class TwistedChannel(Resource, HttpChannel):
 
         # Notify when wait_interval is reached
         if self.wait_interval > -1:
-            reactor.callLater(self.wait_interval, _notify)
+            timeout_call = reactor.callLater(self.wait_interval, _notify)
 
 class StreamingTwistedChannel(TwistedChannel):
     """Handles streaming http connections."""
