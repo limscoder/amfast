@@ -17,17 +17,17 @@ def nc_auth(packet, msg, credentials):
     # authenticated properly.
     packet._authenticated = True
 
-# --- CommandMessage Operations --- #
+# --- Flex CommandMessage Operations --- #
 
 def client_ping(packet, msg, *args):
     """Respond to a ping request and connect to the Channel."""
+
     response = msg.response_msg.body
     if (not hasattr(response, 'headers')) or response.headers is None:
         response.headers = {}
 
-    # Set FlexClientId (unique to a single Flex client)
-    # and create connection.
-    connection = packet.channel.channel_set.getFlexConnection(packet, msg)
+    command = msg.body[0]
+    response.headers[command.FLEX_CLIENT_ID_HEADER] = command.connection.id
 
 def login_operation(packet, msg, raw_creds):
     """RemoteObject style authentication."""
@@ -44,57 +44,48 @@ def login_operation(packet, msg, raw_creds):
     
     channel_set = packet.channel.channel_set
     channel_set.checkCredentials(creds[0], creds[1])
-    connection = channel_set.getFlexConnection(packet, msg)
-    connection.authenticated = True
-    connection.setSessionAttr('flex_user', creds[0])
+    command.connection.authenticated = True
+    command.connection.flex_user = creds[0]
 
 def logout_operation(packet, msg, *args):
     """RemoteObject style de-authentication."""
 
-    connection = packet.channel.channel_set.getFlexConnection(packet, msg)
-    connection.authenticated = False
-    connection.delSessionAttr('flex_user')
+    command = msg.body[0]
+    command.connection.authenticated = False
+    if hasattr(command.connection, 'flex_user'):
+        del command.connection.flex_user
+
+def disconnect_operation(packet, msg, *args):
+    """Respond to a disconnect operation. Disconnects current Connection."""
+
+    command = msg.body[0]
+    packet.channel.disconnect(command.connection)
+
+    response = msg.response_msg.body
+    if hasattr(response, 'headers') and response.FLEX_CLIENT_ID_HEADER in response.headers:
+        del response.headers[response.FLEX_CLIENT_ID_HEADER]
 
 def subscribe_operation(packet, msg, *args):
     """Respond to a subscribe operation."""
     command = msg.body[0]
-    headers = command.headers
 
-    # Subscribe to topic
     channel_set = packet.channel.channel_set
-    connection = channel_set.getFlexConnection(packet, msg)
-
-    if channel_set.message_agent.secure is True:
-        if connection.authenticated is False:
+    if channel_set.subscription_manager.secure is True:
+        if command.connection.authenticated is False:
             raise SecurityError("Operation requires authentication.")
 
-    channel_set.message_agent.subscribe(connection, command.clientId,
-        command.destination, headers.get(command.SUBTOPIC_HEADER, None),
+    headers = command.headers
+    channel_set.subscribe(command.connection,
+        command.clientId, command.destination,
+        headers.get(command.SUBTOPIC_HEADER, None),
         headers.get(command.SELECTOR_HEADER, None))
 
 def unsubscribe_operation(packet, msg, *args):
     """Respond to an unsubscribe operation."""
     command = msg.body[0]
-    headers = command.headers
-   
-    channel_set = packet.channel.channel_set
-    connection = channel_set.getFlexConnection(packet, msg)
-    if connection is not None:
-        channel_set.message_agent.unsubscribe(connection, command.clientId,
-            command.destination, headers.get(command.SUBTOPIC_HEADER, None),
-            headers.get(command.SELECTOR_HEADER, None))
-
-def disconnect_operation(packet, msg, *args):
-    """Respond to a disconnect operation. Disconnects current Connection."""
-    command = msg.body[0]
-    headers = command.headers
-
-    connection = packet.channel.channel_set.getFlexConnection(packet, msg)
-    connection.disconnect()
-    response = msg.response_msg.body
-
-    if hasattr(response, 'headers') and response.FLEX_CLIENT_ID_HEADER in response.headers:
-        del response.headers[response.FLEX_CLIENT_ID_HEADER]
+    packet.channel.channel_set.unSubscribe(command.connection,
+        command.clientId, command.destination,
+        command.headers.get(command.SUBTOPIC_HEADER, None))
 
 def poll_operation(packet, msg, *args):
     """Respond to a poll operation. Returns queued messages."""

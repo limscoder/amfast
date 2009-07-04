@@ -4,14 +4,13 @@ import threading
 
 import amfast
 from amfast import AmFastError
-from amfast.remoting.channel import HttpChannel, Connection, ChannelError
+from amfast.remoting.channel import HttpChannel, ChannelError
 import amfast.remoting.flex_messages as messaging
 
 class WsgiChannel(HttpChannel):
     """WSGI app channel."""
 
-    def __init__(self, name, max_connections=-1, endpoint=None,
-        timeout=1200, wait_interval=0):
+    def __init__(self, name, max_connections=-1, endpoint=None, wait_interval=0):
 
         if wait_interval < 0:
             # The only reliable way to detect
@@ -28,7 +27,7 @@ class WsgiChannel(HttpChannel):
             raise ChannelError('wait_interval < 0 is not supported by WsgiChannel')
             
         HttpChannel.__init__(self, name, max_connections=max_connections,
-            endpoint=endpoint, timeout=timeout, wait_interval=wait_interval)
+            endpoint=endpoint, wait_interval=wait_interval)
 
     def __call__(self, environ, start_response):
         if environ['REQUEST_METHOD'] != 'POST':

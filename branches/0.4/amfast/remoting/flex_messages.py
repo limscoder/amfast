@@ -116,7 +116,7 @@ class AbstractMessage(object):
         response.correlationId = self.messageId
 
         if self.clientId is None:
-            self.clientId = packet.channel.channel_set.generateId()
+            self.clientId = packet.channel.channel_set.connection_manager.generateId()
         response.clientId = self.clientId
 
     def _getId(self):
@@ -292,20 +292,20 @@ class RemotingMessage(AbstractMessage):
     def invoke(self, packet, msg):
         AbstractMessage.invoke(self, packet, msg)
 
-        # Make sure connection timestamp is updated everytime.
-        channel_set = packet.channel.channel_set
-        connection = channel_set.getFlexConnection(packet, msg)
+        # Set connection object, so it is accessable in target.
+        self.connection = packet.channel.getFlexConnection(self)
 
-        target = channel_set.service_mapper.getTarget(self.destination, self.operation)        
+        target = packet.channel.channel_set.service_mapper.getTarget(self.destination, self.operation)        
         if target is None:
             raise FlexMessageError("Operation '%s' not found." % \
                 remoting.Service.SEPARATOR.join((self.destination, self.operation)))
 
         if target.secure is True:
-            if connection.authenticated is False:
+            if self.connection.authenticated is False:
                 raise SecurityError("Operation requires authentication.")
 
         msg.response_msg.body.body = target.invoke(packet, msg, self.body)
+        self.connection.save()
 
 class_def.assign_attrs(RemotingMessage, 'flex.messaging.messages.RemotingMessage',
     ('body', 'clientId', 'destination', 'headers',
@@ -331,15 +331,15 @@ class AsyncMessage(AbstractMessage):
         """Publish this message."""
         AbstractMessage.invoke(self, packet, msg)
 
-        channel_set = packet.channel.channel_set
-        connection = channel_set.getFlexConnection(packet, msg)
+        self.connection = packet.channel.getFlexConnection(self)
 
         if channel_set.message_agent.secure is True:
-            if connection.authenticated is False:
+            if self.connection.authenticated is False:
                 raise SecurityError("Operation requires authentication.")
 
         channel_set.message_agent.publish(self,
             self.destination, self.headers.get(self.SUBTOPIC_HEADER, None))
+        self.connection.save()
 
 class_def.assign_attrs(AsyncMessage, 'flex.messaging.messages.AsyncMessage',
     ('body', 'clientId', 'destination', 'headers',
@@ -413,11 +413,14 @@ class CommandMessage(AsyncMessage):
     def invoke(self, packet, msg):
         AbstractMessage.invoke(self, packet, msg)
 
+        self.connection = packet.channel.getFlexConnection(self)
+
         target = packet.channel.channel_set.service_mapper.command_service.getTarget(self.operation)
         if target is None:
             raise FlexMessageError("Command '%s' not found." % self.operation)
 
         msg.response_msg.body.body = target.invoke(packet, msg, (self.body,))
+        self.connection.save()
 
     def getAcknowledgeClass(self):
         """Returns the correct class for the response message."""
