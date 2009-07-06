@@ -4,6 +4,7 @@ import traceback
 import calendar
 from datetime import datetime
 import logging
+import threading
 
 class AmFastError(Exception):
     """Base exception for this package."""
@@ -32,6 +33,11 @@ def format_byte_string(byte_string):
             char = "%s" % x
         bytes.append("%d: %d-%02X-'%s'" % (i, val, val, char))
     return ' '.join(bytes)
+
+# Set this to dummy_threading.RLock
+# to skip locking when using Twisted
+# or any other single threaded implementation. 
+mutex_cls = threading.RLock
 
 # --- setup module level logging --- #
 

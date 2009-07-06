@@ -1,7 +1,7 @@
 import time
 import uuid
-import threading
 
+import amfast
 from connection import Connection, ConnectionError
 
 class NotConnectedError(ConnectionError):
@@ -13,11 +13,10 @@ class TimeOutError(ConnectionError):
 class ConnectionManager(object):
     """Keeps track of all current connections."""
 
-    def __init__(self, clean_freq=600, timeout=3600,
+    def __init__(self, timeout=3600,
         storage_type='memory', data_dir=None,
         namespace_class=None, namespace_args=None):
     
-        self.clean_freq = clean_freq
         self.timeout = timeout
         self.storage_type = storage_type
         self.data_dir = data_dir
@@ -83,7 +82,7 @@ class MemoryConnectionManager(ConnectionManager):
     def __init__(self, *args, **kwargs):
         ConnectionManager.__init__(self, *args, **kwargs)
         self._connections = {} # Currently connected clients
-        self._lock = threading.RLock()
+        self._lock = amfast.mutex_cls()
 
     def createConnection(self, connection_id=None):
         connection = ConnectionManager.createConnection(self, connection_id)
@@ -99,3 +98,6 @@ class MemoryConnectionManager(ConnectionManager):
                 del self._connections[id]
         finally:
             self._lock.release()
+
+    def getConnectionIds(self):
+        return self._connections.keys()

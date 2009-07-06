@@ -8,6 +8,7 @@ from amfast.class_def import ClassDefMapper
 
 import connection_manager as cm
 import subscription_manager as sm
+import flex_messages as messaging
 from endpoint import AmfEndpoint
 
 class ChannelError(amfast.AmFastError):
@@ -36,7 +37,7 @@ class Channel(object):
             endpoint = AmfEndpoint()
         self.endpoint = endpoint
        
-        self._lock = threading.RLock() 
+        self._lock = amfast.mutex_cls() 
         self._channel_set = None
 
     def _getChannelSet(self):
@@ -106,6 +107,8 @@ class Channel(object):
             raise ChannelError("Channel '%s' is not accepting connections." % self.name)
 
         connection = self.channel_set.connect(connection_id)
+        connection.channel_name = self.name
+        connection.save()
 
         self._lock.acquire()
         try:
@@ -177,9 +180,11 @@ class ChannelSet(object):
      * service_mapper - ServiceMapper, maps destinations to Targets.
      * connection_manager - ConnectionManager, keeps track of connected clients.
      * subscription_manager - SubscriptionManager, keeps track of subscribed clients.
+     * clean_freq - float - number of seconds to clean expired connections.
     """
 
-    def __init__(self, service_mapper=None, connection_manager=None, subscription_manager=None):
+    def __init__(self, service_mapper=None, connection_manager=None,
+        subscription_manager=None, clean_freq=600):
         if service_mapper is None:
             from amfast.remoting import ServiceMapper
             service_mapper = ServiceMapper()
@@ -193,8 +198,10 @@ class ChannelSet(object):
             subscription_manager = sm.MemorySubscriptionManager()
         self.subscription_manager = subscription_manager
 
-        self._lock = threading.RLock()
+        self.clean_freq = clean_freq
+        self._lock = amfast.mutex_cls()
         self._channels = {}
+        self.scheduleClean()
 
     def __iter__(self):
         # To make thread safe
@@ -241,7 +248,34 @@ class ChannelSet(object):
          * connection - Connection being disconnected.
         """
 
+        # Remove any active subscriptions
+        for topic in connection.getSubscribedTopics():
+            self.subscription_manager.unSubscribe(connection.id, topic)
+
         self.connection_manager.deleteConnection(connection)
+
+    def scheduleClean(self):
+        """Schedule connection cleaning procedure to run sometime in the future."""
+
+        def _clean():
+            self.clean()
+            self.scheduleClean()
+
+        threading.Timer(self.clean_freq, _clean)
+
+    def clean(self):
+        """Clean out expired connections."""
+
+        current_time = time.time()
+        for connection_id in self.connection_manager.getConnectionIds():
+            try:
+                connection = self.connection_manager.getConnection(connection_id, False)
+            except cm.NotConnectedError:
+                continue
+
+            if connection.last_active + connection.timeout < current_time:
+                channel = self.getChannel(connection.channel_name)
+                channel.disconnect(connection)
 
     def subscribe(self, connection, client_id, topic, sub_topic=None, selector=None):
         """Subscribe a client to a topic.
@@ -273,6 +307,56 @@ class ChannelSet(object):
         if len(client_ids) < 1:
             # Connection has no subscriptions anymore.
             self.subscription_manager.unSubscribe(connection.id, topic, sub_topic)
+
+    def publishObject(self, body, topic, sub_topic=None, headers=None, ttl=600):
+        """Create a message and publish it.
+
+        arguments:
+        ===========
+        body - Any Python object.
+        topic - string, the topic to publish to.
+        sub_topic - string, the sub topic to publish to. Default = None
+        headers - dict, headers to include with this message.
+        ttl - int time to live in secoded. Default = 600
+        """
+
+        if sub_topic is not None:
+            if headers is None:
+                headers = {}
+            headers[messaging.AsyncMessage.SUBTOPIC_HEADER] = sub_topic
+
+        current_time = int(time.time() * 1000)
+        ttl *= 1000
+
+        msg = messaging.AsyncMessage(headers=headers, body=body,
+            clientId=None, destination=topic, timestamp=current_time,
+            timeToLive=ttl)
+       
+        self.publishMessage(msg)
+
+    def publishMessage(self, msg):
+        """Publish a pre-formed message.
+
+        arguments:
+        ===========
+         * msg - AbstractMessage, the Flex message to publish.
+        """
+
+        topic = msg.destination
+        if hasattr(msg, 'headers') and \
+            msg.headers is not None and \
+            messaging.AsyncMessage.SUBTOPIC_HEADER in msg.headers:
+            sub_topic = msg.headers[messaging.AsyncMessage.SUBTOPIC_HEADER]
+        else:
+            sub_topic = None
+
+        for connection_id in self.subscription_manager.getSubscribers(topic, sub_topic):
+            try:
+                connection = self.connection_manager.getConnection(connection_id, False)
+            except cm.NotConnectedError:
+                continue
+
+            connection.publishMessage(msg)
 
     def mapChannel(self, channel):
         """Add a Channel to the ChannelSet

@@ -90,10 +90,9 @@ def unsubscribe_operation(packet, msg, *args):
 def poll_operation(packet, msg, *args):
     """Respond to a poll operation. Returns queued messages."""
     command = msg.body[0]
-    headers = command.headers
 
     channel = packet.channel
-    connection = channel.channel_set.getFlexConnection(packet, msg)
+    connection = command.connection
 
     if not connection.hasMessages() and channel.wait_interval != 0:
         # Long polling channel, don't return response
@@ -101,7 +100,7 @@ def poll_operation(packet, msg, *args):
         channel.waitForMessage(packet, msg, connection)
     messages = connection.poll()
 
-    if isinstance(packet.channel.endpoint, AmfEndpoint):
+    if isinstance(channel.endpoint, AmfEndpoint):
         # Make sure messages are not encoded as an ArrayCollection
         return AsNoProxy(messages)
     else:

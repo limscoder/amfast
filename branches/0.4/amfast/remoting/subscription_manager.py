@@ -1,4 +1,4 @@
-import threading
+import amfast
 
 class SubscriptionManager(object):
     """Receives and publishes Producer/Consumer style messages.
@@ -20,13 +20,17 @@ class SubscriptionManager(object):
         else:
             return topic
 
+    @classmethod 
+    def splitTopicKey(cls, topic):
+        return topic.split(cls.SUBTOPIC_SEPARATOR)
+
 class MemorySubscriptionManager(SubscriptionManager):
 
     def __init__(self, secure=False):
         SubscriptionManager.__init__(self, secure)
 
         self._topics = {}
-        self._lock = threading.RLock()
+        self._lock = amfast.mutex_cls()
 
     def subscribe(self, connection_id, topic, sub_topic=None, selector=None):
         """Subscribe a client to a topic.
@@ -74,3 +78,15 @@ class MemorySubscriptionManager(SubscriptionManager):
                    del self._topics[topic]
         finally:
             self._lock.release()
+
+    def getSubscribers(self, topic, sub_topic=None):
+        """Iterate through all subscribers of a topic."""
+
+        topic = self.getTopicKey(topic, sub_topic)
+
+        topic_map = self._topics.get(topic, None)
+        if topic_map is None:
+            return 
+
+        for connection_id in topic_map.keys():
+            yield connection_id

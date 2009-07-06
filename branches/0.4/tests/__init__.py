@@ -8,6 +8,7 @@ import round_trip_test
 import remoting_test
 import buffer_test
 import context_test
+import connection_test
 import messaging_test
 
 def suite():
@@ -20,6 +21,7 @@ def suite():
         remoting_test.suite(),
         buffer_test.suite(),
         context_test.suite(),
+        connection_test.suite(),
         messaging_test.suite()
     ))
 
