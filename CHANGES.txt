@@ -1,9 +1,15 @@
 CHANGES
 ========
 
+0.3.5
+=====
+ * Fixed setuptools bootstrapping (ticket: 22).
+ * Fixed AttributeError in TwistedChannel (ticket: 21).
+ * Fixed ChannelSet.__iter__ returning incorrect iterator (ticket: 23).
+
 0.3.4
 ======
- * Fixed some thread synchronization issues.
+ * Fixed some thread synchronization issues (ticket: 19).
  * Improved long polling performance for threaded channels. 
 
 0.3.3
