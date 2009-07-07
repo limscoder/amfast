@@ -1,8 +1,9 @@
 import os
-from setuptools import setup, Feature
 
 from ez_setup import use_setuptools
 use_setuptools()
+
+from setuptools import setup, Feature
 
 from distutils.core import setup, Extension
 from distutils.command.build_ext import build_ext
