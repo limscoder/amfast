@@ -16,13 +16,13 @@ Start the server and point your browser to http://localhost:8000
 
 Use [http://www.cherrypy.org/ CherryPy] web framework to serve the example contact manager over http with the following command:
 {{{
-python addressbook/python/twisted_server.tac
+twistd -noy addressbook/python/cp_server.py
 }}}
 
 == Twisted Example ==
 Use [http://twistedmatrix.com/trac/ Twisted] web framework to serve the example contact manager over http with the following command:
 {{{
-twistd -noy addressbook/python/cp_server.py
+python addressbook/python/twisted_server.tac
 }}}
 
 == WSGI Example ==
