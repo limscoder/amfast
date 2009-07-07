@@ -449,14 +449,15 @@ class ChannelSet(object):
             if connection is None:
                 raise NotConnectedError('Client is not connected.')
 
-            cutoff_time = current_time - connection.channel.timeout
-            if connection.last_active < cutoff_time:
-                raise TimeOutError('Connection is timed out.')
-            
+            try:
+                cutoff_time = current_time - connection.channel.timeout
+                if connection.last_active < cutoff_time:
+                    raise TimeOutError('Connection is timed out.')
+            except TimeOutError:
+                connection.disconnect()
+                raise NotConnectedError('Client is not connected.')
+             
             connection.touch()
-        except TimeOutError:
-            connection.disconnect()
-            raise NotConnectedError('Client is not connected.')
         finally:
             self._lock.release()
 
