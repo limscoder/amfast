@@ -407,7 +407,7 @@ class ChannelSet(object):
     def __iter__(self):
         # To make thread safe
         channel_vals = self._channels.values()
-        return channel_vals.__iter__
+        return channel_vals.__iter__()
 
     def checkCredentials(self, user, password):
         """Determines if credentials are valid.
