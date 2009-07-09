@@ -56,7 +56,7 @@ static void **PyIdx_API;
 #endif
 
 typedef struct {
-    PyObject_HEAD;
+    PyObject_HEAD
     PyObject *buf; // Input
     PyObject *_buf_str; // Temporary storage of PyString read from file-like-obj
     PyObject *amf3; // True to decode as AMF3.
@@ -181,7 +181,7 @@ static void **PyRef_API;
 #endif
 
 typedef struct {
-    PyObject_HEAD;
+    PyObject_HEAD
     PyObject *buf; // Input
     PyObject *amf3; // True to encode as AMF3.
     PyObject *use_collections; // True to encode lists and tuples as ArrayCollections.

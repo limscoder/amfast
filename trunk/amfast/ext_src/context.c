@@ -214,7 +214,7 @@ static void Ref_dealloc(RefObj *self)
     Py_ssize_t pos = 0;
 
     while (PyDict_Next(self->refs, &pos, &key, &val)) {
-        obj = PyLong_AsVoidPtr(key);
+        obj = (PyObject*) PyLong_AsVoidPtr(key);
         Py_DECREF(obj);
     }
 

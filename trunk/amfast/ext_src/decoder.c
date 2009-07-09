@@ -376,10 +376,8 @@ static PyObject* decode_class_def_AMF3(DecoderObj *context, int header)
         // the raw bytes.
         Py_DECREF(class_def_dict);
 
-        char error_str[64 + PyString_Size(alias)];
-        sprintf(error_str, "Encoded class '%s' is externalizable, but ClassDef is not.", PyString_AsString(alias));
         Py_DECREF(alias);        
-        PyErr_SetString(amfast_DecodeError, error_str);
+        PyErr_SetString(amfast_DecodeError, "Encoded class is externalizable, but ClassDef is not.");
         return NULL;
     }
     Py_DECREF(alias); // We were only keeping this around to use in the externalizable error message.
@@ -1048,7 +1046,7 @@ static PyObject* decode_array_AMF0(DecoderObj *context, short map_reference)
     }
 
     // Add each item to the list
-    int i;
+    unsigned int i;
     for (i = 0; i < array_len; i++) {
         PyObject *val = decode_AMF0(context);
         if (!val) {
@@ -1486,12 +1484,12 @@ static PyObject* py_decode(PyObject *self, PyObject *args, PyObject *kwargs)
 
     // If input is a string, create a context object.
     if (PyString_Check(context) == 1) {
-        PyObject *class = PyObject_GetAttrString(context_mod, "DecoderContext");
-        if (class == NULL)
+        PyObject *cls = PyObject_GetAttrString(context_mod, "DecoderContext");
+        if (cls == NULL)
             return NULL;
 
-        dec_context = (DecoderObj*)PyObject_CallFunctionObjArgs(class, context, NULL);
-        Py_DECREF(class);
+        dec_context = (DecoderObj*)PyObject_CallFunctionObjArgs(cls, context, NULL);
+        Py_DECREF(cls);
         if (dec_context == NULL)
             return NULL;
     } else if (Decoder_check(context) == 1) {
@@ -1524,12 +1522,12 @@ static PyObject* py_decode_packet(PyObject *self, PyObject *args, PyObject *kwar
 
     // If input is a string, create a context object.
     if (PyString_Check(context) == 1) {
-        PyObject *class = PyObject_GetAttrString(context_mod, "DecoderContext");
-        if (class == NULL)
+        PyObject *cls = PyObject_GetAttrString(context_mod, "DecoderContext");
+        if (cls == NULL)
             return NULL;
 
-        dec_context = (DecoderObj*)PyObject_CallFunctionObjArgs(class, context, NULL);
-        Py_DECREF(class);
+        dec_context = (DecoderObj*)PyObject_CallFunctionObjArgs(cls, context, NULL);
+        Py_DECREF(cls);
         if (dec_context == NULL)
             return NULL;
     } else if (Decoder_check(context) == 1) {

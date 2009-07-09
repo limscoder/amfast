@@ -1973,12 +1973,12 @@ static PyObject* py_encode(PyObject *self, PyObject *args, PyObject *kwargs)
 
     // Create default context.
     if (context == NULL) {
-        PyObject *class = PyObject_GetAttrString(context_mod, "EncoderContext");
-        if (class == NULL)
+        PyObject *cls = PyObject_GetAttrString(context_mod, "EncoderContext");
+        if (cls == NULL)
             return NULL;
 
-        context = PyObject_CallObject(class, NULL);
-        Py_DECREF(class);
+        context = PyObject_CallObject(cls, NULL);
+        Py_DECREF(cls);
         if (context == NULL)
             return NULL;
     } else {
@@ -2021,12 +2021,12 @@ static PyObject* py_encode_packet(PyObject *self, PyObject *args, PyObject *kwar
 
     // Create default context.
     if (context == NULL) {
-        PyObject *class = PyObject_GetAttrString(context_mod, "EncoderContext");
-        if (class == NULL)
+        PyObject *cls = PyObject_GetAttrString(context_mod, "EncoderContext");
+        if (cls == NULL)
             return NULL;
 
-        context = PyObject_CallObject(class, NULL);
-        Py_DECREF(class);
+        context = PyObject_CallObject(cls, NULL);
+        Py_DECREF(cls);
         if (context == NULL)
             return NULL;
     } else {
