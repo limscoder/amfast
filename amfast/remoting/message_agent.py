@@ -79,7 +79,7 @@ class MessageAgent(object):
         finally:
             self._lock.release()
 
-    def publish(self, body, topic, sub_topic=None, client_id=None, ttl=600):
+    def publish(self, body, topic, sub_topic=None, ttl=600):
         """Publish a message.
 
         arguments:
@@ -87,25 +87,21 @@ class MessageAgent(object):
         body - AbstractMessage or any Python object.
         topic - string, the topic to publish to.
         sub_topic - string, the sub topic to publish to. Default = None
-        client_id - string, if provided, only publish to specific MessageAgent client. Default = None
         ttl - int time to live in secoded. Default = 600
         """
 
         current_time = int(time.time() * 1000)
         ttl *= 1000
 
-        connections = {}
-        if client_id is not None:
-            if client_id in self._clients:
-                connections = {client_id: self._clients[client_id]}
+        if sub_topic is not None:
+            com_topic = self.SUBTOPIC_SEPARATOR.join((topic, sub_topic))
         else:
-            if sub_topic is not None:
-                com_topic = self.SUBTOPIC_SEPARATOR.join((topic, sub_topic))
-            else:
-                com_topic = topic
+            com_topic = topic
                
-            if com_topic in self._topics:
-                connections = self._topics[com_topic]
+        if com_topic in self._topics:
+            connections = self._topics[com_topic]
+        else:
+            connections = {}
 
         # Get msg properties
         if isinstance(body, messaging.AbstractMessage):
