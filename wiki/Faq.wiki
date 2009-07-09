@@ -2,16 +2,23 @@
 
 = Faq =
 
-=== How do I get the encoder/decoder extensions to compile in Windows? ===
+== How do I get the encoder/decoder extensions to compile in Windows? ==
+
+=== MinGW/GCC ===
+ * MinGW provides a very basic GNU environment in Windows, allowing you to use GCC.
  * This answer was provided by Warlei in a comment on my [http://limscoder.blogspot.com/2009/03/amfast-022-released.html#comments blog].
  * It should work with Python 2.5 and 2.6.
 
-There is an easy way to compile amfast on a windows box. Follow these steps:
+ 1. Download and install MinGW. http://sourceforge.net/project/showfiles.php?group_id=2435
+ 1. Add {MinGW}\bin directory to the system PATH
+ 1. Download and unpack amfast source code from !PyPi
+ 1. In the directory you've unpacked amfast type: "python setup.py build -c mingw32" and then "python setup.py install"
 
-1- Download and install MinGW. http://sourceforge.net/project/showfiles.php?group_id=2435
+=== Visual Studio 2008 ===
+ * I tried this method with Visual Studio C++ 2008 Express Edition, which is a [http://www.microsoft.com/express/vc/ free download from Microsoft].
+ * Currently works only on the SVN Trunk, not on the PyPi distribution.
 
-2 - Add {MinGW}\bin directory to the system PATH
-
-3 - Download and unpack amfast source code from !PyPi
-
-4 - In the directory you've unpacked amfast type: "python setup.py build -c mingw32" and then "python setup.py install"
+ 1. Open Visual Studio.
+ 1. Select 'Tools->Visual Studio 2008 Command Prompt'.
+ 1. cd to AmFast directory.
+ 1. {{{python setup.py install}}}
