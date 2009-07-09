@@ -3,9 +3,10 @@ CHANGES
 
 0.3.5
 =====
- * Fixed setuptools bootstrapping (ticket: 22).
  * Fixed AttributeError in TwistedChannel (ticket: 21).
+ * Fixed setuptools bootstrapping (ticket: 22).
  * Fixed ChannelSet.__iter__ returning incorrect iterator (ticket: 23).
+ * Fixed Visual Studio 2008 compatability (ticket: 24).
 
 0.3.4
 ======
