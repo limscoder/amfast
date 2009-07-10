@@ -18,7 +18,6 @@
 
 === Visual Studio 2008 ===
  * I tried this method with Visual Studio C++ 2008 Express Edition, which is a [http://www.microsoft.com/express/vc/ free download from Microsoft].
- * Currently works only on the SVN Trunk, not on the !PyPi distribution.
 
  1. Open Visual Studio.
  1. Select 'Tools->Visual Studio 2008 Command Prompt'.
