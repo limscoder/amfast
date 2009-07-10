@@ -17,6 +17,7 @@
   1. {{{python setup.py install}}}
 
 === Visual Studio 2008 ===
+ * This method should work with Python 2.6.
  * I tried this method with Visual Studio C++ 2008 Express Edition, which is a [http://www.microsoft.com/express/vc/ free download from Microsoft].
 
  1. Open Visual Studio.
