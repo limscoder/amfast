@@ -91,7 +91,7 @@ class Channel(object):
 
         try:
             return self.channel_set.connection_manager.getConnection(flex_msg.headers[flex_msg.FLEX_CLIENT_ID_HEADER])
-        except cm.NotConnectedError:
+        except cm.NotConnectedError, cm.TimeOutError:
             return self.connect(flex_msg.headers[flex_msg.FLEX_CLIENT_ID_HEADER])
 
     def connect(self, connection_id=None):
@@ -184,7 +184,7 @@ class ChannelSet(object):
     """
 
     def __init__(self, service_mapper=None, connection_manager=None,
-        subscription_manager=None, clean_freq=600):
+        subscription_manager=None, clean_freq=10):
         if service_mapper is None:
             from amfast.remoting import ServiceMapper
             service_mapper = ServiceMapper()
@@ -261,7 +261,7 @@ class ChannelSet(object):
             self.clean()
             self.scheduleClean()
 
-        threading.Timer(self.clean_freq, _clean)
+        threading.Timer(self.clean_freq, _clean).start()
 
     def clean(self):
         """Clean out expired connections."""
@@ -353,7 +353,7 @@ class ChannelSet(object):
         for connection_id in self.subscription_manager.getSubscribers(topic, sub_topic):
             try:
                 connection = self.connection_manager.getConnection(connection_id, False)
-            except cm.NotConnectedError:
+            except cm.NotConnectedError, cm.TimeOutError:
                 continue
 
             connection.publishMessage(msg)

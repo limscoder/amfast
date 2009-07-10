@@ -21,17 +21,25 @@ class Connection(Session):
      * last_active - float, epoch timestamp when connection was last accessed.
      * authenticated - boolean, True if connection has been authenticated with RemoteObject style authentication.
      * flex_user - string, username if 'authenticated' is True.
+     * subscriptions - dict, subscribed topics
+     * channel_name - string, name of the channel connection is connected to.
 
     """
 
-    def __init__(self, id, storage_type=None, data_dir=None,
-        timeout=None, namespace_class=None, **namespace_args):
+    def __init__(self, id, beaker_params=None):
 
-        Session.__init__(self, {}, id=id, invalidate_corrupt=False,
-            use_cookies=False, type=storage_type, data_dir=data_dir,
-            key='beaker.session.id', timeout=timeout, cookie_expires=False,
-            cookie_domain=None, secret=None, secure=False,
-            namespace_class=namespace_class, **namespace_args)
+        beaker_defaults = {
+            'type': 'memory',
+            'timeout': 1800,
+            'invalidate_corrupt': False,
+            'use_cookies': False,
+            'secure': False
+        }
+
+        if beaker_params is not None:
+            beaker_defaults.extend(beaker_params)
+
+        Session.__init__(self, {}, id=id, **beaker_defaults)
 
         if self.is_new:
             self._c_loaded = True
@@ -120,6 +128,17 @@ class Connection(Session):
     def _delChannelName(self):
         del self[self.CHANNEL_NAME]
     channel_name = property(_getChannelName, _setChannelName, _delChannelName)
+
+    NOTIFY_KEY = '_NOTIFY_KEY'
+    def _getNotifyKey(self):
+        return self[self.NOTIFY_KEY]
+
+    def _setNotifyKey(self, val):
+        self[self.NOTIFY_KEY] = val
+
+    def _delNotifyKey(self):
+        del self[self.NOTIFY_KEY]
+    notify_key = property(_getNotifyKey, _setNotifyKey, _delNotifyKey)
 
     def load(self):
         """Load connection details."""

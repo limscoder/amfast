@@ -13,18 +13,9 @@ class TimeOutError(ConnectionError):
 class ConnectionManager(object):
     """Keeps track of all current connections."""
 
-    def __init__(self, timeout=3600,
-        storage_type='memory', data_dir=None,
-        namespace_class=None, namespace_args=None):
+    def __init__(self, beaker_params=None):
     
-        self.timeout = timeout
-        self.storage_type = storage_type
-        self.data_dir = data_dir
-        self.namespace_class = namespace_class
-
-        if namespace_args is None:
-            namespace_args = {}
-        self.namespace_args = namespace_args
+        self.beaker_params = beaker_params
 
     def generateId(self):
         """Generates a unique ID for a connection."""
@@ -43,15 +34,13 @@ class ConnectionManager(object):
         =======
          * NotConnectedError if connection doesn't exist.
         """
-        connection = Connection(connection_id, storage_type=self.storage_type,
-            data_dir=self.data_dir, timeout=self.timeout,
-            namespace_class=self.namespace_class, **self.namespace_args)
+        connection = Connection(connection_id, self.beaker_params)
 
         if connection.is_new is True:
             connection.delete()
             raise NotConnectedError("Connection '%s' is not connected." % connection_id)
 
-        cutoff_time = time.time() - self.timeout
+        cutoff_time = time.time() - connection.timeout
         if connection.last_active < cutoff_time:
             connection.delete()
             raise TimeOutError("Connection '%s' is timed out." % connection_id)
@@ -66,9 +55,7 @@ class ConnectionManager(object):
         if connection_id is None:
             connection_id = self.generateId()
 
-        connection = Connection(connection_id, storage_type=self.storage_type,
-            data_dir=self.data_dir, timeout=self.timeout,
-            namespace_class=self.namespace_class, **self.namespace_args)
+        connection = Connection(connection_id, self.beaker_params)
 
         connection.last_active = time.time()
         return connection

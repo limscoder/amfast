@@ -108,10 +108,9 @@ class WsgiChannel(HttpChannel):
 class StreamingWsgiChannel(WsgiChannel):
     """WsgiChannel that opens a persistent connection with the client to serve messages."""
 
-    def __init__(self, name, max_connections=-1, endpoint=None,
-        timeout=1200, wait_interval=0, heart_interval=30):
-        WsgiChannel.__init__(self, name, max_connections, endpoint,
-            timeout, wait_interval)
+    def __init__(self, name, max_connections=-1, endpoint=None, wait_interval=0, heart_interval=30):
+        WsgiChannel.__init__(self, name, max_connections=max_connections,
+            endpoint=endpoint, wait_interval=wait_interval)
 
         self.heart_interval = heart_interval
 
@@ -145,7 +144,7 @@ class StreamingWsgiChannel(WsgiChannel):
         """Start streaming response."""
 
         try: 
-            connection = self.channel_set.getConnection(msg.headers.get(msg.FLEX_CLIENT_ID_HEADER))
+            connection = self.channel_set.connection_manager.getConnection(msg.headers.get(msg.FLEX_CLIENT_ID_HEADER))
         except (KeyboardInterrupt, SystemExit):
             raise
         except Exception, exc:
@@ -159,7 +158,7 @@ class StreamingWsgiChannel(WsgiChannel):
         try:
             # Send acknowledge message
             response = msg.acknowledge()
-            response.body = connection.flex_client_id
+            response.body = connection.id
 
             try:
                 bytes = messaging.StreamingMessage.prepareMsg(response, self.endpoint)
@@ -176,11 +175,12 @@ class StreamingWsgiChannel(WsgiChannel):
 
             # Wait for new messages.
             event = threading.Event()
-            connection.setSessionAttr(connection.NOTIFY_KEY, event.set)
+            connection.notify_key = event.set
             while True:
-                if connection.active is not True:
+                connection.load()
+
+                if connection.is_new is True:
                     # Connection is no longer active
-                    connection.setSessionAttr(connection.NOTIFY_KEY, False)
                     msg = messaging.StreamingMessage.getDisconnectMsg()
                     try:
                         write(messaging.StreamingMessage.prepareMsg(msg, self.endpoint))
@@ -195,30 +195,30 @@ class StreamingWsgiChannel(WsgiChannel):
 
                 # Message has been published,
                 # or it's time for a heart beat
-                connection.setSessionAttr(connection.NOTIFY_KEY, False)
+                del connection.notify_key
                 new_msg = connection.hasMessages()
                 if new_msg is True:
                     # Send message
                     while new_msg is True:
-                        msg = connection.popMessage()
+                        msgs = connection.poll()
+                        for msg in msgs:
+                            try:
+                                bytes = messaging.StreamingMessage.prepareMsg(msg, self.endpoint)
+                            except (KeyboardInterrupt, SystemExit):
+                                raise
+                            except Exception, exc:
+                                amfast.log_exc()
+                                connection.disconnect()
+                                break
 
-                        try:
-                            bytes = messaging.StreamingMessage.prepareMsg(msg, self.endpoint)
-                        except (KeyboardInterrupt, SystemExit):
-                            raise
-                        except Exception, exc:
-                            amfast.log_exc()
-                            connection.disconnect()
-                            break
-
-                        try:
-                            write(bytes)
-                        except (KeyboardInterrupt, SystemExit):
-                            raise
-                        except:
-                            # Client has disconnected
-                            connection.disconnect()
-                            return []
+                            try:
+                                write(bytes)
+                            except (KeyboardInterrupt, SystemExit):
+                                raise
+                            except:
+                                # Client has disconnected
+                                connection.disconnect()
+                                return []
 
                         new_msg = connection.hasMessages()
                 else:
@@ -234,7 +234,8 @@ class StreamingWsgiChannel(WsgiChannel):
 
                 # Create new event to trigger new messages or heart beats
                 event = threading.Event()
-                connection.setSessionAttr(connection.NOTIFY_KEY, event.set)
+                connection.notify_key = event.set
+                connection.save()
         except (KeyboardInterrupt, SystemExit):
             raise
         except Exception, exc:
@@ -244,13 +245,13 @@ class StreamingWsgiChannel(WsgiChannel):
 
     def beat(self, connection):
         """Send a heart beat."""
-        if connection.active is not True:
+        connection.load()
+        if connection.is_new is True:
             # Client is disconnected
             return
 
-        notify_func = connection.getSessionAttr(connection.NOTIFY_KEY)
-        if notify_func is not False:
-            notify_func()
+        if hasattr(connection, "notify_key") and connection.notify_key is not False:
+            connection.notify_key()
 
         # Create timer for next beat
         timer = threading.Timer(self.heart_interval, self.beat, (connection, ))
