@@ -106,9 +106,7 @@ class Channel(object):
         if self.max_connections > -1 and self.connection_count >= self.max_connections:
             raise ChannelError("Channel '%s' is not accepting connections." % self.name)
 
-        connection = self.channel_set.connect(connection_id)
-        connection.channel_name = self.name
-        connection.save()
+        connection = self.channel_set.connect(self, connection_id)
 
         self._lock.acquire()
         try:
@@ -159,13 +157,14 @@ class HttpChannel(Channel):
         for Channels where each connection is a thread.
         """
         event = threading.Event()
-        connection.setSessionAttr(connection.NOTIFY_KEY, event.set)
+        connection.setNotifyFunc(event.set)
+        
         if (self.wait_interval > -1):
             event.wait(self.wait_interval)
 
         # Event.set has been called,
-        # or timeout has been reached
-        connection.setSessionAttr(connection.NOTIFY_KEY, False)
+        # or timeout has been reached.
+        connection.unSetNotifyFunc()
 
 class ChannelSet(object):
     """A collection of Channels.
@@ -221,7 +220,7 @@ class ChannelSet(object):
         """
         raise SecurityError('Authentication not implemented.');
 
-    def connect(self, connection_id=None):
+    def connect(self, channel, connection_id=None):
         """Add a client connection to this channel.
 
         arguments
@@ -238,7 +237,7 @@ class ChannelSet(object):
         else:
             raise ChannelError("Connection ID '%s' is already connected." % connection_id)
 
-        return self.connection_manager.createConnection(connection_id)
+        return self.connection_manager.createConnection(channel, connection_id)
 
     def disconnect(self, connection):
         """Remove a client connection from this ChannelSet.
@@ -257,6 +256,9 @@ class ChannelSet(object):
     def scheduleClean(self):
         """Schedule connection cleaning procedure to run sometime in the future."""
 
+        print "CONNECTION CLEANING NOT SCHEDULED!!!"
+        return
+
         def _clean():
             self.clean()
             self.scheduleClean()
@@ -271,7 +273,10 @@ class ChannelSet(object):
             try:
                 connection = self.connection_manager.getConnection(connection_id, False)
             except cm.NotConnectedError:
-                continue
+                # Connection was already disconnected
+                # from channel, but has not been disconnected
+                # from the connection_manager.
+                self.disconnect(connection)
 
             if connection.last_active + connection.timeout < current_time:
                 channel = self.getChannel(connection.channel_name)
@@ -341,7 +346,6 @@ class ChannelSet(object):
         ===========
          * msg - AbstractMessage, the Flex message to publish.
         """
-
         topic = msg.destination
         if hasattr(msg, 'headers') and \
             msg.headers is not None and \

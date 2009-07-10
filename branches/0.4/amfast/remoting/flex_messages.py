@@ -305,7 +305,6 @@ class RemotingMessage(AbstractMessage):
                 raise SecurityError("Operation requires authentication.")
 
         msg.response_msg.body.body = target.invoke(packet, msg, self.body)
-        self.connection.save()
 
 class_def.assign_attrs(RemotingMessage, 'flex.messaging.messages.RemotingMessage',
     ('body', 'clientId', 'destination', 'headers',
@@ -329,6 +328,7 @@ class AsyncMessage(AbstractMessage):
 
     def invoke(self, packet, msg):
         """Publish this message."""
+
         AbstractMessage.invoke(self, packet, msg)
 
         channel = packet.channel
@@ -341,7 +341,6 @@ class AsyncMessage(AbstractMessage):
                 raise SecurityError("Operation requires authentication.")
 
         channel_set.publishMessage(self)
-        self.connection.save()
 
 class_def.assign_attrs(AsyncMessage, 'flex.messaging.messages.AsyncMessage',
     ('body', 'clientId', 'destination', 'headers',
@@ -422,7 +421,6 @@ class CommandMessage(AsyncMessage):
             raise FlexMessageError("Command '%s' not found." % self.operation)
 
         msg.response_msg.body.body = target.invoke(packet, msg, (self.body,))
-        self.connection.save()
 
     def getAcknowledgeClass(self):
         """Returns the correct class for the response message."""

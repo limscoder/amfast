@@ -3,6 +3,8 @@ import amfast
 class SubscriptionManager(object):
     """Receives and publishes Producer/Consumer style messages.
 
+    This is an abstract base class and should be implemented by a sub-class.
+
     attributes
     ===========
      * secure - bool, Set to True to require pulishers and subscribers to be authenticated.
@@ -25,6 +27,7 @@ class SubscriptionManager(object):
         return topic.split(cls.SUBTOPIC_SEPARATOR)
 
 class MemorySubscriptionManager(SubscriptionManager):
+    """Stores all subscription information in memory."""
 
     def __init__(self, secure=False):
         SubscriptionManager.__init__(self, secure)

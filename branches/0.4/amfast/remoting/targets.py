@@ -44,16 +44,13 @@ def login_operation(packet, msg, raw_creds):
     
     channel_set = packet.channel.channel_set
     channel_set.checkCredentials(creds[0], creds[1])
-    command.connection.authenticated = True
-    command.connection.flex_user = creds[0]
+    command.connection.authenticate(creds[0])
 
 def logout_operation(packet, msg, *args):
     """RemoteObject style de-authentication."""
 
     command = msg.body[0]
-    command.connection.authenticated = False
-    if hasattr(command.connection, 'flex_user'):
-        del command.connection.flex_user
+    command.connection.unAuthenticate()
 
 def disconnect_operation(packet, msg, *args):
     """Respond to a disconnect operation. Disconnects current Connection."""
@@ -94,14 +91,15 @@ def poll_operation(packet, msg, *args):
     channel = packet.channel
     connection = command.connection
 
-    if not connection.hasMessages() and channel.wait_interval != 0:
+    msgs = connection.poll()
+    if len(msgs) < 1 and channel.wait_interval != 0:
         # Long polling channel, don't return response
         # until a message is available.
         channel.waitForMessage(packet, msg, connection)
-    messages = connection.poll()
+        msgs = connection.poll()
 
     if isinstance(channel.endpoint, AmfEndpoint):
         # Make sure messages are not encoded as an ArrayCollection
-        return AsNoProxy(messages)
+        return AsNoProxy(msgs)
     else:
-        return messages
+        return msgs

@@ -175,11 +175,10 @@ class StreamingWsgiChannel(WsgiChannel):
 
             # Wait for new messages.
             event = threading.Event()
-            connection.notify_key = event.set
+            connection.notify_func = event.set
             while True:
-                connection.load()
 
-                if connection.is_new is True:
+                if connection.connected is False:
                     # Connection is no longer active
                     msg = messaging.StreamingMessage.getDisconnectMsg()
                     try:
@@ -195,12 +194,15 @@ class StreamingWsgiChannel(WsgiChannel):
 
                 # Message has been published,
                 # or it's time for a heart beat
-                del connection.notify_key
-                new_msg = connection.hasMessages()
-                if new_msg is True:
-                    # Send message
-                    while new_msg is True:
-                        msgs = connection.poll()
+
+                # Remove notify_func so that
+                # New messages don't trigger event.
+                connection.unSetNotifyFunc()
+
+                msgs = connection.poll()
+                if len(msgs) > 0:
+                    while len(msgs) > 0:
+                        # Dispatch all messages to client
                         for msg in msgs:
                             try:
                                 bytes = messaging.StreamingMessage.prepareMsg(msg, self.endpoint)
@@ -208,7 +210,7 @@ class StreamingWsgiChannel(WsgiChannel):
                                 raise
                             except Exception, exc:
                                 amfast.log_exc()
-                                connection.disconnect()
+                                self.channel_set.disconnect(connection)
                                 break
 
                             try:
@@ -217,10 +219,10 @@ class StreamingWsgiChannel(WsgiChannel):
                                 raise
                             except:
                                 # Client has disconnected
-                                connection.disconnect()
+                                self.channel_set.disconnect(connection)
                                 return []
 
-                        new_msg = connection.hasMessages()
+                        msgs = connection.poll()
                 else:
                     # Send heart beat
                     try:
@@ -229,29 +231,25 @@ class StreamingWsgiChannel(WsgiChannel):
                         raise
                     except:
                         # Client has disconnected
-                        connection.disconnect()
+                        self.channel_set.disconnect(connection)
                         return []
 
                 # Create new event to trigger new messages or heart beats
                 event = threading.Event()
-                connection.notify_key = event.set
-                connection.save()
+                connection.setNotifyFunc(event.set)
         except (KeyboardInterrupt, SystemExit):
             raise
         except Exception, exc:
             amfast.log_exc()
-            connection.disconnect()
+            self.channel_set.disconnect(connection)
             return []
 
     def beat(self, connection):
         """Send a heart beat."""
-        connection.load()
-        if connection.is_new is True:
-            # Client is disconnected
+        if hasattr(connection, "notify_func") and connection.notify_func is not None:
+            connection.notify_func()
+        else:
             return
-
-        if hasattr(connection, "notify_key") and connection.notify_key is not False:
-            connection.notify_key()
 
         # Create timer for next beat
         timer = threading.Timer(self.heart_interval, self.beat, (connection, ))
@@ -261,6 +259,5 @@ class StreamingWsgiChannel(WsgiChannel):
         """Stop a streaming connection."""
         connection = self.channel_set.getConnection(msg.headers.get(msg.FLEX_CLIENT_ID_HEADER))
         connection.disconnect()
-        notify_func = connection.getSessionAttr(connect.NOTIFY_KEY)
-        if notify_func is not False:
-            notify_func()
+        if hasattr(connection, "notify_func") and connection.notify_func is not None:
+            connection.notify_func()

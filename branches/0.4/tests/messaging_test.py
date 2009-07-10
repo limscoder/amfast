@@ -29,13 +29,9 @@ class MessagingTestCase(unittest.TestCase):
 
     def testConnect(self):
         connection = self.connect(self.CHANNEL_NAME)
-        connection['test'] = True
-        connection.save()
 
         channel = self.channel_set.getChannel(self.CHANNEL_NAME)
         self.assertTrue(channel.connection_count > 0)
-
-        self.assertTrue(self.channel_set.connection_manager.getConnection(connection.id)['test'])
 
         channel = self.channel_set.getChannel(self.HTTP_CHANNEL_NAME)
         self.assertRaises(ChannelError, channel.connect, connection.id)
@@ -45,11 +41,11 @@ class MessagingTestCase(unittest.TestCase):
         channel = self.channel_set.getChannel(self.CHANNEL_NAME)
 
         connection_count = channel.connection_count
-
+        id = connection.id
         channel.disconnect(connection)
-
+         
         self.assertEquals(connection_count - 1, channel.connection_count)
-        self.assertRaises(NotConnectedError, self.channel_set.connection_manager.getConnection, connection.id)
+        self.assertRaises(NotConnectedError, self.channel_set.connection_manager.getConnection, id)
 
     def testSubscribe(self):
         connection = self.connect(self.CHANNEL_NAME)

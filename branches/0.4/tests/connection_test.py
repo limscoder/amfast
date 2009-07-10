@@ -4,41 +4,26 @@ from amfast.remoting.connection_manager import NotConnectedError, MemoryConnecti
 
 class MemoryConnectionTestCase(unittest.TestCase):
 
+    class TestChannel(object):
+        def __init__(self):
+            self.name = 'test'
+
     def setUp(self):
         self.manager = MemoryConnectionManager()
+        self.channel = self.TestChannel()        
 
     def testCreateConnection(self):
-        connection = self.manager.createConnection()
+        connection = self.manager.createConnection(self.channel)
         self.assertEquals(36, len(connection.id))
 
     def testGetConnection(self):
-        connection = self.manager.createConnection()
-        connection['test'] = True
+        connection = self.manager.createConnection(self.channel)
         id = connection.id
         last_active = connection.last_active
-        connection.save()
 
         connection = self.manager.getConnection(id, True)
-        self.assertTrue('test' in connection)
         self.assertNotEqual(last_active, connection.last_active)
         last_active = connection.last_active
-
-        #connection = self.manager.getConnection(id, False)
-        #self.assertEqual(last_active, connection.last_active)
-
-    def testDelAttr(self):
-        connection = self.manager.createConnection()
-        connection['test'] = True
-        id = connection.id
-        connection.save()
-
-        connection = self.manager.getConnection(id, True)
-        self.assertTrue('test' in connection)
-        del connection['test']
-        connection.save()
-
-        connection = self.manager.getConnection(id, True)
-        self.assertFalse('test' in connection)
 
     def testGetConnectionRaisesNotConnectedError(self):
         self.assertRaises(NotConnectedError, self.manager.getConnection, 'not connected')

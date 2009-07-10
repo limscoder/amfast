@@ -1,204 +1,107 @@
 import time
 
-from beaker.session import Session
-
 import amfast
 import flex_messages as messaging
-from subscription_manager import SubscriptionManager
 
 class ConnectionError(amfast.AmFastError):
     pass
 
-class Connection(Session):
+class Connection(object):
     """A client connection to a Channel.
 
     This class acts like a session.
     Unique to a single flash client.
-    Persisted by Beaker package.
 
-    attributes
-    ============
+    attributes (read-only)
+    =======================
+     * manager - ConnectionManager, the class that manages connection persistence.
+     * channel_name - string, name of the channel connection is connected to.
+     * id - string, Flash client's ID.
+     * timeout - int, timeout in seconds
+     * connected - boolean, True if connection is connected
      * last_active - float, epoch timestamp when connection was last accessed.
      * authenticated - boolean, True if connection has been authenticated with RemoteObject style authentication.
      * flex_user - string, username if 'authenticated' is True.
-     * subscriptions - dict, subscribed topics
-     * channel_name - string, name of the channel connection is connected to.
 
     """
 
-    def __init__(self, id, beaker_params=None):
+    # Keeps track of notification functions
+    # by their IDs, 
+    # so they can be serialized
+    # when the connection is saved.
+    _notifications = {}
 
-        beaker_defaults = {
-            'type': 'memory',
-            'timeout': 1800,
-            'invalidate_corrupt': False,
-            'use_cookies': False,
-            'secure': False
-        }
+    @classmethod
+    def _setNotifyFunc(cls, func):
+        func_id = id(func)
+        cls._notifications[func_id] = func
+        return func_id
 
-        if beaker_params is not None:
-            beaker_defaults.extend(beaker_params)
+    @classmethod
+    def _getNotifyFuncById(cls, func_id):
+        return cls._notifications[func_id]
 
-        Session.__init__(self, {}, id=id, **beaker_defaults)
+    @classmethod
+    def _delNotifyFunc(cls, func_id):
+        del cls._notifications[func_id]
 
-        if self.is_new:
-            self._c_loaded = True
-            self._c_dirty = True
-            self._init()
-        else:
-            self._c_loaded = False
-            self._c_dirty = False
+    def __init__(self, manager, channel_name, id, timeout=1800):
+        self._manager = manager
+        self._channel_name = channel_name
+        self._id = id
+        self._timeout = timeout
+        self._connected = True
+        self._last_active = 0
+        self._authenticated = False
 
-    def __getitem__(self, key):
-        """Lazy-load session when item is accessed."""
-        if self._c_loaded is False:
-            self.load()
-        return Session.__getitem__(self, key)
+    # These properties should all be read only!!
+    def _getManager(self):
+        return self._manager
+    manager = property(_getManager)
 
-    def __setitem__(self, key, value):
-        """Mark as dirty, so save is implemented properly."""
-        if self._c_loaded is False:
-            self.load()
-        self._c_dirty = True
-        Session.__setitem__(self, key, value)
-
-    def __delitem__(self, key):
-        """Mark as dirty, so save is implemented properly."""
-        if self._c_loaded is False:
-            self.load()
-        self._c_dirty = True
-        Session.__delitem__(self, key)
-
-    def _init(self):
-        """Initialize new connections."""
-        self.authenticated = False
-        self.subscriptions = {}
-
-    LAST_ACTIVE = '_LAST_ACTIVE'
-    def _getLastActive(self):
-        return self[self.LAST_ACTIVE]
-
-    def _setLastActive(self, val):
-        self[self.LAST_ACTIVE] = val
-
-    def _delLastActive(self):
-        del self[self.LAST_ACTIVE]
-    last_active = property(_getLastActive, _setLastActive, _delLastActive)
-
-    AUTHENTICATED = '_AUTHENTICATED'
-    def _getAuthenticated(self):
-        return self[self.AUTHENTICATED]
-
-    def _setAuthenticated(self, val):
-        self[self.AUTHENTICATED] = val
-
-    def _delAuthenticated(self):
-        del self[self.AUTHENTICATED]
-    authenticated = property(_getAuthenticated, _setAuthenticated, _delAuthenticated)
-
-    FLEX_USER = '_FLEX_USER'
-    def _getFlexUser(self):
-        return self[self.FLEX_USER]
-
-    def _setFlexUser(self, val):
-        self[self.FLEX_USER] = val
-
-    def _delFlexUser(self):
-        del self[self.FLEX_USER]
-    flex_user = property(_getFlexUser, _setFlexUser, _delFlexUser)
-
-    SUBSCRIPTIONS = '_SUBSCRIPTIONS'
-    def _getSubscriptions(self):
-        return self[self.SUBSCRIPTIONS]
-
-    def _setSubscriptions(self, val):
-        self[self.SUBSCRIPTIONS] = val
-
-    def _delSubscriptions(self):
-        del self[self.SUBSCRIPTIONS]
-    subscriptions = property(_getSubscriptions, _setSubscriptions, _delSubscriptions)
-
-    CHANNEL_NAME = '_CHANNEL_NAME'
     def _getChannelName(self):
-        return self[self.CHANNEL_NAME]
+        return self._channel_name
+    channel_name = property(_getChannelName)
 
-    def _setChannelName(self, val):
-        self[self.CHANNEL_NAME] = val
+    def _getId(self):
+        return self._id
+    id = property(_getId)
 
-    def _delChannelName(self):
-        del self[self.CHANNEL_NAME]
-    channel_name = property(_getChannelName, _setChannelName, _delChannelName)
+    def _getTimeout(self):
+        return self._timeout
+    timeout = property(_getTimeout)
 
-    NOTIFY_KEY = '_NOTIFY_KEY'
-    def _getNotifyKey(self):
-        return self[self.NOTIFY_KEY]
+    def _getConnected(self):
+        return self._connected
+    connected = property(_getConnected)
 
-    def _setNotifyKey(self, val):
-        self[self.NOTIFY_KEY] = val
+    def _getLastActive(self):
+        return self._last_active
+    last_active = property(_getLastActive)
 
-    def _delNotifyKey(self):
-        del self[self.NOTIFY_KEY]
-    notify_key = property(_getNotifyKey, _setNotifyKey, _delNotifyKey)
+    def _getAuthenticated(self):
+        return self._authenticated
+    authenticated = property(_getAuthenticated)
 
-    def load(self):
-        """Load connection details."""
-        self._c_loaded = True
-        Session.load(self)
+    def _getFlexUser(self):
+        return self._flex_user
+    flex_user = property(_getFlexUser)
 
-    def save(self, force=False):
-        """Save connection details."""
-        if self._c_dirty is True or force is True:
-            self._c_loaded = True
-            self._c_dirty = False
-            Session.save(self)
+    def _getNotifyFunc(self):
+        return self._getNotifyFuncById(self._notify_func_id)
+    notify_func = property(_getNotifyFunc)
+
+    # These methods are just proxies to the manager's methods
+    def touch(self):
+        """Update last_active."""
+        self._manager.touchConnection(self)
 
     def subscribe(self, client_id, topic, sub_topic=None):
-        """Add a subscription to a topic."""
-        topic = SubscriptionManager.getTopicKey(topic, sub_topic)
+        self._manager.subscribeConnection(self, client_id, topic, sub_topic)
 
-        self.lock()
-        try:
-            topic_map = self.subscriptions.get(topic, None)
-            if topic_map is None:
-                topic_map = {}
-                self.subscriptions[topic] = topic_map
-
-            if client_id not in topic_map:
-                topic_map[client_id] = []
-        finally:
-            self.unlock()
-
-    def getSubscribedTopics(self):
-        """Returns a list of topics that the connection is subscribed to."""
-        return self.subscriptions.keys()
-
-    def getSubscribedClients(self, topic, sub_topic=None):
-        """Returns a list of client_ids subscribed to topic."""
-        client_ids = []
-        topic_map = self.subscriptions.get(topic, None)
-        if topic_map is None:
-            return client_ids
-        else:
-            return topic_map.keys()
-        
     def unSubscribe(self, client_id, topic, sub_topic=None):
         """Remove a subscription from a topic."""
-        topic = SubscriptionManager.getTopicKey(topic, sub_topic)
-
-        self.lock()
-        try:
-            topic_map = self.subscriptions.get(topic, None)
-            if topic_map is None:
-                topic_map = {}
-                self.subscriptions[topic] = topic_map
-
-            if client_id in topic_map:
-                del topic_map[client_id]
-
-                if len(topic_map) < 1:
-                    del self.subscriptions[topic]
-        finally:
-            self.unlock()
+        self._manager.unSubscribeConnection(self, client_id, topic, sub_topic)
 
     def publishMessage(self, msg):
         """Publish a message to this connection.
@@ -209,56 +112,46 @@ class Connection(Session):
         ===========
          * msg - AbstractMessage, the message to publish.
         """
-
-        topic = msg.destination
-        if hasattr(msg, 'headers') and \
-            msg.headers is not None and \
-            messaging.AsyncMessage.SUBTOPIC_HEADER in msg.headers:
-            sub_topic = msg.headers[messaging.AsyncMessage.SUBTOPIC_HEADER]
-        else:
-            sub_topic = None
-
-        topic = SubscriptionManager.getTopicKey(topic, sub_topic)
-
-        self.lock()
-        self.load()
-        try:
-            topic_map = self.subscriptions.get(topic, None)
-            if topic_map is None:
-                return
-
-            for messages in topic_map.itervalues():
-                messages.append(msg)
-            self.save(force=True)
-        finally:
-            self.unlock()
-
-    def hasMessages(self):
-        """Returns True if new messages are present."""
-        for topic_map in self.subscriptions.values():
-            for messages in topic_map.values():
-                if len(messages) > 0:
-                    return True
-
-        return False
+        self._manager.publishToConnection(self, msg)
 
     def poll(self):
         """Returns a list of messages, and clears message qeue."""
+        return self._manager.pollConnection(self)
 
-        polled_messages = []
+    def getSubscribedTopics(self):
+        """Returns a list of topics that the connection is subscribed to."""
+        return self._manager.getSubscribedTopics(self)
 
-        self.lock()
-        self.load()
-        try:
-            for topic_map in self.subscriptions.itervalues():
-                for client_id, messages in topic_map.iteritems():
-                    for i in xrange(len(messages)):
-                        polled_messages.append(self.personalizeMessage(client_id, messages.pop()))
-            self.save(force=True)
-        finally:
-            self.unlock()
+    def getSubscribedClients(self, topic, sub_topic=None):
+        return self._manager.getSubscribedClients(self, topic, sub_topic)
 
-        return polled_messages
+    def delete(self):
+        self._manager.deleteConnection(self)
+
+    def authenticate(self, user):
+        self._manager.authenticateConnection(self, user)
+
+    def unAuthenticate(self):
+        self._manager.unAuthenticateConnection(self)
+
+    def getSessionAttr(self, name):
+        self._manager.getConnectionSessionAttr(self, name)
+
+    def setSessionAttr(self, name, val):
+        self._manager.setConnectionSessionAttr(self, name, val)
+
+    def delSessionAttr(self, name):
+        self._manager.delConnectionSessionAttr(self, name)
+
+    # Actual methods
+
+    def setNotifyFunc(self, func):
+        self._notify_func_id = self._setNotifyFunc(func)
+
+    def unSetNotifyFunc(self):
+        if hasattr(self, '_notify_func_id'):
+            self._delNotifyFunc(self._notify_func_id)
+            del self._notify_func_id
 
     def personalizeMessage(self, client_id, msg):
         """Return a copy of the message with client_id set."""
