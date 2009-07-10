@@ -1,0 +1,321 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Application xmlns:mx="http://www.adobe.com/2006/mxml">
+	<mx:Panel width="100%" height="100%"
+		title="Flex -- AmFast -- Producer Consumer Example">
+		<mx:HBox width="100%">
+			<mx:Form>
+				<mx:FormItem label="messaging url:">
+					<mx:TextInput
+						id="messagingUrl"
+						text="http://localhost:8000/amf"
+						width="400"/>
+				</mx:FormItem>
+				
+				<mx:FormItem label="subscribed:">
+					<mx:Label text="{subscribed? 'yes':'no'}"/>
+				</mx:FormItem>
+				
+				<mx:FormItem label="status:">
+					<mx:Label text="{master? 'master':'slave'}"/>
+				</mx:FormItem>
+			</mx:Form>
+			
+			<mx:VRule />
+			
+			<mx:Form>
+				<mx:FormItem width="100%">
+					<mx:Button
+						label="Subscribe"
+						click="subscribeMessaging()"
+						toolTip="Subscribe to messages."
+						width="100%"/>
+				</mx:FormItem>
+				
+				<mx:FormItem width="100%">
+					<mx:Button
+						label="UnSubscribe"
+						click="unSubscribeMessaging()"
+						toolTip="UnSubscribe from messages."
+						enabled="{subscribed}"
+						width="100%"/>
+				</mx:FormItem>
+				
+				<mx:FormItem width="100%">
+					<mx:Button
+						id="closeBtn"
+						label="Close Connection"
+						click="disconnect()"
+						toolTip="Close streaming connection."
+						enabled="false"
+						width="100%"/>
+				</mx:FormItem>
+			</mx:Form>
+			
+			<mx:VRule />
+			
+			<mx:Form>
+				<mx:FormItem width="100%">
+					<mx:Button
+						id="masterBtn"
+						label="Master"
+						click="becomeMaster()"
+						enabled="false"
+						toolTip="Click this button to broadcast object changes to other clients."
+						width="100%"/>
+				</mx:FormItem>
+			</mx:Form>
+		</mx:HBox>
+		
+		<mx:Canvas
+			id="mainContainer"
+			width="100%"
+			height="400"
+			backgroundColor="#FFF"
+			creationComplete="initCircle()"
+			toolTip="Drag the circle around the screen. Changes to the master will be replicated to all subscribed slaves."/>
+	</mx:Panel>
+	
+	<mx:Script>
+		<![CDATA[
+			import mx.controls.Alert;
+			import mx.messaging.Consumer;
+			import mx.messaging.Producer;
+			import mx.messaging.ChannelSet;
+			import mx.messaging.channels.StreamingAMFChannel;
+			import mx.messaging.events.MessageEvent;
+			import mx.messaging.events.MessageFaultEvent;
+			import mx.messaging.messages.AsyncMessage;
+			
+			import flash.display.Sprite;
+			
+			// This is the name of the topic
+			// that will be used to broadcast
+			// object coordinates.
+			protected const TOPIC:String = 'coordinates';
+			
+			protected var channelSet:ChannelSet;
+			protected var consumer:Consumer;
+			protected var producer:Producer;
+			protected var serverUrl:String;
+			protected var circle:Sprite;
+			[Bindable]
+			protected var master:Boolean = false;
+			[Bindable]
+			protected var subscribed:Boolean = false;
+			
+			/**
+			 * Draw a circle that we can drag around.
+			 */
+			protected function initCircle():void
+			{
+				circle = new Sprite();
+				circle.graphics.beginFill(0xFFCC00);
+				circle.graphics.drawCircle(30, 30, 30);
+				circle.graphics.endFill();
+				
+				// We can drag this circle around.
+				circle.addEventListener(MouseEvent.MOUSE_DOWN, circle_mouseDownHandler);
+				circle.addEventListener(MouseEvent.MOUSE_UP, circle_mouseUpHandler);
+				circle.x = mainContainer.width / 2;
+				circle.y = mainContainer.height / 2;
+				mainContainer.rawChildren.addChild(circle);
+			}
+			
+			protected function circle_mouseDownHandler(event:MouseEvent):void
+			{
+				event.target.startDrag();
+				if (master) {
+					event.target.addEventListener(MouseEvent.MOUSE_MOVE, circle_mouseMoveHandler);
+				}
+			}
+			
+			protected function circle_mouseUpHandler(event:MouseEvent):void
+			{
+				event.target.stopDrag();
+				event.target.addEventListener(MouseEvent.MOUSE_MOVE, circle_mouseMoveHandler);
+			}
+			
+			protected function circle_mouseMoveHandler(event:MouseEvent):void
+			{
+				// Publish new coordinates
+				if (master) {
+					var coords:Object = {
+						'x': circle.x,
+						'y': circle.y
+					}
+					
+					var producer:Producer = getProducer();
+					var msg:AsyncMessage = new AsyncMessage();
+					msg.body = coords;
+					producer.send(msg);
+				}
+			}
+			
+			/**
+			 * Take control of the object.
+			 */
+			protected function becomeMaster():void
+			{
+				// Send flag to other clients,
+				// so they know they aren't the
+				// master anymore.
+				var producer:Producer = getProducer();
+				var msg:AsyncMessage = new AsyncMessage();
+				msg.body = {'master': getConsumer().clientId};
+				producer.send(msg);
+				
+				master = true;
+				masterBtn.enabled = false;
+			}
+			
+			/**
+			 * Create the AMF Channels
+			 * that messages will be
+			 * sent and recieved from.
+			 */
+			protected function getChannelSet():ChannelSet
+			{
+				if (channelSet != null && serverUrl == messagingUrl.text)
+				{
+					// User has not changed URL.
+					// Use existing channelSet.
+					return channelSet;
+				}
+				
+				serverUrl = messagingUrl.text;
+				var channel:StreamingAMFChannel = new StreamingAMFChannel("streaming-channel", serverUrl);
+				
+				// Create a channel set and add channel(s) to it
+				channelSet = new ChannelSet();
+				channelSet.addChannel(channel);
+				
+				return channelSet;
+			}
+			
+			/**
+			 * Create a Consumer with url from user input.
+			 */
+			protected function getConsumer():Consumer
+			{
+				if (consumer != null && consumer.channelSet == channelSet) {
+					// URL has not changed since
+					// last time, return
+					// existing consumer
+					return consumer;
+				}
+				
+				// Create a new Consumer
+				// and set it's destination
+				// name to the topic we want
+				// to subscribe to.
+				consumer = new Consumer();
+				consumer.destination = TOPIC;
+				consumer.channelSet = getChannelSet();
+				
+				return consumer;
+			}
+			
+			/**
+			 * Create a message Producer with url from user input.
+			 */
+			protected function getProducer():Producer
+			{
+				if (producer != null && producer.channelSet == channelSet) {
+					// URL has not changed since
+					// last time, return
+					// existing consumer
+					return producer;
+				}
+				
+				producer = new Producer();
+				producer.destination = TOPIC;
+				producer.channelSet = getChannelSet();
+				
+				return producer;
+			}
+			
+			/**
+			 * Subscribe to the 'messages' topic.
+			 */
+			protected function subscribeMessaging():void
+			{
+				var consumer:Consumer = getConsumer();
+				
+				// Add event handlers for when new messages
+				// arrive.
+				consumer.addEventListener(MessageEvent.MESSAGE,
+					consumer_MsgHandler, false, 0 , true);
+				consumer.addEventListener(MessageFaultEvent.FAULT,
+					consumer_faultHandler, false, 0, true);
+					
+				// Subscribe to receive messages
+				consumer.subscribe();
+				subscribed = true;
+				
+				if (!master) {
+					masterBtn.enabled = true;
+				}
+				closeBtn.enabled = true;
+			}
+			
+			protected function unSubscribeMessaging():void
+			{
+				var consumer:Consumer = getConsumer();
+				if (consumer.subscribed) {
+					consumer.unsubscribe();
+				}
+				
+				subscribed = false;
+				masterBtn.enabled = false;
+			}
+			
+			/**
+			 * Handle an incoming message.
+			 */
+			protected function consumer_MsgHandler(event:MessageEvent):void
+			{
+				// Check message for MASTER flag
+				if (event.message.body.hasOwnProperty('master')) {
+					// Flag that another client has taken over.
+					if (event.message.body.master == getConsumer().clientId) {
+						master = true;
+						masterBtn.enabled = false;
+					} else {
+						master = false;
+						masterBtn.enabled = true;
+					}
+					return;
+				}
+				
+				if (!master) {
+					// Update object position
+					// with coordinates in message
+					circle.x = event.message.body.x;
+					circle.y = event.message.body.y;
+				}
+			}
+			
+			/**
+			 * Handle a failed message.
+			 */ 
+			protected function consumer_faultHandler(event:MessageFaultEvent):void
+			{
+				Alert.show(event.faultString, 'Message Fault',
+					Alert.OK, this, null, null);
+			}
+			
+			/**
+			 * Disconnect from channel.
+			 */
+			protected function disconnect():void
+			{
+				var channelSet:ChannelSet = getChannelSet();
+				channelSet.disconnectAll();
+				
+				subscribed = false;
+				masterBtn.enabled = false;
+				closeBtn.enabled = false;
+			}
+		]]>
+	</mx:Script>
+</mx:Application>
