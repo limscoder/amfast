@@ -1,11 +1,39 @@
+import time
+
 from twisted.internet import defer, task, reactor
 from twisted.web import server
 from twisted.web.resource import Resource
 
-from amfast.remoting.channel import HttpChannel
+import amfast
+from amfast.remoting.channel import ChannelSet, HttpChannel
 from amfast.class_def.as_types import AsNoProxy
 from amfast.remoting.endpoint import AmfEndpoint
 import amfast.remoting.flex_messages as messaging
+
+class TwistedChannelSet(ChannelSet):
+    """A ChannelSet optimized for use with Twisted."""
+
+    def scheduleClean(self):
+        reactor.callLater(self.clean_freq, self.clean)
+
+    def clean(self):
+        amfast.logger.debug("Cleaning connections.")
+
+        current_time = time.time()
+        deferreds = []
+        for connection_id in self.connection_manager.getConnectionIds():
+            d = defer.Deferred()
+            d.addCallbacks(self.cleanConnection, callbackArgs=(current_time,))
+            reactor.callLater(0.3, d.callback, connection_id)
+
+        if len(deferreds) > 0:
+            def _scheduleClean(val):
+                self.scheduleClean()
+
+            deferredList = defer.DeferredList(deferreds)
+            deferredList.addCallback(self.scheduleClean)
+        else:
+            self.scheduleClean()
 
 class TwistedChannel(Resource, HttpChannel):
     """An AMF messaging channel that can be used with Twisted Web."""

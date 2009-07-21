@@ -267,20 +267,27 @@ class ChannelSet(object):
 
     def clean(self):
         """Clean out expired connections."""
+        amfast.logger.debug("Cleaning connections.")
 
         current_time = time.time()
         for connection_id in self.connection_manager.getConnectionIds():
-            try:
-                connection = self.connection_manager.getConnection(connection_id, False)
-            except cm.NotConnectedError:
-                # Connection was already disconnected
-                # from channel, but has not been disconnected
-                # from the connection_manager.
-                self.disconnect(connection)
+            self.cleanConnection(connection_id, current_time)
 
-            if connection.last_active + connection.timeout < current_time:
-                channel = self.getChannel(connection.channel_name)
-                channel.disconnect(connection)
+    def cleanConnection(self, connection_id, current_time): 
+        if amfast.log_debug is True: 
+            amfast.logger.debug("Cleaning connection: %s" % connection_id) 
+ 
+        try: 
+            connection = self.connection_manager.getConnection(connection_id, False) 
+        except cm.NotConnectedError: 
+            # Connection was already disconnected 
+            # from channel, but has not been disconnected 
+            # from the connection_manager. 
+            self.disconnect(connection) 
+ 
+        if connection.last_active + connection.timeout < current_time: 
+            channel = self.getChannel(connection.channel_name) 
+            channel.disconnect(connection) 
 
     def subscribe(self, connection, client_id, topic, sub_topic=None, selector=None):
         """Subscribe a client to a topic.
