@@ -1,4 +1,4 @@
-"""An example server using the CherryPy web framework."""
+"""An example server using WSGI."""
 import os
 import optparse
 from wsgiref import simple_server
