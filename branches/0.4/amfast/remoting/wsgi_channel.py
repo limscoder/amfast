@@ -175,7 +175,7 @@ class StreamingWsgiChannel(WsgiChannel):
 
             # Wait for new messages.
             event = threading.Event()
-            connection.notify_func = event.set
+            connection.setNotifyFunc(event.set)
             while True:
 
                 if connection.connected is False:

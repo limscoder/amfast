@@ -1,8 +1,9 @@
 """Channels that can be used with the CherryPy framework."""
 
 import cherrypy
+import cherrypy.process.plugins as cp_plugins
 
-from amfast.remoting.channel import HttpChannel
+from amfast.remoting.channel import ChannelSet, HttpChannel
 
 def amfhook():
     """Checks for POST, and stops cherrypy from processing the body."""
@@ -13,6 +14,20 @@ def amfhook():
     if cherrypy.request.method != 'POST':
         raise cherrypy.HTTPError(405, "AMF request must use 'POST' method.");
 cherrypy.tools.amfhook = cherrypy.Tool('before_request_body', amfhook, priority=0)
+
+class CherryPyChannelSet(ChannelSet):
+    """A ChannelSet for use with CherryPy."""
+
+    def __init__(self, *args, **kwargs):
+        self.clean_scheduled = False
+        ChannelSet.__init__(self, *args, **kwargs)
+
+    def scheduleClean(self):
+        """Overridden to use CherryPy's Monitor functionality."""
+        if self.clean_scheduled is False:
+            cleaner = cp_plugins.Monitor(cherrypy.engine, self.clean, self.clean_freq)
+            cleaner.subscribe()
+            self.clean_scheduled = True
 
 class CherryPyChannel(HttpChannel):
     """An AMF messaging channel that can be used with CherryPy HTTP framework.

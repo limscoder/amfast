@@ -256,14 +256,13 @@ class ChannelSet(object):
     def scheduleClean(self):
         """Schedule connection cleaning procedure to run sometime in the future."""
 
-        print "CONNECTION CLEANING NOT SCHEDULED!!!"
-        return
-
         def _clean():
             self.clean()
             self.scheduleClean()
 
-        threading.Timer(self.clean_freq, _clean).start()
+        thread = threading.Timer(self.clean_freq, _clean)
+        thread.daemon = True
+        thread.start()
 
     def clean(self):
         """Clean out expired connections."""
