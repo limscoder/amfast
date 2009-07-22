@@ -1,8 +1,11 @@
 """Channels that can be used with the CherryPy framework."""
+import threading
 
 import cherrypy
 import cherrypy.process.plugins as cp_plugins
 
+import amfast
+import amfast.remoting.flex_messages as messaging
 from amfast.remoting.channel import ChannelSet, HttpChannel
 
 def amfhook():
@@ -36,11 +39,13 @@ class CherryPyChannel(HttpChannel):
     mount the processMsg method to the URL where
     AMF messaging should be available from. 
 
-    CherryPyChannel does not support HTTP streaming.
-    Use WsgiChannel to achieve HTTP streaming.
+    You can also use a WsgiChannel instance by
+    grafting it to the CherryPy tree with
+    the command cherrypy.tree.graft.
 
-    A WsgiChannel instance can be mounted to a URL
-    within CherryPy with the command cherrypy.tree.graft.
+    Using WsgiChannel will be more efficient, but you
+    won't have access to any of CherryPy's built-in tools
+    such as cookie-based sessions.
 
     """
 
@@ -56,3 +61,161 @@ class CherryPyChannel(HttpChannel):
         response = self.invoke(self.decode(raw_request))
         cherrypy.response.headers['Content-Type'] = self.CONTENT_TYPE
         return self.encode(response)
+
+class StreamingCherryPyChannel(CherryPyChannel):
+    """Allows HTTP streaming."""
+
+    def __init__(self, name, max_connections=-1, endpoint=None, wait_interval=0, heart_interval=30):
+        CherryPyChannel.__init__(self, name, max_connections=max_connections,
+            endpoint=endpoint, wait_interval=wait_interval)
+
+        self.heart_interval = heart_interval
+
+    @cherrypy.expose
+    @cherrypy.tools.amfhook()
+    def processMsg(self, command=None, version=None):
+        if cherrypy.request.headers['Content-Type'] == self.CONTENT_TYPE:
+            # Regular AMF message
+            return CherryPyChannel.processMsg(self)
+
+
+        # Create streaming message command
+        cherrypy.response.stream = True
+        try:
+            msg = messaging.StreamingMessage()
+            msg.parseParams(cherrypy.request.query_string)
+
+            c_len = int(cherrypy.request.headers['Content-Length'])
+            body = cherrypy.request.rfile.read(c_len)
+            msg.parseBody(body)
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except:
+            amfast.log_exc()
+            raise ChannelError("AMF server error.")
+
+        if msg.operation == msg.OPEN_COMMAND:
+            return self.startStream(msg)
+
+        if msg.operation == msg.CLOSE_COMMAND:
+            return self.stopStream(msg)
+
+        raise ChannelError('Http streaming operation unknown: %s' % msg.operation)
+
+    def startStream(self, msg):
+        """Returns an iterator for streaming."""
+
+        try:
+            connection = self.channel_set.connection_manager.getConnection(msg.headers.get(msg.FLEX_CLIENT_ID_HEADER))
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception, exc:
+            amfast.log_exc()
+            raise ChannelError('Http streaming operation unknown: %s' % msg.operation)
+
+        cherrypy.response.headers['Content-Type'] = self.CONTENT_TYPE
+
+        try:
+            # Start heart beat
+            timer = threading.Timer(self.heart_interval, self.beat, (connection, ))
+            timer.daemon = True
+            timer.start()
+
+            # Wait for new messages.
+            inited = False
+            event = threading.Event()
+            connection.setNotifyFunc(event.set)
+            while True:
+
+                if connection.connected is False:
+                    # Connection is no longer active
+                    msg = messaging.StreamingMessage.getDisconnectMsg()
+                    try:
+                        yield messaging.StreamingMessage.prepareMsg(msg, self.endpoint)
+                    finally:
+                        # Client may have already disconnected
+                        return
+
+                if inited is False:
+                    # Send acknowledge message
+                    response = msg.acknowledge()
+                    response.body = connection.id
+
+                    bytes = messaging.StreamingMessage.prepareMsg(response, self.endpoint)
+                    inited = True
+                    yield bytes
+ 
+                # Block until new message
+                event.wait()
+
+                # Message has been published,
+                # or it's time for a heart beat
+
+                # Remove notify_func so that
+                # New messages don't trigger event.
+                connection.unSetNotifyFunc()
+
+                msgs = connection.poll()
+                if len(msgs) > 0:
+                    while len(msgs) > 0:
+                        # Dispatch all messages to client
+                        for msg in msgs:
+                            try:
+                                bytes = messaging.StreamingMessage.prepareMsg(msg, self.endpoint)
+                            except (KeyboardInterrupt, SystemExit):
+                                raise
+                            except Exception, exc:
+                                amfast.log_exc()
+                                self.channel_set.disconnect(connection)
+                                break
+
+                            try:
+                                yield bytes
+                            except (KeyboardInterrupt, SystemExit):
+                                raise
+                            except:
+                                # Client has disconnected
+                                self.channel_set.disconnect(connection)
+                                return
+
+                        msgs = connection.poll()
+                else:
+                    # Send heart beat
+                    try:
+                        yield chr(messaging.StreamingMessage.NULL_BYTE)
+                    except (KeyboardInterrupt, SystemExit):
+                        raise
+                    except:
+                        # Client has disconnected
+                        self.channel_set.disconnect(connection)
+                        return
+
+                # Create new event to trigger new messages or heart beats
+                event = threading.Event()
+                connection.setNotifyFunc(event.set)
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception, exc:
+            amfast.log_exc()
+            self.channel_set.disconnect(connection)
+            return
+
+    def stopStream(self, msg):
+        """Stop a streaming connection."""
+        connection = self.channel_set.getConnection(msg.headers.get(msg.FLEX_CLIENT_ID_HEADER))
+        connection.disconnect()
+        if hasattr(connection, "notify_func") and connection.notify_func is not None:
+            connection.notify_func()
+
+    def beat(self, connection):
+        """Send a heart beat."""
+
+        if hasattr(connection, "notify_func") and connection.notify_func is not None:
+            connection.notify_func()
+        else:
+            return
+
+        # Create timer for next beat
+        timer = threading.Timer(self.heart_interval, self.beat, (connection, ))
+        timer.daemon = True
+        timer.start()

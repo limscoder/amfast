@@ -183,7 +183,7 @@ class ChannelSet(object):
     """
 
     def __init__(self, service_mapper=None, connection_manager=None,
-        subscription_manager=None, clean_freq=10):
+        subscription_manager=None, clean_freq=300):
         if service_mapper is None:
             from amfast.remoting import ServiceMapper
             service_mapper = ServiceMapper()

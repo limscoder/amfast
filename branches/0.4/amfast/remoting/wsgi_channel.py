@@ -171,6 +171,7 @@ class StreamingWsgiChannel(WsgiChannel):
 
             # Start heart beat
             timer = threading.Timer(self.heart_interval, self.beat, (connection, ))
+            timer.daemon = True
             timer.start()
 
             # Wait for new messages.
@@ -253,6 +254,7 @@ class StreamingWsgiChannel(WsgiChannel):
 
         # Create timer for next beat
         timer = threading.Timer(self.heart_interval, self.beat, (connection, ))
+        timer.daemon = True
         timer.start()
 
     def stopStream(self, msg):

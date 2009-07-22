@@ -64,8 +64,6 @@ if __name__ == '__main__':
     app = App()
     setattr(app, 'amf', polling_channel.processMsg)
     setattr(app, 'longPoll', long_poll_channel.processMsg)
-    #cherrypy.tree.graft(polling_channel.processMsg, '/amf')
-    #cherrypy.tree.graft(long_poll_channel.processMsg, '/longPoll')
     cherrypy.quickstart(app, '/', config=cp_options)
 
     print "Serving on %s:%s" % (options.domain, options.port)
