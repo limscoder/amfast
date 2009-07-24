@@ -256,6 +256,9 @@ class ChannelSet(object):
     def scheduleClean(self):
         """Schedule connection cleaning procedure to run sometime in the future."""
 
+        print "NOT SCHEDULING CLEAN!!"
+        return
+
         def _clean():
             self.clean()
             self.scheduleClean()
@@ -363,21 +366,18 @@ class ChannelSet(object):
          * msg - AbstractMessage, the Flex message to publish.
         """
 
-        topic = msg.destination
-        if hasattr(msg, 'headers') and \
-            msg.headers is not None and \
-            messaging.AsyncMessage.SUBTOPIC_HEADER in msg.headers:
-            sub_topic = msg.headers[messaging.AsyncMessage.SUBTOPIC_HEADER]
-        else:
-            sub_topic = None
+        self.subscription_manager.publishMessage(msg)
 
+        # Notify connections
         for connection_id in self.subscription_manager.getSubscribers(topic, sub_topic):
             try:
                 connection = self.connection_manager.getConnection(connection_id, False)
             except cm.NotConnectedError, cm.TimeOutError:
                 continue
 
-            connection.publishMessage(msg)
+            if hasattr(connection 'notify_func') and \
+                connection.notify_func is not None:
+                connection.notify_func()
 
     def mapChannel(self, channel):
         """Add a Channel to the ChannelSet

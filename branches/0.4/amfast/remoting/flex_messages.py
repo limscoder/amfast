@@ -56,28 +56,12 @@ class AbstractMessage(object):
             self.headers = headers
 
         if timestamp is None:
-            timestamp = int(time.time() * 1000)
+            timestamp = time.time()
         self.timestamp = timestamp
    
         if messageId is None:
             messageId = self._getId()
         self.messageId = messageId
-
-    def isExpired(self, current_time=None):
-        """Checks to see if message has expired."""
-        if self.timestamp is None or self.timeToLive is None:
-            return False
-
-        if current_time is None:
-            current_time = time.time() * 1000
-        else:
-            current_time *= 1000
-
-        expires = self.timestamp + self.timeToLive
-        if expires < current_time:
-            return True
-        else:
-            return False
 
     def invoke(self, packet, msg):
         """Invoke all message headers."""

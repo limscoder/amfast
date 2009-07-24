@@ -52,6 +52,7 @@ class Connection(object):
         self._timeout = timeout
         self._connected = True
         self._last_active = 0.0
+        self._last_polled = 0.0
         self._authenticated = False
 
     # These properties should all be read only!!
@@ -79,6 +80,10 @@ class Connection(object):
         return self._last_active
     last_active = property(_getLastActive)
 
+    def _getLastPolled(self):
+        return self._last_polled
+    last_polled = property(_getLastPolled)
+
     def _getAuthenticated(self):
         return self._authenticated
     authenticated = property(_getAuthenticated)
@@ -96,6 +101,10 @@ class Connection(object):
         """Update last_active."""
         self._manager.touchConnection(self)
 
+    def touch_polled(self):
+        """Update last_polled."""
+        self._manager.touchPolled(self)
+
     def subscribe(self, client_id, topic, sub_topic=None):
         self._manager.subscribeConnection(self, client_id, topic, sub_topic)
 
@@ -103,27 +112,12 @@ class Connection(object):
         """Remove a subscription from a topic."""
         self._manager.unSubscribeConnection(self, client_id, topic, sub_topic)
 
-    def publishMessage(self, msg):
-        """Publish a message to this connection.
+#    def getSubscribedTopics(self):
+#        """Returns a list of topics that the connection is subscribed to."""
+#        return self._manager.getSubscribedTopics(self)
 
-        The message will be published to all suscribed MessageAgents.
- 
-        arguments:
-        ===========
-         * msg - AbstractMessage, the message to publish.
-        """
-        self._manager.publishToConnection(self, msg)
-
-    def poll(self):
-        """Returns a list of messages, and clears message qeue."""
-        return self._manager.pollConnection(self)
-
-    def getSubscribedTopics(self):
-        """Returns a list of topics that the connection is subscribed to."""
-        return self._manager.getSubscribedTopics(self)
-
-    def getSubscribedClients(self, topic, sub_topic=None):
-        return self._manager.getSubscribedClients(self, topic, sub_topic)
+#    def getSubscribedClients(self, topic, sub_topic=None):
+#        return self._manager.getSubscribedClients(self, topic, sub_topic)
 
     def delete(self):
         self._manager.deleteConnection(self)
@@ -155,6 +149,7 @@ class Connection(object):
 
     def personalizeMessage(self, client_id, msg):
         """Return a copy of the message with client_id set."""
+
         if hasattr(msg, 'headers'):
             headers = msg.headers
         else:
