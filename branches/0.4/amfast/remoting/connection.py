@@ -51,7 +51,7 @@ class Connection(object):
         self._id = id
         self._timeout = timeout
         self._connected = True
-        self._last_active = 0
+        self._last_active = 0.0
         self._authenticated = False
 
     # These properties should all be read only!!

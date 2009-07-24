@@ -7,8 +7,7 @@ from twisted.application import service, strports
 from twisted.web import static, server, resource, vhost
 
 import amfast
-from amfast.remoting.channel import ChannelSet
-from amfast.remoting.twisted_channel import TwistedChannel
+from amfast.remoting.twisted_channel import TwistedChannelSet, TwistedChannel
 
 import utils
 
@@ -19,7 +18,7 @@ domain = "localhost"
 root.addHost(domain, static.File("../flex/deploy"))
 
 # Setup ChannelSet
-channel_set = ChannelSet()
+channel_set = TwistedChannelSet()
 rpc_channel = TwistedChannel('rpc')
 channel_set.mapChannel(rpc_channel)
 utils.setup_channel_set(channel_set)

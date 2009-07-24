@@ -1,8 +1,6 @@
 """Endpoints specify how messages are encoded and decoded."""
 
 import amfast
-from amfast.encoder import Encoder
-from amfast.decoder import Decoder
 
 class Endpoint(object):
     def logRaw(label, raw):
@@ -21,10 +19,12 @@ class AmfEndpoint(Endpoint):
 
     def __init__(self, encoder=None, decoder=None):
         if encoder is None:
+            from amfast.encoder import Encoder
             encoder = Encoder()
         self.encoder = encoder
 
         if decoder is None:
+            from amfast.decoder import Decoder
             decoder = Decoder()
         self.decoder = decoder
 

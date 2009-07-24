@@ -40,8 +40,12 @@ class ConnectionManager(object):
         =======
          * NotConnectedError if connection doesn't exist.
         """
-        connection = self._getConnection(connection_id)
+        if connection_id is None:
+            raise NotConnectedError("Blank connection_id is not connected.")
 
+        connection = self.loadConnection(connection_id)
+
+        # Check for timeout
         current_time = time.time()
         if connection.last_active < current_time - connection.timeout:
             raise NotConnectedError("Connection '%s' is not connected." % connection_id)
@@ -80,7 +84,7 @@ class MemoryConnectionManager(ConnectionManager):
         self._connections = {} # Currently connected clients
         self._lock = amfast.mutex_cls()
 
-    def _getConnection(self, connection_id):
+    def loadConnection(self, connection_id):
 
         connection = self._connections.get(connection_id, None)
         if connection is None:

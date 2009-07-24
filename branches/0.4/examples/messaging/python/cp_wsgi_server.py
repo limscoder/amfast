@@ -1,4 +1,4 @@
-"""An example server using the CherryPy web framework."""
+"""An example server using a WSGI application with the CherryPy web server."""
 import os
 import optparse
 import logging
@@ -7,8 +7,7 @@ import sys
 import cherrypy
 
 import amfast
-from amfast.remoting.channel import ChannelSet
-from amfast.remoting.wsgi_channel import WsgiChannel
+from amfast.remoting.wsgi_channel import WsgiChannelSet, WsgiChannel
 
 class App(object):
     """Base web app."""
@@ -45,19 +44,20 @@ if __name__ == '__main__':
         }
     }
 
-    channel_set = ChannelSet()
+    channel_set = WsgiChannelSet()
+
     # Clients connect every x seconds
     # to polling channels to check for messages.
     # If messages are available, they are
     # returned to the client.
-    polling_channel = WsgiChannel('amf-polling-channel')
+    polling_channel = WsgiChannel('amf')
     channel_set.mapChannel(polling_channel)
 
     # Long-poll channels do not return
     # a response to the client until
     # a message is available, or channel.max_interval
     # is reached.
-    long_poll_channel = WsgiChannel('long-poll-channel', wait_interval=90)
+    long_poll_channel = WsgiChannel('longPoll', wait_interval=90)
     channel_set.mapChannel(long_poll_channel)
 
     app = App()

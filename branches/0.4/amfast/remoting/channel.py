@@ -9,7 +9,6 @@ from amfast.class_def import ClassDefMapper
 import connection_manager as cm
 import subscription_manager as sm
 import flex_messages as messaging
-from endpoint import AmfEndpoint
 
 class ChannelError(amfast.AmFastError):
     pass
@@ -34,6 +33,7 @@ class Channel(object):
         self.max_connections = max_connections
         self.connection_count = 0
         if endpoint is None:
+            from endpoint import AmfEndpoint
             endpoint = AmfEndpoint()
         self.endpoint = endpoint
        
@@ -314,8 +314,18 @@ class ChannelSet(object):
         """
 
         connection.unSubscribe(client_id, topic, sub_topic)
+
+        # Remove connection subscription.
+        # If there are no other client_ids left.
+        # TODO: This is lame!
         client_ids = connection.getSubscribedClients(topic, sub_topic)
-        if len(client_ids) < 1:
+
+        # Because client_ids is an iterator
+        cnt = 0
+        for client_id in client_ids:
+            cnt += 1
+
+        if cnt < 1:
             # Connection has no subscriptions anymore.
             self.subscription_manager.unSubscribe(connection.id, topic, sub_topic)
 
@@ -352,6 +362,7 @@ class ChannelSet(object):
         ===========
          * msg - AbstractMessage, the Flex message to publish.
         """
+
         topic = msg.destination
         if hasattr(msg, 'headers') and \
             msg.headers is not None and \
@@ -404,4 +415,7 @@ class ChannelSet(object):
         ==========
          * name - string, the name of the Channel to retrieve.
         """
-        return self._channels[name]
+        try:
+            return self._channels[name]
+        except KeyError:
+            raise ChannelError("Channel '%s' is not mapped." % name)

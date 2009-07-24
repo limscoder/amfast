@@ -4,10 +4,10 @@ import traceback
 import calendar
 from datetime import datetime
 import logging
-import threading
 
 class AmFastError(Exception):
     """Base exception for this package."""
+
     # To get around 2.6 deprecation warning
     def _get_message(self):
         return self._message
@@ -34,11 +34,6 @@ def format_byte_string(byte_string):
         bytes.append("%d: %d-%02X-'%s'" % (i, val, val, char))
     return ' '.join(bytes)
 
-# Set this to dummy_threading.RLock
-# to skip locking when using Twisted
-# or any other single threaded implementation. 
-mutex_cls = threading.RLock
-
 # --- setup module level logging --- #
 
 class NullHandler(logging.Handler):
@@ -64,3 +59,16 @@ def log_exc():
         (error_type.__name__, error_value)
     msg += "-\n".join(tb_list)
     logger.error(msg)
+
+# --- Setup threading implementation --- #
+
+try:
+    import threading
+except ImportError:
+    if log_debug:
+        logger.debug("AmFast is using dummy_threading module.")
+
+# Set this to dummy_threading.RLock
+# to skip locking when using Twisted
+# or any other single threaded implementation. 
+mutex_cls = threading.RLock

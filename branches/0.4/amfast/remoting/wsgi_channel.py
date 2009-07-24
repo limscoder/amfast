@@ -4,8 +4,14 @@ import threading
 
 import amfast
 from amfast import AmFastError
-from amfast.remoting.channel import HttpChannel, ChannelError
+from amfast.remoting.channel import ChannelSet, HttpChannel, ChannelError
 import amfast.remoting.flex_messages as messaging
+
+class WsgiChannelSet(ChannelSet):
+    def __call__(self, environ, start_response):
+        channel_name = environ['PATH_INFO'][1:]
+        channel = self.getChannel(channel_name)
+        return channel(environ, start_response)
 
 class WsgiChannel(HttpChannel):
     """WSGI app channel."""

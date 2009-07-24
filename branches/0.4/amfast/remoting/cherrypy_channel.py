@@ -6,7 +6,7 @@ import cherrypy.process.plugins as cp_plugins
 
 import amfast
 import amfast.remoting.flex_messages as messaging
-from amfast.remoting.channel import ChannelSet, HttpChannel
+from amfast.remoting.channel import ChannelSet, HttpChannel, ChannelError
 
 def amfhook():
     """Checks for POST, and stops cherrypy from processing the body."""
@@ -32,11 +32,20 @@ class CherryPyChannelSet(ChannelSet):
             cleaner.subscribe()
             self.clean_scheduled = True
 
+    def mapChannel(self, channel):
+        """Overridden so that channel is added as an attribute."""
+        if hasattr(self, channel.name):
+            raise ChannelError("Reserved attribute name '%s' cannot be used as a channel name." % channel.name)
+
+        ChannelSet.mapChannel(self, channel)
+
+        setattr(self, channel.name, channel.__call__)
+
 class CherryPyChannel(HttpChannel):
     """An AMF messaging channel that can be used with CherryPy HTTP framework.
 
     Instantiate a CherryPyChannel object and
-    mount the processMsg method to the URL where
+    mount the __call__ method to the URL where
     AMF messaging should be available from. 
 
     You can also use a WsgiChannel instance by
@@ -51,7 +60,7 @@ class CherryPyChannel(HttpChannel):
 
     @cherrypy.expose
     @cherrypy.tools.amfhook()
-    def processMsg(self):
+    def __call__(self):
         try:
             c_len = int(cherrypy.request.headers['Content-Length'])
             raw_request = cherrypy.request.rfile.read(c_len)
@@ -73,10 +82,10 @@ class StreamingCherryPyChannel(CherryPyChannel):
 
     @cherrypy.expose
     @cherrypy.tools.amfhook()
-    def processMsg(self, command=None, version=None):
+    def __call__(self, command=None, version=None):
         if cherrypy.request.headers['Content-Type'] == self.CONTENT_TYPE:
             # Regular AMF message
-            return CherryPyChannel.processMsg(self)
+            return CherryPyChannel.__call__(self)
 
 
         # Create streaming message command

@@ -13,6 +13,11 @@ import amfast.remoting.flex_messages as messaging
 class TwistedChannelSet(ChannelSet):
     """A ChannelSet optimized for use with Twisted."""
 
+    def render_POST(self, request):
+        channel_name = request.path[1:]
+        channel = self.getChannel(channel_name)
+        return channel.render_POST(request)
+
     def scheduleClean(self):
         reactor.callLater(self.clean_freq, self.clean)
 
