@@ -189,7 +189,7 @@ class TwistedChannel(Resource, HttpChannel):
 
             # Get messages and add them
             # to the response message
-            messages = connection.poll()
+            messages = self.channel_set.subscription_manager.pollConnection(connection)
             
             if isinstance(packet.channel.endpoint, AmfEndpoint):
                 # Make sure messages are not encoded as an ArrayCollection
@@ -258,7 +258,7 @@ class StreamingTwistedChannel(TwistedChannel):
                 request.finish()
                 return
 
-            msgs = connection.poll()
+            msgs = self.channel_set.subscription_manager.pollConnection(connection)
             for msg in msgs:
                 request.write(messaging.StreamingMessage.prepareMsg(msg, self.endpoint))
         connection.setNotifyFunc(_notify)

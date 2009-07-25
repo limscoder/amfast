@@ -46,7 +46,7 @@ if __name__ == '__main__':
     }
 
     # Create ChannelSet
-    channel_set = App()
+    channel_set = App(notify_connections=True)
 
     # Clients connect every x seconds
     # to polling channels to check for messages.

@@ -1,14 +1,22 @@
 CHANGES
 ========
 
-0.4
-=====
- * Added ConnectionManager and SubscriptionManager
+0.4.0
+======
+ * Published messages are now dispatched to clients that subscribe
+   after the message is published (assuming the message has not expired yet).
+ * Added GaeChannelSet and GaeChannel to work with Google App Engine.
+ * Added ConnectionManager and SubscriptionManager classes.
+  - Sub-class these classes to customize how connection and message data is
+    persisted between requests.
  * Added HTTP Streaming to CherryPyChannel
- * Added CherryPyChannelSet and TwistedChannelSet
+ * Added CherryPyChannelSet and TwistedChannelSet to work better with the
+   respective frameworks.
+ * Added notify_connection attribute to ChannelSet to avoid un-needed overhead
+   when long-polling or streaming is not being used.
 
 0.3.5
-=====
+======
  * Fixed AttributeError in TwistedChannel (ticket: 21).
  * Fixed setuptools bootstrapping (ticket: 22).
  * Fixed ChannelSet.__iter__ returning incorrect iterator (ticket: 23).

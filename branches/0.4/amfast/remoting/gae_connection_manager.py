@@ -5,21 +5,6 @@ from google.appengine.ext import db
 
 from connection import Connection
 from connection_manager import ConnectionManager, NotConnectedError
-from subscription_manager import SubscriptionManager
-import flex_messages as messaging
-
-class Subscription(db.Model):
-    """A client's subscription to a topic, persisted in a Google Datastore."""
-
-    connection_id = db.StringProperty(required=True)
-    client_id = db.StringProperty(required=True)
-    topic = db.StringProperty(required=True)
-    message_keys = db.ListProperty(db.Key, required=True)
-
-class GaeMessage(db.Model):
-    """A Flex message, persisted in a Google Datastore."""
-
-    p_message = db.BlobProperty(required=True)
 
 class GaeConnection(db.Model, Connection):
     """A connection that is persisted in a Google Datastore."""
@@ -29,8 +14,10 @@ class GaeConnection(db.Model, Connection):
     _timeout = db.IntegerProperty(required=True)
     _connected = db.BooleanProperty(required=True)
     _last_active = db.FloatProperty(required=True)
+    _last_polled = db.FloatProperty(required=True)
     _authenticated = db.BooleanProperty(required=True)
     _flex_user = db.StringProperty(required=False)
+    _p_session = db.BlobProperty(required=False)
 
 class GaeConnectionManager(ConnectionManager):
     """Manages connections stored by Google DataStore."""
@@ -47,9 +34,6 @@ class GaeConnectionManager(ConnectionManager):
 
     def getIdFromKey(self, key_name):
         return key_name.replace(self.KEY, '', 1)
-
-    def getSubscriptionKey(self, connection_id, client_id, topic):
-        return self.KEY.join(('', connection_id, client_id, topic))
 
     def loadConnection(self, connection_id):
         connection = GaeConnection.get_by_key_name(self.getKeyName(connection_id))
@@ -68,9 +52,10 @@ class GaeConnectionManager(ConnectionManager):
             'key_name': self.getKeyName(connection_id),
             '_id': connection_id,
             '_channel_name': channel.name,
-            '_timeout': 1800,
+            '_timeout': 1800000,
             '_connected': True,
             '_last_active': time.time(),
+            '_last_polled': 0.0,
             '_authenticated': False
         }
 
@@ -85,102 +70,18 @@ class GaeConnectionManager(ConnectionManager):
         connection.delete()
         ConnectionManager.deleteConnection(self, connection)
 
-    def getConnectionIds(self):
+    def iterConnectionIds(self):
         query = GaeConnection.all(keys_only=True)
         for key in query:
             yield self.getIdFromKey(key.name())
 
     def touchConnection(self, connection):
-        connection._last_active = time.time()
+        connection._last_active = time.time() * 1000
         connection.put()
 
-    def subscribeConnection(self, connection, client_id, topic, sub_topic=None):
-        """Add a subscription to a topic."""
-
-        topic = SubscriptionManager.getTopicKey(topic, sub_topic)
-        key_name = self.getSubscriptionKey(connection.id, client_id, topic)
-        subscription = Subscription(key_name=key_name,
-            connection_id=connection.id, client_id=client_id,
-            topic=topic, message_keys=[])
-        subscription.put()
-
-    def unSubscribeConnection(self, connection, client_id, topic, sub_topic=None):
-        """Remove a subscription from a topic."""
-        topic = SubscriptionManager.getTopicKey(topic, sub_topic)
-        key_name = self.getSubscriptionKey(connection.id, client_id, topic)
-        subscription = Subscription.get_by_key_name(key_name)
-
-        if subscription is not None:
-            subscription.delete()
-
-    def getSubscribedTopics(self, connection):
-        """Returns a list of topics that the connection is subscribed to."""
-
-        query = Subscription.all()
-        query.filter('connection_id = ', connection.id)
-        topics = {}
-        for subscription in query:
-            if subscription.topic in topics:
-                continue
-
-            topics[subscription.topic] = True
-            yield subscription.topic
-
-    def getSubscribedClients(self, connection, topic, sub_topic=None):
-        topic = SubscriptionManager.getTopicKey(topic, sub_topic)
-
-        query = Subscription.all()
-        query.filter('connection_id = ', connection.id)
-        query.filter('topic = ', topic)
-        for subscription in query:
-            yield subscription.topic
-
-    def publishToConnection(self, connection, msg):
-        """Publish a message to a connection."""
-
-        topic = msg.destination
-        if hasattr(msg, 'headers') and \
-            msg.headers is not None and \
-            messaging.AsyncMessage.SUBTOPIC_HEADER in msg.headers:
-            sub_topic = msg.headers[messaging.AsyncMessage.SUBTOPIC_HEADER]
-        else:
-            sub_topic = None
-
-        topic = SubscriptionManager.getTopicKey(topic, sub_topic)
-
-        # TODO: This is ugly!!
-        # Make sure message has already been inserted into the DB.
-        key_name = self.getKeyName(msg.messageId)
-        message = GaeMessage.get_by_key_name(key_name)
-        if message is None:
-            # Message needs to be inserted 1st.
-            p_message = pickle.dumps(msg)
-            message = GaeMessage(p_message=p_message)
-            message.put()
-        message_key = message.key()
-
-        query = Subscription.all()
-        query.filter('connection_id = ', connection.id)
-        query.filter('topic = ', topic)
-        for subscription in query:
-            subscription.message_keys.append(message_key)
-        subscription.put()
-
-    def pollConnection(self, connection):
-        """Returns a list of messages, and clears message qeue."""
-        polled_messages = []
-
-        query = Subscription.all()
-        query.filter('connection_id = ', connection.id)
-        for subscription in query:
-            for message_key in subscription.message_keys:
-                message = GaeMessage.get(message_key)
-                polled_messages.append(connection.personalizeMessage(
-                    subscription.client_id, pickle.loads(message.p_message)))
-            subscription.message_keys = []
-            subscription.put()
-
-        return polled_messages
+    def touchPolled(self, connection):
+        connection._last_polled = time.time() * 1000
+        connection.put()
 
     def authenticateConnection(self, connection, user):
         connection._authenticated = True
@@ -192,11 +93,29 @@ class GaeConnectionManager(ConnectionManager):
         connection._flex_user = None
         connection.put()
 
+    def initSession(self, connection):
+        if not hasattr(connection, '_session'):
+            if not hasattr(connection, '_p_session'):
+                connection._session = {}
+            else:
+                connection._session = pickle.loads(connection._p_session)
+
+    def saveSession(self, connection):
+        if hasattr(connection, '_session'):
+            connection._p_session = pickle.dumps(connection._session)
+
     def getConnectionSessionAttr(self, connection, name):
+        self.initSession(connection)
         return connection._session[name]
 
     def setConnectionSessionAttr(self, connection, name, val):
+        self.initSession(connection)
         connection._session[name] = val
+        self.saveSession(connection)
+        connection.put()
 
     def delSessionAttr(self, connection, name):
+        self.initSession(connection)
         del connection._session[name]
+        self.saveSession(connection)
+        connection.put()

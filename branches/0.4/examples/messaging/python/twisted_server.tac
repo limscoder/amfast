@@ -31,7 +31,7 @@ import dummy_threading
 amfast.mutex_cls = dummy_threading.RLock
 
 # Setup ChannelSet
-channel_set = TwistedChannelSet()
+channel_set = TwistedChannelSet(notify_connections=True)
 
 # Clients connect every x seconds
 # to polling channels to check for messages.

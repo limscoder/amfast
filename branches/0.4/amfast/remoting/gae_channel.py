@@ -23,12 +23,8 @@ class GaeChannelSet(WsgiChannelSet):
         pass
 
 class GaeChannel(WsgiChannel):
-    def __init__(self, *args, **kwargs):
-
-        # We can't use AmFast's encoder/decoder
-        # since extensions won't work properly.
-        key = 'endpoint'
-        if key not in kwargs:
-            kwargs[key] = PyAmfEndpoint()
-
-        WsgiChannel.__init__(self, *args, **kwargs) 
+    def __init__(self, name, endpoint=None):
+        if endpoint is None:
+            endpoint = PyAmfEndpoint()
+        WsgiChannel.__init__(self, name, max_connections=-1,
+            endpoint=endpoint, wait_interval=0)

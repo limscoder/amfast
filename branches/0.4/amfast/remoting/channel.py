@@ -179,11 +179,12 @@ class ChannelSet(object):
      * service_mapper - ServiceMapper, maps destinations to Targets.
      * connection_manager - ConnectionManager, keeps track of connected clients.
      * subscription_manager - SubscriptionManager, keeps track of subscribed clients.
+     * notify_connections - boolean, set to True when using long-polling or streaming channels.
      * clean_freq - float - number of seconds to clean expired connections.
     """
 
     def __init__(self, service_mapper=None, connection_manager=None,
-        subscription_manager=None, clean_freq=300):
+        subscription_manager=None, notify_connections=False, clean_freq=300):
         if service_mapper is None:
             from amfast.remoting import ServiceMapper
             service_mapper = ServiceMapper()
@@ -197,6 +198,7 @@ class ChannelSet(object):
             subscription_manager = sm.MemorySubscriptionManager()
         self.subscription_manager = subscription_manager
 
+        self.notify_connections = notify_connections
         self.clean_freq = clean_freq
         self._lock = amfast.mutex_cls()
         self._channels = {}
@@ -247,18 +249,11 @@ class ChannelSet(object):
          * connection - Connection being disconnected.
         """
 
-        # Remove any active subscriptions
-        for topic in connection.getSubscribedTopics():
-            self.subscription_manager.unSubscribe(connection.id, topic)
-
+        self.subscription_manager.deleteConnection(connection)
         self.connection_manager.deleteConnection(connection)
 
     def scheduleClean(self):
         """Schedule connection cleaning procedure to run sometime in the future."""
-
-        print "NOT SCHEDULING CLEAN!!"
-        return
-
         def _clean():
             self.clean()
             self.scheduleClean()
@@ -271,7 +266,7 @@ class ChannelSet(object):
         """Clean out expired connections."""
         amfast.logger.debug("Cleaning connections.")
 
-        current_time = time.time()
+        current_time = time.time() * 1000
         for connection_id in self.connection_manager.getConnectionIds():
             self.cleanConnection(connection_id, current_time)
 
@@ -291,48 +286,7 @@ class ChannelSet(object):
             channel = self.getChannel(connection.channel_name) 
             channel.disconnect(connection) 
 
-    def subscribe(self, connection, client_id, topic, sub_topic=None, selector=None):
-        """Subscribe a client to a topic.
-
-        arguments:
-        ===========
-         * connection - Connection subscribing.
-         * client_id - string, id of MessageAgent subscribing.
-         * topic - string, Topic to subscribe to.
-         * sub_topic - string, Sub-topic to subscribe to.
-        """
-
-        connection.subscribe(client_id, topic, sub_topic)
-        self.subscription_manager.subscribe(connection.id, topic, sub_topic, selector)
-
-    def unSubscribe(self, connection, client_id, topic, sub_topic=None):
-        """un-subscribe a client to a topic.
-
-        arguments:
-        ===========
-         * connection - Connection subscribing.
-         * client_id - string, id of MessageAgent subscribing.
-         * topic - string, Topic to subscribe to.
-         * sub_topic - string, Sub-topic to subscribe to.
-        """
-
-        connection.unSubscribe(client_id, topic, sub_topic)
-
-        # Remove connection subscription.
-        # If there are no other client_ids left.
-        # TODO: This is lame!
-        client_ids = connection.getSubscribedClients(topic, sub_topic)
-
-        # Because client_ids is an iterator
-        cnt = 0
-        for client_id in client_ids:
-            cnt += 1
-
-        if cnt < 1:
-            # Connection has no subscriptions anymore.
-            self.subscription_manager.unSubscribe(connection.id, topic, sub_topic)
-
-    def publishObject(self, body, topic, sub_topic=None, headers=None, ttl=600):
+    def publishObject(self, body, topic, sub_topic=None, headers=None, ttl=30000):
         """Create a message and publish it.
 
         arguments:
@@ -341,7 +295,7 @@ class ChannelSet(object):
         topic - string, the topic to publish to.
         sub_topic - string, the sub topic to publish to. Default = None
         headers - dict, headers to include with this message.
-        ttl - int time to live in secoded. Default = 600
+        ttl - int time to live in milliseconds. Default = 30000
         """
 
         if sub_topic is not None:
@@ -349,8 +303,7 @@ class ChannelSet(object):
                 headers = {}
             headers[messaging.AsyncMessage.SUBTOPIC_HEADER] = sub_topic
 
-        current_time = int(time.time() * 1000)
-        ttl *= 1000
+        current_time = time.time() * 1000
 
         msg = messaging.AsyncMessage(headers=headers, body=body,
             clientId=None, destination=topic, timestamp=current_time,
@@ -367,15 +320,34 @@ class ChannelSet(object):
         """
 
         self.subscription_manager.publishMessage(msg)
+        if self.notify_connections is True:
+            self.notifyConnections(msg)
 
-        # Notify connections
-        for connection_id in self.subscription_manager.getSubscribers(topic, sub_topic):
+    def notifyConnections(self, msg):
+        """Notify connections that a message has been published.
+
+        arguments:
+        ===========
+         * msg - AbstractMessage, the Flex message that was published.
+        """
+
+        # TODO: Make this threaded???
+        topic = msg.destination
+        if hasattr(msg, 'headers') and \
+            msg.headers is not None and \
+            messaging.AsyncMessage.SUBTOPIC_HEADER in msg.headers:
+            sub_topic = msg.headers[messaging.AsyncMessage.SUBTOPIC_HEADER]
+        else:
+            sub_topic = None
+
+        # Notify all subscribed connections that a new message has been published.
+        for connection_id in self.subscription_manager.iterSubscribers(topic, sub_topic):
             try:
                 connection = self.connection_manager.getConnection(connection_id, False)
             except cm.NotConnectedError, cm.TimeOutError:
                 continue
 
-            if hasattr(connection 'notify_func') and \
+            if hasattr(connection, 'notify_func') and \
                 connection.notify_func is not None:
                 connection.notify_func()
 

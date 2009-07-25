@@ -33,7 +33,7 @@ import dummy_threading
 amfast.mutex_cls = dummy_threading.RLock
 
 # Setup ChannelSet
-channel_set = TwistedChannelSet()
+channel_set = TwistedChannelSet(notify_connections=True)
 stream_channel = StreamingTwistedChannel('streaming-channel')
 channel_set.mapChannel(stream_channel)
 

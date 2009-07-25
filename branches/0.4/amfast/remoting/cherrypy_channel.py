@@ -29,6 +29,7 @@ class CherryPyChannelSet(ChannelSet):
         """Overridden to use CherryPy's Monitor functionality."""
         if self.clean_scheduled is False:
             cleaner = cp_plugins.Monitor(cherrypy.engine, self.clean, self.clean_freq)
+            cleaner.name = "ConnectionCleaner"
             cleaner.subscribe()
             self.clean_scheduled = True
 
@@ -164,7 +165,7 @@ class StreamingCherryPyChannel(CherryPyChannel):
                 # New messages don't trigger event.
                 connection.unSetNotifyFunc()
 
-                msgs = connection.poll()
+                msgs = self.channel_set.subscription_manager.pollConnection(connection)
                 if len(msgs) > 0:
                     while len(msgs) > 0:
                         # Dispatch all messages to client
@@ -187,7 +188,7 @@ class StreamingCherryPyChannel(CherryPyChannel):
                                 self.channel_set.disconnect(connection)
                                 return
 
-                        msgs = connection.poll()
+                        msgs = self.channel_set.subscription_manager.pollConnection(connection)
                 else:
                     # Send heart beat
                     try:

@@ -56,7 +56,7 @@ class AbstractMessage(object):
             self.headers = headers
 
         if timestamp is None:
-            timestamp = time.time()
+            timestamp = time.time() * 1000
         self.timestamp = timestamp
    
         if messageId is None:

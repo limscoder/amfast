@@ -53,7 +53,7 @@ if __name__ == '__main__':
         }
     }
 
-    channel_set = ChannelSet()
+    channel_set = ChannelSet(notify_connections=True)
     stream_channel = StreamingWsgiChannel('stream-channel')
     channel_set.mapChannel(stream_channel)
 

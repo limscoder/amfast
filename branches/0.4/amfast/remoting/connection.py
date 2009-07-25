@@ -17,9 +17,10 @@ class Connection(object):
      * manager - ConnectionManager, the class that manages connection persistence.
      * channel_name - string, name of the channel connection is connected to.
      * id - string, Flash client's ID.
-     * timeout - int, timeout in seconds
+     * timeout - int, timeout in milliseconds
      * connected - boolean, True if connection is connected
      * last_active - float, epoch timestamp when connection was last accessed.
+     * last_polled - float, epocj timestamp when connection last polled for messsages.
      * authenticated - boolean, True if connection has been authenticated with RemoteObject style authentication.
      * flex_user - string, username if 'authenticated' is True.
 
@@ -45,13 +46,13 @@ class Connection(object):
     def _delNotifyFunc(cls, func_id):
         del cls._notifications[func_id]
 
-    def __init__(self, manager, channel_name, id, timeout=1800):
+    def __init__(self, manager, channel_name, id, timeout=1800000):
         self._manager = manager
         self._channel_name = channel_name
         self._id = id
         self._timeout = timeout
         self._connected = True
-        self._last_active = 0.0
+        self._last_active = time.time() * 1000
         self._last_polled = 0.0
         self._authenticated = False
 
@@ -93,6 +94,8 @@ class Connection(object):
     flex_user = property(_getFlexUser)
 
     def _getNotifyFunc(self):
+        if not hasattr(self, '_notify_func_id'):
+            return None
         return self._getNotifyFuncById(self._notify_func_id)
     notify_func = property(_getNotifyFunc)
 
@@ -104,20 +107,6 @@ class Connection(object):
     def touch_polled(self):
         """Update last_polled."""
         self._manager.touchPolled(self)
-
-    def subscribe(self, client_id, topic, sub_topic=None):
-        self._manager.subscribeConnection(self, client_id, topic, sub_topic)
-
-    def unSubscribe(self, client_id, topic, sub_topic=None):
-        """Remove a subscription from a topic."""
-        self._manager.unSubscribeConnection(self, client_id, topic, sub_topic)
-
-#    def getSubscribedTopics(self):
-#        """Returns a list of topics that the connection is subscribed to."""
-#        return self._manager.getSubscribedTopics(self)
-
-#    def getSubscribedClients(self, topic, sub_topic=None):
-#        return self._manager.getSubscribedClients(self, topic, sub_topic)
 
     def delete(self):
         self._manager.deleteConnection(self)

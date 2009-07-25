@@ -13,7 +13,7 @@ import cherrypy
 import amfast
 from amfast.remoting.cherrypy_channel import CherryPyChannelSet, StreamingCherryPyChannel
 
-class App(object):
+class App(CherryPyChannelSet):
     """Base web app."""
 
     @cherrypy.expose
@@ -51,13 +51,11 @@ if __name__ == '__main__':
         }
     }
 
-    channel_set = CherryPyChannelSet()
-    stream_channel = StreamingCherryPyChannel('stream-channel')
+    channel_set = App(notify_connections=True)
+    stream_channel = StreamingCherryPyChannel('amf')
     channel_set.mapChannel(stream_channel)
 
-    app = App()
-    setattr(app, 'amf', stream_channel.processMsg)
-    cherrypy.quickstart(app, '/', config=cp_options)
+    cherrypy.quickstart(channel_set, '/', config=cp_options)
 
     print "Serving on %s:%s" % (options.domain, options.port)
     print "Press ctrl-c to halt."

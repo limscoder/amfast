@@ -72,7 +72,7 @@ def subscribe_operation(packet, msg, *args):
             raise SecurityError("Operation requires authentication.")
 
     headers = command.headers
-    channel_set.subscribe(command.connection,
+    channel_set.subscription_manager.subscribe(command.connection.id,
         command.clientId, command.destination,
         headers.get(command.SUBTOPIC_HEADER, None),
         headers.get(command.SELECTOR_HEADER, None))
@@ -80,23 +80,22 @@ def subscribe_operation(packet, msg, *args):
 def unsubscribe_operation(packet, msg, *args):
     """Respond to an unsubscribe operation."""
     command = msg.body[0]
-    packet.channel.channel_set.unSubscribe(command.connection,
-        command.clientId, command.destination,
+    packet.channel.channel_set.subscription_manager.unSubscribe(
+        command.connection.id, command.clientId, command.destination,
         command.headers.get(command.SUBTOPIC_HEADER, None))
 
 def poll_operation(packet, msg, *args):
     """Respond to a poll operation. Returns queued messages."""
     command = msg.body[0]
-
-    channel = packet.channel
     connection = command.connection
+    channel = packet.channel
 
-    msgs = connection.poll()
+    msgs = channel.channel_set.subscription_manager.pollConnection(connection)
     if len(msgs) < 1 and channel.wait_interval != 0:
         # Long polling channel, don't return response
         # until a message is available.
         channel.waitForMessage(packet, msg, connection)
-        msgs = connection.poll()
+        msgs = channel.channel_set.subscription_manager.pollConnection(connection)
 
     if isinstance(channel.endpoint, AmfEndpoint):
         # Make sure messages are not encoded as an ArrayCollection

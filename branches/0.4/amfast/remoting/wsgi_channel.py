@@ -206,7 +206,7 @@ class StreamingWsgiChannel(WsgiChannel):
                 # New messages don't trigger event.
                 connection.unSetNotifyFunc()
 
-                msgs = connection.poll()
+                msgs = self.channel_set.subscription_manager.pollConnection(connection)
                 if len(msgs) > 0:
                     while len(msgs) > 0:
                         # Dispatch all messages to client
@@ -229,7 +229,7 @@ class StreamingWsgiChannel(WsgiChannel):
                                 self.channel_set.disconnect(connection)
                                 return []
 
-                        msgs = connection.poll()
+                        msgs = self.channel_set.subscription_manager.pollConnection(connection)
                 else:
                     # Send heart beat
                     try:
