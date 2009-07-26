@@ -114,7 +114,7 @@ from amfast import class_def
 class_mapper = class_def.ClassDefMapper()
 
 # Map a custom class with static attributes
-class_mapper.mapClass(class_def.ClassDef(MyCustomClass, 'class.alias', (tuple, of, static, attributes)))
+class_mapper.mapClass(class_def.ClassDef(MyCustomClass, 'class.alias', ('tuple', 'of', 'static', 'attribute', 'names')))
 
 # Map a custom class with dynamic attributes
 class_mapper.mapClass(class_def.DynamicClassDef(MyCustomClass, 'class.alias', ()))
