@@ -186,6 +186,8 @@ service_mapper.command_service.mapTarget(target)
 channel_set.message_agent.publish(message, 'topic', 'sub_topic')
 }}}
 
+----
+
 == Authentication ==
  * Authentication can be used with both !NetConnection and !RemoteObject
  * Targets and !MessageAgents can be secured.
