@@ -8,6 +8,13 @@ from subscription_manager import Subscription, SubscriptionManager
 class GaeSubscription(db.Model, Subscription):
     """A client's subscription to a topic, persisted in a Google Datastore."""
 
+    # Prefix id with this string to make a key_name
+    KEY = 'K'
+
+    @classmethod
+    def getKeyName(cls, connection_id, client_id, topic):
+        return cls.KEY.join(('', connection_id, client_id, topic))
+
     connection_id = db.StringProperty(required=True)
     client_id = db.StringProperty(required=True)
     topic = db.StringProperty(required=True)
@@ -20,17 +27,11 @@ class GaeMessage(db.Model):
 class GaeSubscriptionManager(SubscriptionManager):
     """Stores subscriptions in Google DataStore."""
 
-    # Prefix id with this string to make a key_name
-    KEY = 'K'
-
-    def getKeyName(self, connection_id, client_id, topic):
-        return self.KEY.join(('', connection_id, client_id, topic))
-
     def subscribe(self, connection_id, client_id, topic, sub_topic=None, selector=None):
         """Add a subscription to a topic."""
 
         topic = SubscriptionManager.getTopicKey(topic, sub_topic)
-        key_name = self.getKeyName(connection_id, client_id, topic)
+        key_name = GaeSubscription.getKeyName(connection_id, client_id, topic)
         subscription = GaeSubscription(key_name=key_name,
             connection_id=connection_id, client_id=client_id, topic=topic)
         subscription.put()
@@ -38,7 +39,7 @@ class GaeSubscriptionManager(SubscriptionManager):
     def unSubscribe(self, connection_id, client_id, topic, sub_topic=None):
         """Remove a subscription from a topic."""
         topic = SubscriptionManager.getTopicKey(topic, sub_topic)
-        key_name = self.getKeyName(connection_id, client_id, topic)
+        key_name = GaeSubscription.getKeyName(connection_id, client_id, topic)
 
         subscription = GaeSubscription.get_by_key_name(key_name)
         if subscription is not None:

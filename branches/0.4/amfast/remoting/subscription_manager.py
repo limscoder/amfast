@@ -58,7 +58,7 @@ class SubscriptionManager(object):
                 for msg in self.pollMessages(subscription.topic, \
                 connection.last_polled, current_time)])
 
-        connection.touch_polled()
+        connection.touchPolled()
         return polled_msgs
 
 class MemorySubscriptionManager(SubscriptionManager):

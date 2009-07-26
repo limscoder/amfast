@@ -26,7 +26,7 @@ class TwistedChannelSet(ChannelSet):
 
         current_time = time.time()
         deferreds = []
-        for connection_id in self.connection_manager.getConnectionIds():
+        for connection_id in self.connection_manager.iterConnectionIds():
             d = defer.Deferred()
             d.addCallbacks(self.cleanConnection, callbackArgs=(current_time,))
             reactor.callLater(0.3, d.callback, connection_id)

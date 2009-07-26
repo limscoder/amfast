@@ -91,7 +91,7 @@ class Channel(object):
 
         try:
             return self.channel_set.connection_manager.getConnection(flex_msg.headers[flex_msg.FLEX_CLIENT_ID_HEADER])
-        except cm.NotConnectedError, cm.TimeOutError:
+        except cm.NotConnectedError:
             return self.connect(flex_msg.headers[flex_msg.FLEX_CLIENT_ID_HEADER])
 
     def connect(self, connection_id=None):
@@ -267,7 +267,7 @@ class ChannelSet(object):
         amfast.logger.debug("Cleaning connections.")
 
         current_time = time.time() * 1000
-        for connection_id in self.connection_manager.getConnectionIds():
+        for connection_id in self.connection_manager.iterConnectionIds():
             self.cleanConnection(connection_id, current_time)
 
     def cleanConnection(self, connection_id, current_time): 
@@ -344,7 +344,7 @@ class ChannelSet(object):
         for connection_id in self.subscription_manager.iterSubscribers(topic, sub_topic):
             try:
                 connection = self.connection_manager.getConnection(connection_id, False)
-            except cm.NotConnectedError, cm.TimeOutError:
+            except cm.NotConnectedError:
                 continue
 
             if hasattr(connection, 'notify_func') and \

@@ -60,8 +60,7 @@ class ConnectionManager(object):
             connection_id = self.generateId()
 
         connection = self.connection_class(self, channel.name, connection_id, **self.connection_params)
-
-        self.touchConnection(connection)
+        self.initConnection(connection)
         return connection
 
     def deleteConnection(self, connection):
@@ -97,6 +96,41 @@ class MemoryConnectionManager(ConnectionManager):
         self._connections[connection.id] = connection
         return connection
 
+    def initConnection(self, connection):
+        connection._connected = True
+        connection._last_active = time.time() * 1000
+        connection._last_polled = 0.0
+        connection._authenticated = False
+        connection._flex_user = None
+
+    def iterConnectionIds(self):
+        return self._connections.keys()
+
+    # --- proxies for connection properties --- #
+
+    def getConnected(self, connection):
+        return connection._connected
+
+    def getLastActive(self, connection):
+        return connection._last_active
+
+    def getLastPolled(self, connection):
+        return connection._last_polled
+
+    def getAuthenticated(self, connection):
+        return connection._authenticated
+
+    def getFlexUser(self, connection):
+        return connection._flex_user
+
+    def getNotifyFunc(self, connection):
+        if not hasattr(connection, '_notify_func_id'):
+            return None
+        else:
+            return connection._getNotifyFuncById(connection._notify_func_id)
+
+    # --- proxies for connection methods --- #
+
     def deleteConnection(self, connection):
         self._lock.acquire()
         try:
@@ -108,9 +142,6 @@ class MemoryConnectionManager(ConnectionManager):
             self._lock.release()
 
         ConnectionManager.deleteConnection(self, connection)
-
-    def iterConnectionIds(self):
-        return self._connections.keys()
 
     def touchConnection(self, connection):
         connection._last_active = time.time() * 1000
@@ -127,11 +158,19 @@ class MemoryConnectionManager(ConnectionManager):
         if hasattr(connection, '_flex_user'):
             del connection._flex_user
 
+    def setNotifyFunc(self, connection, func):
+        connection._notify_func_id = connection._setNotifyFunc(func)
+
+    def unSetNotifyFunc(self, connection):
+        if hasattr(connection, '_notify_func_id'):
+            connection._delNotifyFunc(connection._notify_func_id)
+            del connection._notify_func_id
+
     def getConnectionSessionAttr(self, connection, name):
         return connection._session[name]
 
     def setConnectionSessionAttr(self, connection, name, val):
         connection._session[name] = val
 
-    def delSessionAttr(self, connection, name):
+    def delConnectionSessionAttr(self, connection, name):
         del connection._session[name]

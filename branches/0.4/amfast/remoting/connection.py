@@ -47,16 +47,19 @@ class Connection(object):
         del cls._notifications[func_id]
 
     def __init__(self, manager, channel_name, id, timeout=1800000):
+        # These attributes should not
+        # changed during the life of a connection.
+        #
+        # All other attributes that may
+        # change during the life of a connection
+        # should be accessed through properties
+        # that call methods in the connection_manager.
         self._manager = manager
         self._channel_name = channel_name
         self._id = id
         self._timeout = timeout
-        self._connected = True
-        self._last_active = time.time() * 1000
-        self._last_polled = 0.0
-        self._authenticated = False
 
-    # These properties should all be read only!!
+    # --- read-only properties --- #
     def _getManager(self):
         return self._manager
     manager = property(_getManager)
@@ -73,68 +76,73 @@ class Connection(object):
         return self._timeout
     timeout = property(_getTimeout)
 
+    # --- proxied properties --- #
+
     def _getConnected(self):
-        return self._connected
+        return self._manager.getConnected(self)
     connected = property(_getConnected)
 
     def _getLastActive(self):
-        return self._last_active
+        return self._manager.getLastActive(self)
     last_active = property(_getLastActive)
 
     def _getLastPolled(self):
-        return self._last_polled
+        return self._manager.getLastPolled(self)
     last_polled = property(_getLastPolled)
 
     def _getAuthenticated(self):
-        return self._authenticated
+        return self._manager.getAuthenticated(self)
     authenticated = property(_getAuthenticated)
 
     def _getFlexUser(self):
-        return self._flex_user
+        return self._manager.getFlexUser(self)
     flex_user = property(_getFlexUser)
 
     def _getNotifyFunc(self):
-        if not hasattr(self, '_notify_func_id'):
-            return None
-        return self._getNotifyFuncById(self._notify_func_id)
+        return self._manager.getNotifyFunc(self)
     notify_func = property(_getNotifyFunc)
 
-    # These methods are just proxies to the manager's methods
+    # --- proxied methods --- #
+
     def touch(self):
         """Update last_active."""
         self._manager.touchConnection(self)
 
-    def touch_polled(self):
+    def touchPolled(self):
         """Update last_polled."""
         self._manager.touchPolled(self)
 
     def delete(self):
+        """Delete connection."""
         self._manager.deleteConnection(self)
 
     def authenticate(self, user):
+        """Set authenticated = True"""
         self._manager.authenticateConnection(self, user)
 
     def unAuthenticate(self):
+        """Set authenticated = False"""
         self._manager.unAuthenticateConnection(self)
 
+    def setNotifyFunc(self, func):
+        self._manager.setNotifyFunc(self, func)
+
+    def unSetNotifyFunc(self):
+        self._manager.unSetNotifyFunc(self)
+
     def getSessionAttr(self, name):
+        """Get a session attribute."""
         self._manager.getConnectionSessionAttr(self, name)
 
     def setSessionAttr(self, name, val):
+        """Set a session attribute."""
         self._manager.setConnectionSessionAttr(self, name, val)
 
     def delSessionAttr(self, name):
+        """Del a session attribute."""
         self._manager.delConnectionSessionAttr(self, name)
 
-    # Actual methods
-
-    def setNotifyFunc(self, func):
-        self._notify_func_id = self._setNotifyFunc(func)
-
-    def unSetNotifyFunc(self):
-        if hasattr(self, '_notify_func_id'):
-            self._delNotifyFunc(self._notify_func_id)
-            del self._notify_func_id
+    # --- instance methods --- #
 
     def personalizeMessage(self, client_id, msg):
         """Return a copy of the message with client_id set."""

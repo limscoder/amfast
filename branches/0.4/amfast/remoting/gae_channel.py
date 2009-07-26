@@ -4,8 +4,12 @@ from pyamf_endpoint import PyAmfEndpoint
 from wsgi_channel import WsgiChannelSet, WsgiChannel
 
 class GaeChannelSet(WsgiChannelSet):
+
+    # Access this URL to clean-up stale connection data.
+    CLEAN_URL = '_clean'
+
     def __init__(self, service_mapper=None, connection_manager=None,
-        subscription_manager=None, clean_freq=300):
+        subscription_manager=None):
 
         if connection_manager is None:
             connection_manager = GaeConnectionManager()
@@ -16,10 +20,21 @@ class GaeChannelSet(WsgiChannelSet):
         WsgiChannelSet.__init__(self, service_mapper=service_mapper,
             connection_manager=connection_manager,
             subscription_manager=subscription_manager,
-            clean_freq=clean_freq)
+            clean_freq=100000)
+
+    def __call__(self, environ, start_response):
+        channel_name = environ['PATH_INFO'][1:]
+        if channel_name == self.CLEAN_URL:
+            self.clean()
+            return
+
+        channel = self.getChannel(channel_name)
+        return channel(environ, start_response)
 
     def scheduleClean(self):
-        # TODO: clean database.
+        """You must configure cron.yaml
+        to access the url: self.CLEAN_URL to
+        clean-up any stale connections."""
         pass
 
 class GaeChannel(WsgiChannel):
