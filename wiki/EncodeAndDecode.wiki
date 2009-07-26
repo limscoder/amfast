@@ -46,7 +46,7 @@
     * use_collections - bool - True to encode lists and tuples as !ArrayCollections.
     * use_proxies - bool - True to encode dicts as !ObjectProxies.
     * use_references - bool - True to encode multiply occurring objects by reference.
-    * use_legacy_xml - bool - True to encode XML as !XMLDocument instead of e4x.
+    * use_legacy_xml - bool - True to encode XML as XMLDocument instead of e4x.
     * include_private - bool - True to encode attributes starting with an underscore.
     * class_def_mapper - amfast.class_def.!ClassDefMapper - The object that retrieves ClassDef objects.
     * buffer - file-like-object - Output buffer. Set to None to output to a string.
