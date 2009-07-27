@@ -100,7 +100,7 @@ class GaeConnectionManager(ConnectionManager):
         return stored_connection.flex_user
 
     def getNotifyFunc(self, connection):
-        raise ConnectionError('Function not implemented.')
+        return None
 
     # --- proxies for connection methods --- #
 

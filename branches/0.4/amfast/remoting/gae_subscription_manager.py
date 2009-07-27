@@ -47,12 +47,22 @@ class GaeSubscriptionManager(SubscriptionManager):
 
     def deleteConnection(self, connection):
         query = GaeSubscription.all()
-        query.filter('connection_id = ', connection_id)
+        query.filter('connection_id = ', connection.id)
         db.delete(query)
 
     def persistMessage(self, msg):
+        # Remove connection data,
+        # so that it is not pickled
+        tmp_connection = getattr(msg, 'connection', None)
+        if tmp_connection is not None:
+            msg.connection = None
+       
         message = GaeMessage(p_message=pickle.dumps(msg))
         message.put()
+
+        # Restore connection attr.
+        if tmp_connection is not None:
+            msg.connection = tmp_connection
 
     def iterConnectionSubscriptions(self, connection):
         """Iterate through all Subscriptions that belong to a specific connection."""

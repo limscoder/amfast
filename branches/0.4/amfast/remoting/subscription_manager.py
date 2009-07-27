@@ -56,7 +56,7 @@ class SubscriptionManager(object):
             polled_msgs.extend([connection.personalizeMessage(\
                 subscription.client_id, msg) \
                 for msg in self.pollMessages(subscription.topic, \
-                connection.last_polled, current_time)])
+                    connection.last_polled, current_time)])
 
         connection.touchPolled()
         return polled_msgs
@@ -147,7 +147,7 @@ class MemorySubscriptionManager(SubscriptionManager):
         finally:
             self._lock.release()
 
-    def deleteConnection(self, connection_id):
+    def deleteConnection(self, connection):
         """Remove all subscriptions for this connection.
 
         arguments
@@ -156,8 +156,8 @@ class MemorySubscriptionManager(SubscriptionManager):
         """
 
         for topic, topic_map in self._topics.items():
-            if connection_id in topic_map[self.CONNECTION_ATTR]:
-                del topic_map[self.CONNECTION_ATTR][connection_id]
+            if connection.id in topic_map[self.CONNECTION_ATTR]:
+                del topic_map[self.CONNECTION_ATTR][connection.id]
                 self._cleanTopicMap(topic, topic_map)
 
     def iterSubscribers(self, topic, sub_topic=None):

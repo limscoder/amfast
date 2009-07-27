@@ -73,6 +73,12 @@ class ConnectionManager(object):
 
         connection.unSetNotifyFunc()
 
+    def setNotifyFunc(self, connection, func):
+        raise ConnectionError('Not implemented')
+
+    def unSetNotifyFunc(self, connection):
+        raise ConnectionError('Not implemented')
+
 class MemoryConnectionManager(ConnectionManager):
     """Manages connections in memory."""
 
