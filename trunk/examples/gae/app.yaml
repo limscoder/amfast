@@ -1,0 +1,16 @@
+application: chat
+version: 1
+runtime: python
+api_version: 1
+
+handlers:
+- url: /flash
+  static_dir: flex/deploy
+
+
+- url: /run_tests
+  script: run_tests.py
+
+- url: /.*
+  script: app.py
+

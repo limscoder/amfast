@@ -2,18 +2,18 @@ import sqlalchemy as sa
 
 import models
 
+engine = sa.create_engine('sqlite:///sqlalchemy_example.db', echo=False)
+metadata = sa.MetaData()
+
 class Schema(object):
     """Describes the schema and mappers used by the SQLAlchemy example."""
-    engine = sa.create_engine('sqlite:///sqlalchemy_example.db', echo=False)
 
     def _get_session(self):
-        return sa.orm.scoped_session(sa.orm.sessionmaker(bind=self.engine))
+        return sa.orm.scoped_session(sa.orm.sessionmaker(bind=engine))
     session = property(_get_session)
 
     def createSchema(self):
-        metadata = sa.MetaData()
 
-        metadata = sa.MetaData()
         self.users_table = sa.Table('users_table', metadata,
             sa.Column('id', sa.Integer, primary_key=True),
             sa.Column('first_name', sa.String(50)),
@@ -31,7 +31,7 @@ class Schema(object):
             sa.Column('label', sa.String(50)),
             sa.Column('email', sa.String(50)))
 
-        metadata.create_all(self.engine)
+        metadata.create_all(engine)
 
     def createMappers(self):
         sa.orm.clear_mappers()

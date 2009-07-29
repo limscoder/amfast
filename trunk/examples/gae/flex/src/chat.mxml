@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Application xmlns:mx="http://www.adobe.com/2006/mxml">
+	<mx:Panel width="100%" height="100%"
+		title="AmFast -- Google App Engine -- Chat">
+		<mx:HBox width="100%">
+			<mx:Form
+				defaultButton="{publishBtn}"
+				creationComplete="init()">
+				<mx:FormItem label="url:">
+					<mx:Label
+						id="messagingUrl"
+						text="http://localhost:8000/amf"
+						width="400"/>
+				</mx:FormItem>
+				
+				<mx:FormItem label="username:">
+					<mx:TextInput
+						id="userInput"
+						toolTip="Enter a username."
+						text="Anonymous"
+						maxChars="15"
+						width="400"/>
+				</mx:FormItem>
+				
+				<mx:FormItem label="message:">
+					<mx:TextInput
+						id="publishInput"
+						toolTip="Enter a message to publish."
+						maxChars="400"
+						width="400"/>
+				</mx:FormItem>
+				
+				<mx:FormItem>
+					<mx:Button
+						id="publishBtn"
+						label="Send Message"
+						click="publishMessage()"
+						toolTip="Send a message."
+						enabled="{subscribed}"
+						width="400"/>
+				</mx:FormItem>
+			</mx:Form>
+			
+			<mx:VRule height="100%" />
+			
+			<mx:Form width="100%">
+				<mx:FormItem width="100%">
+					<mx:TextArea
+						width="100%"
+						text="This application was created with AmFast, a Flash remoting framework for Python." />
+				</mx:FormItem>
+				
+				<mx:FormItem>
+					<mx:Button
+						label="View AmFast Project"
+						click="viewProject()"
+						toolTip="View AmFast Project"
+						width="200" />
+				</mx:FormItem>
+
+				<mx:FormItem>
+					<mx:Button
+						label="View Source Code"
+						click="viewSource()"
+						toolTip="View the source code for this demo."
+						width="200" />
+				</mx:FormItem>
+			</mx:Form>
+		</mx:HBox>
+		
+		<mx:HRule width="100%" />
+		
+		<mx:DataGrid
+			id="msgList"
+			width="100%"
+			height="100%"
+			dataProvider="{messages}">
+			<mx:columns>
+				<mx:DataGridColumn width="150" headerText="User" itemRenderer="MessageRenderer" dataField="user"/>
+				<mx:DataGridColumn width="200" headerText="Time" itemRenderer="MessageRenderer" dataField="time"/>
+				<mx:DataGridColumn headerText="Message" itemRenderer="MessageRenderer" dataField="msg"/>
+			</mx:columns>
+		</mx:DataGrid>
+	</mx:Panel>
+	
+	<mx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.messaging.Consumer;
+			import mx.messaging.Producer;
+			import mx.messaging.ChannelSet;
+			import mx.messaging.channels.AMFChannel;
+			import mx.messaging.events.MessageEvent;
+			import mx.messaging.events.MessageFaultEvent;
+			import mx.messaging.messages.AsyncMessage;
+			
+			protected const TOPIC:String = 'messages';
+			
+			protected var channelSet:ChannelSet;
+			protected var consumer:Consumer;
+			protected var producer:Producer;
+			[Bindable]
+			protected var subscribed:Boolean = false;
+			[Bindable]
+			protected var messages:ArrayCollection = new ArrayCollection();
+			
+			/**
+			 * Subscribe to topic at start-up.
+			 */
+			protected function init():void
+			{
+				// Create a channel set and add channel(s) to it
+				channelSet = new ChannelSet();
+				channelSet.addChannel(new AMFChannel("amf-channel", messagingUrl.text));
+				
+				// Create a new Consumer
+				// and set it's destination
+				// name to the topic we want
+				// to subscribe to.
+				consumer = new Consumer();
+				consumer.destination = TOPIC;
+				consumer.channelSet = channelSet;
+				
+				// Listen for events, so we
+				// can respond to incoming messages.
+				consumer.addEventListener(MessageEvent.MESSAGE,
+					consumer_msgHandler, false, 0 , true);
+				consumer.addEventListener(MessageFaultEvent.FAULT,
+					faultHandler, false, 0, true);
+					
+				// Subscribe to topic to 
+				// begin polling server for messages.
+				consumer.subscribe();
+				subscribed = true;
+				
+				// Create a new Producer
+				// and set it's destination
+				// name to the topic we want
+				// to publish messages to.
+				producer = new Producer();
+				producer.destination = TOPIC;
+				producer.channelSet = channelSet;
+			}
+			
+			/**
+			 * Handle an incoming message.
+			 */
+			protected function consumer_msgHandler(event:MessageEvent):void
+			{
+				var msgDate:Date = new Date();
+				msgDate.setTime(event.message.timestamp);
+				
+				var item:* = event.message.body;
+				item.time = msgDate.toDateString();
+				
+				if (item.sender == consumer.clientId) {
+					// Colorize messages published by this client.
+					item.color = 0x006300;
+				} else {
+					item.color = 0x000000;
+				}
+				
+				messages.addItem(item);
+			}
+			
+			/**
+			 * Handle a failed message.
+			 */ 
+			protected function faultHandler(event:MessageFaultEvent):void
+			{
+				Alert.show(event.faultString, 'Message Fault',
+					Alert.OK, this, null, null);
+			}
+			
+			/**
+			 * Publish a message to all clients.
+			 */
+			protected function publishMessage():void
+			{
+				var msg:AsyncMessage = new AsyncMessage();
+				msg.body = {
+					'user': userInput.text,
+					'sender': consumer.clientId,
+					'msg': publishInput.text
+				};
+				
+				// Let message live for 5 minutes after publishing
+				msg.timeToLive = 300000; 
+				producer.send(msg);
+				
+				publishInput.text = '';
+			}
+			
+			/**
+			 * View example source code.
+			 */
+			protected function viewSource():void
+			{
+				var request:URLRequest = new URLRequest('http://code.google.com/p/amfast/source/browse/#svn/trunk/examples/gae');
+				flash.net.navigateToURL(request, "_blank");
+			}
+			
+			/**
+			 * View project.
+			 */
+			protected function viewProject():void
+			{
+				var request:URLRequest = new URLRequest('http://code.google.com/p/amfast/');
+				flash.net.navigateToURL(request, "_blank");
+			}
+		]]>
+	</mx:Script>
+</mx:Application>

@@ -6,7 +6,6 @@ import cgi
 import amfast
 from amfast import class_def, remoting
 from amfast.class_def.as_types import AsError
-from amfast.remoting.channel import SecurityError
 
 try:
     # Use decode module if available.
@@ -57,28 +56,12 @@ class AbstractMessage(object):
             self.headers = headers
 
         if timestamp is None:
-            timestamp = int(time.time() * 1000)
+            timestamp = time.time() * 1000
         self.timestamp = timestamp
    
         if messageId is None:
             messageId = self._getId()
         self.messageId = messageId
-
-    def isExpired(self, current_time=None):
-        """Checks to see if message has expired."""
-        if self.timestamp is None or self.timeToLive is None:
-            return False
-
-        if current_time is None:
-            current_time = time.time() * 1000
-        else:
-            current_time *= 1000
-
-        expires = self.timestamp + self.timeToLive
-        if expires < current_time:
-            return True
-        else:
-            return False
 
     def invoke(self, packet, msg):
         """Invoke all message headers."""
@@ -116,7 +99,7 @@ class AbstractMessage(object):
         response.correlationId = self.messageId
 
         if self.clientId is None:
-            self.clientId = packet.channel.channel_set.generateId()
+            self.clientId = packet.channel.channel_set.connection_manager.generateId()
         response.clientId = self.clientId
 
     def _getId(self):
@@ -292,17 +275,17 @@ class RemotingMessage(AbstractMessage):
     def invoke(self, packet, msg):
         AbstractMessage.invoke(self, packet, msg)
 
-        # Make sure connection timestamp is updated everytime.
-        channel_set = packet.channel.channel_set
-        connection = channel_set.getFlexConnection(packet, msg)
+        # Set connection object, so it is accessable in target.
+        self.connection = packet.channel.getFlexConnection(self)
 
-        target = channel_set.service_mapper.getTarget(self.destination, self.operation)        
+        target = packet.channel.channel_set.service_mapper.getTarget(self.destination, self.operation)        
         if target is None:
             raise FlexMessageError("Operation '%s' not found." % \
                 remoting.Service.SEPARATOR.join((self.destination, self.operation)))
 
         if target.secure is True:
-            if connection.authenticated is False:
+            if self.connection.authenticated is False:
+                from amfast.remoting.channel import SecurityError
                 raise SecurityError("Operation requires authentication.")
 
         msg.response_msg.body.body = target.invoke(packet, msg, self.body)
@@ -329,17 +312,19 @@ class AsyncMessage(AbstractMessage):
 
     def invoke(self, packet, msg):
         """Publish this message."""
+
         AbstractMessage.invoke(self, packet, msg)
 
-        channel_set = packet.channel.channel_set
-        connection = channel_set.getFlexConnection(packet, msg)
+        channel = packet.channel
+        channel_set = channel.channel_set
+        self.connection = channel.getFlexConnection(self)
 
-        if channel_set.message_agent.secure is True:
-            if connection.authenticated is False:
+        if channel_set.subscription_manager.secure is True:
+            if self.connection.authenticated is False:
+                from amfast.remoting.channel import SecurityError
                 raise SecurityError("Operation requires authentication.")
 
-        channel_set.message_agent.publish(self,
-            self.destination, self.headers.get(self.SUBTOPIC_HEADER, None))
+        channel_set.publishMessage(self)
 
 class_def.assign_attrs(AsyncMessage, 'flex.messaging.messages.AsyncMessage',
     ('body', 'clientId', 'destination', 'headers',
@@ -412,6 +397,8 @@ class CommandMessage(AsyncMessage):
 
     def invoke(self, packet, msg):
         AbstractMessage.invoke(self, packet, msg)
+
+        self.connection = packet.channel.getFlexConnection(self)
 
         target = packet.channel.channel_set.service_mapper.command_service.getTarget(self.operation)
         if target is None:
