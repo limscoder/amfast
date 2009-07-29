@@ -50,7 +50,7 @@ pyamf.register_class(klass, 'alias', ....)
     def encodePacket(self, packet):
         pyamf_packet = pc.packet_to_pyamf(packet)
         if amfast.log_debug:
-            amfast.logger.debug("<encodedPyAmfPacket>%s</encodedPyAmfPacket" % pyamf_packet)
+            amfast.logger.debug("<encodedPyAmfPacket>%s</encodedPyAmfPacket>" % pyamf_packet)
 
         context = pyamf.get_context(pyamf.AMF0)
         stream = pyamf.remoting.encode(pyamf_packet, context)

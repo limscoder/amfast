@@ -5,12 +5,12 @@ import optparse
 import cherrypy
 
 import amfast
-from amfast.remoting.channel import ChannelSet
-from amfast.remoting.wsgi_channel import WsgiChannel
+from amfast.remoting.cherrypy_channel import CherryPyChannelSet, CherryPyChannel
 import utils
 
-class App(object):
+class App(CherryPyChannelSet):
     """Base web app."""
+
     @cherrypy.expose
     def index(self):
         raise cherrypy.HTTPRedirect('/red5Test.html')
@@ -41,8 +41,8 @@ if __name__ == '__main__':
         }
     }
 
-    channel_set = ChannelSet()
-    rpc_channel = WsgiChannel('amf-channel')
+    channel_set = app()
+    rpc_channel = CherryPyChannel('amf')
     channel_set.mapChannel(rpc_channel)
     utils.setup_channel_set(channel_set)
 

@@ -7,11 +7,11 @@ import sys
 import cherrypy
 
 import amfast
-from amfast.remoting.channel import ChannelSet
-from amfast.remoting.wsgi_channel import WsgiChannel
+from amfast.remoting.cherrypy_channel import CherryPyChannel, CherryPyChannelSet
 
-class App(object):
+class App(CherryPyChannelSet):
     """Base web app."""
+
     @cherrypy.expose
     def index(self):
         raise cherrypy.HTTPRedirect('/messaging.html')
@@ -45,25 +45,25 @@ if __name__ == '__main__':
         }
     }
 
-    channel_set = ChannelSet()
+    # Create ChannelSet
+    channel_set = App(notify_connections=True)
+
     # Clients connect every x seconds
     # to polling channels to check for messages.
     # If messages are available, they are
     # returned to the client.
-    polling_channel = WsgiChannel('amf-polling-channel')
+    polling_channel = CherryPyChannel('amf')
     channel_set.mapChannel(polling_channel)
 
     # Long-poll channels do not return
     # a response to the client until
     # a message is available, or channel.max_interval
     # is reached.
-    long_poll_channel = WsgiChannel('long-poll-channel', wait_interval=90)
+    long_poll_channel = CherryPyChannel('longPoll', wait_interval=90)
     channel_set.mapChannel(long_poll_channel)
 
-    app = App()
-    cherrypy.tree.graft(polling_channel, '/amf')
-    cherrypy.tree.graft(long_poll_channel, '/longPoll')
-    cherrypy.quickstart(app, '/', config=cp_options)
+    # Start serving
+    cherrypy.quickstart(channel_set, '/', config=cp_options)
 
     print "Serving on %s:%s" % (options.domain, options.port)
     print "Press ctrl-c to halt."

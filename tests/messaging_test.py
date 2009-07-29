@@ -1,9 +1,9 @@
-import threading
 import unittest
 import time
 import random
 
-from amfast.remoting.channel import ChannelSet, Channel, HttpChannel, NotConnectedError, ChannelError
+from amfast.remoting.channel import ChannelSet, Channel, HttpChannel, ChannelError
+from amfast.remoting.connection_manager import NotConnectedError
 
 class MessagingTestCase(unittest.TestCase):
 
@@ -16,69 +16,68 @@ class MessagingTestCase(unittest.TestCase):
     channel_set.mapChannel(Channel(CHANNEL_NAME))
     channel_set.mapChannel(HttpChannel(HTTP_CHANNEL_NAME))
 
+    def setUp(self):
+        self.channel_set.connection_manager.reset()
+        self.channel_set.subscription_manager.reset()
+        self.flex_client_id = 'my_client_id'
+
     def tearDown(self):
-        for connection in self.channel_set._connections.values():
-            connection.disconnect()
+        pass
 
     def connect(self, channel_name):
-        client_id = self.channel_set.generateId()
         channel = self.channel_set.getChannel(channel_name)
-        return channel.connect(client_id)
+        return channel.connect()
 
     def testConnect(self):
         connection = self.connect(self.CHANNEL_NAME)
-        self.assertTrue(connection.channel.connection_count > 0)
-        self.assertEquals(id(connection), id(self.channel_set.getConnection(connection.flex_client_id)))
+
+        channel = self.channel_set.getChannel(self.CHANNEL_NAME)
+        self.assertTrue(channel.channel_set.connection_manager.getConnectionCount(channel.name) > 0)
 
         channel = self.channel_set.getChannel(self.HTTP_CHANNEL_NAME)
-        self.assertRaises(ChannelError, channel.connect, connection.flex_client_id)
+        self.assertRaises(ChannelError, channel.connect, connection.id)
 
     def testDisconnect(self):
         connection = self.connect(self.CHANNEL_NAME)
-        connection.disconnect()
+        channel = self.channel_set.getChannel(self.CHANNEL_NAME)
 
-        self.assertEquals(0, connection.channel.connection_count)
-        self.assertRaises(NotConnectedError, self.channel_set.getConnection, connection.flex_client_id)
+        connection_count = channel.channel_set.connection_manager.getConnectionCount(channel.name)
+        id = connection.id
+        channel.disconnect(connection)
+         
+        self.assertEquals(connection_count - 1, channel.channel_set.connection_manager.getConnectionCount(channel.name))
+        self.assertRaises(NotConnectedError, self.channel_set.connection_manager.getConnection, id)
 
     def testSubscribe(self):
         connection = self.connect(self.CHANNEL_NAME)
-        self.channel_set.message_agent.subscribe(connection, connection.flex_client_id, self.TOPIC)
-
-        # Make sure subscription is listed in connection
-        client_subscriptions = connection._subscriptions.get(connection.flex_client_id)
-        self.assertTrue(client_subscriptions.has_key(self.TOPIC))
-
-        # Make sure subscription is listed in message_agent
-        client_ids = self.channel_set.message_agent._topics[self.TOPIC]
-        self.assertTrue(client_ids.has_key(connection.flex_client_id))
+        self.channel_set.subscription_manager.subscribe(connection, self.flex_client_id, self.TOPIC)
 
     def testUnSubscribe(self):
         connection = self.connect(self.CHANNEL_NAME)
-        self.channel_set.message_agent.subscribe(connection, connection.flex_client_id, self.TOPIC)
+        self.channel_set.subscription_manager.subscribe(connection, self.flex_client_id, self.TOPIC)
         
-        self.channel_set.message_agent.unsubscribe(connection, connection.flex_client_id, self.TOPIC)
-
-        # Make sure subscription is listed in connection
-        self.assertFalse(connection._subscriptions.has_key(connection.flex_client_id))
-
-        # Make sure subscription is listed in message_agent
-        self.assertFalse(self.channel_set.message_agent._topics.has_key(self.TOPIC))
+        self.channel_set.subscription_manager.unSubscribe(connection, self.flex_client_id, self.TOPIC)
 
     def testPublish(self):
         connection = self.connect(self.CHANNEL_NAME)
-        self.channel_set.message_agent.subscribe(connection, connection.flex_client_id, self.TOPIC)
+        self.channel_set.subscription_manager.subscribe(connection.id, self.flex_client_id, self.TOPIC)
 
-        self.channel_set.message_agent.publish('test', self.TOPIC)
-        self.assertEquals(1, len(connection._messages))
+        self.channel_set.publishObject('test', self.TOPIC)
+        msgs = self.channel_set.subscription_manager.pollConnection(connection)
+        self.assertEquals(1, len(msgs))
 
     def testPoll(self):
         connection = self.connect(self.CHANNEL_NAME)
-        self.channel_set.message_agent.subscribe(connection, connection.flex_client_id, self.TOPIC)
+        self.channel_set.subscription_manager.subscribe(connection.id, self.flex_client_id, self.TOPIC)
 
-        self.channel_set.message_agent.publish('test', self.TOPIC)
-        msgs = connection.poll()
+        # Make sure messages are polled
+        self.channel_set.publishObject('test', self.TOPIC)
+        msgs = self.channel_set.subscription_manager.pollConnection(connection)
         self.assertEquals(1, len(msgs))
-        self.assertEquals(0, len(connection._messages))
+
+        # Make sure polled messages were deleted
+        msgs = self.channel_set.subscription_manager.pollConnection(connection)
+        self.assertEquals(0, len(msgs))
 
 def suite():
     return unittest.TestLoader().loadTestsFromTestCase(MessagingTestCase)

@@ -47,11 +47,14 @@ int type_list(PyObject* class_def, PyObject *mapper,
             break;
         default:
             return 0;
-            
     }
 
     if (types == NULL)
         return 0;
+
+    if (types == Py_None)
+        // No type mapping has been set.
+        return 1;
 
     Py_ssize_t name_len = PySequence_Size(name_list);
     if (name_len == -1) {

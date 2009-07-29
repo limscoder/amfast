@@ -4,26 +4,8 @@ import optparse
 from wsgiref import simple_server
 
 import amfast
-from amfast.remoting.channel import ChannelSet
-from amfast.remoting.wsgi_channel import WsgiChannel
+from amfast.remoting.wsgi_channel import WsgiChannelSet, WsgiChannel
 import utils
-
-class App(object):
-    def __init__(self):
-        self.channel_set = ChannelSet()
-        rpc_channel = WsgiChannel('amf-channel')
-        self.channel_set.mapChannel(rpc_channel)
-        utils.setup_channel_set(self.channel_set)
-
-    def __call__(self, environ, start_response):
-        path = environ['PATH_INFO'].replace('/', '')
-
-        if path == 'amf':
-            channel = self.channel_set.getChannel('amf-channel')
-            return channel(environ, start_response)
-        else:
-            channel = self.channel_set.getChannel('amf-channel')
-            return channel.badPage(start_response, 'Page does not exist.')
 
 if __name__ == '__main__':
     usage = """usage: %s [options]""" % __file__
@@ -38,10 +20,15 @@ if __name__ == '__main__':
 
     amfast.log_debug = options.log_debug
 
+    channel_set = WsgiChannelSet()
+    rpc_channel = WsgiChannel('amf')
+    channel_set.mapChannel(rpc_channel)
+    utils.setup_channel_set(channel_set)
+
     server = simple_server.WSGIServer((options.domain, int(options.port)),
         simple_server.WSGIRequestHandler)
 
-    server.set_app(App())
+    server.set_app(channel_set)
 
     try:
         print "Serving on %s:%s" % (options.domain, options.port)

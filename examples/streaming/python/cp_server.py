@@ -1,7 +1,5 @@
 """An example server using the CherryPy web framework.
 
-This example uses a WsgiChannel, grafted onto the CherryPy tree.
-
 To run the example execute the command:
     python cp_server.py
 """
@@ -13,11 +11,11 @@ import sys
 import cherrypy
 
 import amfast
-from amfast.remoting.channel import ChannelSet
-from amfast.remoting.wsgi_channel import StreamingWsgiChannel
+from amfast.remoting.cherrypy_channel import CherryPyChannelSet, StreamingCherryPyChannel
 
-class App(object):
+class App(CherryPyChannelSet):
     """Base web app."""
+
     @cherrypy.expose
     def index(self):
         raise cherrypy.HTTPRedirect('/streaming.html')
@@ -53,13 +51,11 @@ if __name__ == '__main__':
         }
     }
 
-    channel_set = ChannelSet()
-    stream_channel = StreamingWsgiChannel('stream-channel')
+    channel_set = App(notify_connections=True)
+    stream_channel = StreamingCherryPyChannel('amf')
     channel_set.mapChannel(stream_channel)
 
-    app = App()
-    cherrypy.tree.graft(stream_channel, '/amf')
-    cherrypy.quickstart(app, '/', config=cp_options)
+    cherrypy.quickstart(channel_set, '/', config=cp_options)
 
     print "Serving on %s:%s" % (options.domain, options.port)
     print "Press ctrl-c to halt."

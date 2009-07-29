@@ -37,8 +37,8 @@ class ClassDef(object):
          * alias - string, specifies the amf class alias. Default = module.class
          * static_attrs - tuple or list, a tuple of static attribute strings. Default = empty tuple
          * amf3 - bool, if True, this object will be encoded in AMF3. Default = True
-         * encode_types - dict, keys = attribute names, values = callables. Default = empty dict
-         * decode_types - dict, keys = attribute names, values = callables. Default = empty dict
+         * encode_types - dict, keys = attribute names, values = callables. Default = None
+         * decode_types - dict, keys = attribute names, values = callables. Default = None
         """
         self.class_ = class_
         self._built_in = _built_in
@@ -64,12 +64,7 @@ class ClassDef(object):
                 amf3 = True
         self.amf3 = amf3
 
-        if encode_types is None:
-            encode_types = {}
         self.encode_types = encode_types
-
-        if decode_types is None:
-            decode_types = {}
         self.decode_types = decode_types
 
     def getStaticAttrVals(self, obj):

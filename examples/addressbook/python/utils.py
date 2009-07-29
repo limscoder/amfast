@@ -11,6 +11,8 @@ from amfast.class_def import ClassDefMapper, DynamicClassDef, ExternClassDef
 from amfast.class_def.sa_class_def import SaClassDef
 from amfast.class_def.code_generator import CodeGenerator
 from amfast.remoting import Service, CallableTarget
+from amfast.remoting.sa_connection_manager import SaConnectionManager
+from amfast.remoting.sa_subscription_manager import SaSubscriptionManager
 
 import persistent
 import controller
@@ -23,6 +25,17 @@ def setup_channel_set(channel_set):
     schema = persistent.Schema()
     schema.createSchema()
     schema.createMappers()
+
+    # Setup DB based connection_manager and subscription_manager
+    channel_set.connection_manager = SaConnectionManager(
+        persistent.engine,
+        persistent.metadata)
+    channel_set.connection_manager.createTables()
+
+    channel_set.subscription_manager = SaSubscriptionManager(
+        persistent.engine,
+        persistent.metadata)
+    channel_set.subscription_manager.createTables()
 
     # Send log messages to STDOUT
     handler = logging.StreamHandler(sys.stdout)

@@ -10,8 +10,7 @@ from twisted.application import service, strports
 from twisted.web import static, server, resource, vhost
 
 import amfast
-from amfast.remoting.channel import ChannelSet
-from amfast.remoting.twisted_channel import StreamingTwistedChannel
+from amfast.remoting.twisted_channel import TwistedChannelSet, StreamingTwistedChannel
 
 # Uncomment this like to log debug messages
 #amfast.log_debug = True
@@ -27,8 +26,14 @@ root.default = static.File("../flex/deploy")
 domain = "localhost"
 root.addHost(domain, static.File("../flex/deploy"))
 
+# If the code is completely asynchronous, 
+# you can use the dummy_threading module
+# to avoid RLock overhead.
+import dummy_threading
+amfast.mutex_cls = dummy_threading.RLock
+
 # Setup ChannelSet
-channel_set = ChannelSet()
+channel_set = TwistedChannelSet(notify_connections=True)
 stream_channel = StreamingTwistedChannel('streaming-channel')
 channel_set.mapChannel(stream_channel)
 

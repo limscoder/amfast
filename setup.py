@@ -1,9 +1,8 @@
 import os
+from setuptools import setup, Feature
 
 from ez_setup import use_setuptools
 use_setuptools()
-
-from setuptools import setup, Feature
 
 from distutils.core import setup, Extension
 from distutils.command.build_ext import build_ext
@@ -26,7 +25,7 @@ extensions = Feature(
     ])
 
 setup(name="AmFast",
-    version = "0.3.5",
+    version = "0.4.0",
     description = "Flash remoting framework. Includes support for NetConnection, RemoteObject, IExternizeable, custom type serialization, and a C-based AMF encoder/decoder.",
     url = "http://code.google.com/p/amfast/",
     author = "Dave Thompson",

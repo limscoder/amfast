@@ -1,0 +1,4 @@
+cron:
+- description: clean-up stale connections
+  url: /_clean
+  schedule: every 10 minutes
