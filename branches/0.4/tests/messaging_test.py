@@ -1,4 +1,3 @@
-import threading
 import unittest
 import time
 import random
@@ -18,6 +17,8 @@ class MessagingTestCase(unittest.TestCase):
     channel_set.mapChannel(HttpChannel(HTTP_CHANNEL_NAME))
 
     def setUp(self):
+        self.channel_set.connection_manager.reset()
+        self.channel_set.subscription_manager.reset()
         self.flex_client_id = 'my_client_id'
 
     def tearDown(self):
@@ -31,7 +32,7 @@ class MessagingTestCase(unittest.TestCase):
         connection = self.connect(self.CHANNEL_NAME)
 
         channel = self.channel_set.getChannel(self.CHANNEL_NAME)
-        self.assertTrue(channel.connection_count > 0)
+        self.assertTrue(channel.channel_set.connection_manager.getConnectionCount(channel.name) > 0)
 
         channel = self.channel_set.getChannel(self.HTTP_CHANNEL_NAME)
         self.assertRaises(ChannelError, channel.connect, connection.id)
@@ -40,42 +41,42 @@ class MessagingTestCase(unittest.TestCase):
         connection = self.connect(self.CHANNEL_NAME)
         channel = self.channel_set.getChannel(self.CHANNEL_NAME)
 
-        connection_count = channel.connection_count
+        connection_count = channel.channel_set.connection_manager.getConnectionCount(channel.name)
         id = connection.id
         channel.disconnect(connection)
          
-        self.assertEquals(connection_count - 1, channel.connection_count)
+        self.assertEquals(connection_count - 1, channel.channel_set.connection_manager.getConnectionCount(channel.name))
         self.assertRaises(NotConnectedError, self.channel_set.connection_manager.getConnection, id)
 
     def testSubscribe(self):
         connection = self.connect(self.CHANNEL_NAME)
-        self.channel_set.subscribe(connection, self.flex_client_id, self.TOPIC)
+        self.channel_set.subscription_manager.subscribe(connection, self.flex_client_id, self.TOPIC)
 
     def testUnSubscribe(self):
         connection = self.connect(self.CHANNEL_NAME)
-        self.channel_set.subscribe(connection, self.flex_client_id, self.TOPIC)
+        self.channel_set.subscription_manager.subscribe(connection, self.flex_client_id, self.TOPIC)
         
-        self.channel_set.unSubscribe(connection, self.flex_client_id, self.TOPIC)
+        self.channel_set.subscription_manager.unSubscribe(connection, self.flex_client_id, self.TOPIC)
 
     def testPublish(self):
         connection = self.connect(self.CHANNEL_NAME)
-        self.channel_set.subscribe(connection, self.flex_client_id, self.TOPIC)
+        self.channel_set.subscription_manager.subscribe(connection.id, self.flex_client_id, self.TOPIC)
 
         self.channel_set.publishObject('test', self.TOPIC)
-        msgs = connection.poll()
+        msgs = self.channel_set.subscription_manager.pollConnection(connection)
         self.assertEquals(1, len(msgs))
 
     def testPoll(self):
         connection = self.connect(self.CHANNEL_NAME)
-        self.channel_set.subscribe(connection, self.flex_client_id, self.TOPIC)
+        self.channel_set.subscription_manager.subscribe(connection.id, self.flex_client_id, self.TOPIC)
 
         # Make sure messages are polled
         self.channel_set.publishObject('test', self.TOPIC)
-        msgs = connection.poll()
+        msgs = self.channel_set.subscription_manager.pollConnection(connection)
         self.assertEquals(1, len(msgs))
 
         # Make sure polled messages were deleted
-        msgs = connection.poll()
+        msgs = self.channel_set.subscription_manager.pollConnection(connection)
         self.assertEquals(0, len(msgs))
 
 def suite():
