@@ -31,6 +31,9 @@ class GaeChannelSet(WsgiChannelSet):
         channel = self.getChannel(channel_name)
         return channel(environ, start_response)
 
+    def notifyConnections(self):
+        pass
+
     def scheduleClean(self):
         """You must configure cron.yaml
         to access the url: self.CLEAN_URL to
@@ -38,8 +41,9 @@ class GaeChannelSet(WsgiChannelSet):
         pass
 
 class GaeChannel(WsgiChannel):
-    def __init__(self, name, endpoint=None):
+    def __init__(self, name, max_connections=-1, endpoint=None):
         if endpoint is None:
             endpoint = PyAmfEndpoint()
-        WsgiChannel.__init__(self, name, max_connections=-1,
+
+        WsgiChannel.__init__(self, name, max_connections=max_connections,
             endpoint=endpoint, wait_interval=0)

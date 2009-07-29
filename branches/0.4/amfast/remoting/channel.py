@@ -16,6 +16,9 @@ class ChannelError(amfast.AmFastError):
 class SecurityError(ChannelError):
     pass
 
+class ChannelFullError(ChannelError):
+    pass
+
 class Channel(object):
     """An individual channel that can send/receive messages.
 
@@ -31,7 +34,6 @@ class Channel(object):
     def __init__(self, name, max_connections=-1, endpoint=None):
         self.name = name
         self.max_connections = max_connections
-        self.connection_count = 0
         if endpoint is None:
             from endpoint import AmfEndpoint
             endpoint = AmfEndpoint()
@@ -103,18 +105,12 @@ class Channel(object):
 
         Returns Connection
         """
-        if self.max_connections > -1 and self.connection_count >= self.max_connections:
-            raise ChannelError("Channel '%s' is not accepting connections." % self.name)
+        if self.max_connections > -1 and \
+            self.channel_set.connection_manager.getConnectionCount(self.name) \
+            >= self.max_connections:
+            raise ChannelFullError("Channel '%s' is not accepting connections." % self.name)
 
-        connection = self.channel_set.connect(self, connection_id)
-
-        self._lock.acquire()
-        try:
-            self.connection_count += 1
-        finally:
-            self._lock.release()
-
-        return connection
+        return self.channel_set.connect(self, connection_id)
 
     def disconnect(self, connection):
         """Remove a client connection from this Channel.
@@ -123,13 +119,8 @@ class Channel(object):
         ==========
          * connection - Connection.
         """
-        self.channel_set.disconnect(connection)
 
-        self._lock.acquire()
-        try:
-            self.connection_count -= 1
-        finally:
-            self._lock.release()
+        self.channel_set.disconnect(connection)
 
 class HttpChannel(Channel):
     """An individual channel that can send/receive messages over HTTP.
@@ -207,7 +198,7 @@ class ChannelSet(object):
     def __iter__(self):
         # To make thread safe
         channel_vals = self._channels.values()
-        return channel_vals.__iter__
+        return channel_vals.__iter__()
 
     def checkCredentials(self, user, password):
         """Determines if credentials are valid.
@@ -252,8 +243,13 @@ class ChannelSet(object):
         self.subscription_manager.deleteConnection(connection)
         self.connection_manager.deleteConnection(connection)
 
-    def scheduleClean(self):
+    def scheduleClean(self, dummy=True):
         """Schedule connection cleaning procedure to run sometime in the future."""
+
+        if dummy is True:
+            amfast.logger.warn('Connection cleaning was NOT scheduled.')
+            return
+
         def _clean():
             self.clean()
             self.scheduleClean()
@@ -286,7 +282,7 @@ class ChannelSet(object):
             channel = self.getChannel(connection.channel_name) 
             channel.disconnect(connection) 
 
-    def publishObject(self, body, topic, sub_topic=None, headers=None, ttl=30000):
+    def publishObject(self, body, topic, sub_topic=None, headers=None, ttl=10000):
         """Create a message and publish it.
 
         arguments:
@@ -320,10 +316,19 @@ class ChannelSet(object):
         """
 
         self.subscription_manager.publishMessage(msg)
-        if self.notify_connections is True:
-            self.notifyConnections(msg)
 
-    def notifyConnections(self, msg):
+        if self.notify_connections is True:
+            topic = msg.destination
+            if hasattr(msg, 'headers') and \
+                msg.headers is not None and \
+                messaging.AsyncMessage.SUBTOPIC_HEADER in msg.headers:
+                sub_topic = msg.headers[messaging.AsyncMessage.SUBTOPIC_HEADER]
+            else:
+                sub_topic = None
+
+            self.notifyConnections(topic, sub_topic)
+
+    def notifyConnections(self, topic, sub_topic):
         """Notify connections that a message has been published.
 
         arguments:
@@ -331,24 +336,19 @@ class ChannelSet(object):
          * msg - AbstractMessage, the Flex message that was published.
         """
 
-        # TODO: Make this threaded???
-        topic = msg.destination
-        if hasattr(msg, 'headers') and \
-            msg.headers is not None and \
-            messaging.AsyncMessage.SUBTOPIC_HEADER in msg.headers:
-            sub_topic = msg.headers[messaging.AsyncMessage.SUBTOPIC_HEADER]
-        else:
-            sub_topic = None
+        thread = threading.Thread(target=self._notifyConnections, args=(topic, sub_topic))
+        thread.run()
 
-        # Notify all subscribed connections that a new message has been published.
+    def _notifyConnections(self, topic, sub_topic):
+        """Do the real work of notifyConnections."""
+
         for connection_id in self.subscription_manager.iterSubscribers(topic, sub_topic):
             try:
                 connection = self.connection_manager.getConnection(connection_id, False)
             except cm.NotConnectedError:
                 continue
 
-            if hasattr(connection, 'notify_func') and \
-                connection.notify_func is not None:
+            if connection.notify_func is not None:
                 connection.notify_func()
 
     def mapChannel(self, channel):

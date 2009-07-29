@@ -23,7 +23,7 @@ class MemcacheMutex(object):
         
         while lock_holder != self.id:
             if lock_holder is None:
-                self.mc.set(key, self.id)       
+                self.mc.set(key, self.id) 
                 lock_holder = self.mc.get(key)
             else:
                 time.sleep(0.1)
@@ -34,6 +34,10 @@ class MemcacheMutex(object):
         if key in self.acquired_locks or force is True:
             self.mc.delete(key)
             del self.acquired_locks[key]
+
+    def releaseAll(self):
+        self.mc.delete_multi(self.acquired_locks.keys())
+        self.acquired_locks = {}
 
 class MemcacheManager(object):
     KEY_SEPARATOR = ':'

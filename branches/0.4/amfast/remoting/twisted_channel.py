@@ -5,10 +5,11 @@ from twisted.web import server
 from twisted.web.resource import Resource
 
 import amfast
-from amfast.remoting.channel import ChannelSet, HttpChannel
 from amfast.class_def.as_types import AsNoProxy
-from amfast.remoting.endpoint import AmfEndpoint
-import amfast.remoting.flex_messages as messaging
+from channel import ChannelSet, HttpChannel
+from endpoint import AmfEndpoint
+import flex_messages as messaging
+import connection_manager as cm
 
 class TwistedChannelSet(ChannelSet):
     """A ChannelSet optimized for use with Twisted."""
@@ -20,6 +21,19 @@ class TwistedChannelSet(ChannelSet):
 
     def scheduleClean(self):
         reactor.callLater(self.clean_freq, self.clean)
+
+    def notifyConnections(self, topic, sub_topic):
+        reactor.callLater(0.1, self._notifyConnections, topic, sub_topic)
+
+    def _notifyConnections(self, topic, sub_topic):
+        for connection_id in self.subscription_manager.iterSubscribers(topic, sub_topic):
+            try:
+                connection = self.connection_manager.getConnection(connection_id, False)
+            except cm.NotConnectedError:
+                continue
+
+            if connection.notify_func is not None:
+                reactor.callLater(0.1, connection.notify_func)
 
     def clean(self):
         amfast.logger.debug("Cleaning connections.")

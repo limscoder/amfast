@@ -22,14 +22,14 @@ class SubscriptionManager(object):
 
     SUBTOPIC_SEPARATOR = "_;_"
 
-    def __init__(self, secure=False, ttl=30000):
+    def __init__(self, secure=False, ttl=10000):
         self.secure = secure
         self.ttl = ttl
 
     @classmethod
     def getTopicKey(cls, topic, sub_topic=None):
         if sub_topic is not None:
-            return cls.SUBTOPIC_SEPARATOR.join(topic, sub_topic)
+            return cls.SUBTOPIC_SEPARATOR.join((topic, sub_topic))
         else:
             return topic
 
@@ -70,8 +70,11 @@ class MemorySubscriptionManager(SubscriptionManager):
     def __init__(self, secure=False, ttl=30000):
         SubscriptionManager.__init__(self, secure=secure, ttl=ttl)
 
-        self._topics = {}
         self._lock = amfast.mutex_cls()
+        self.reset()
+
+    def reset(self):
+        self._topics = {}
 
     def _getTopicMap(self, topic):
         """Retrieves or creates a topic map."""
@@ -198,7 +201,7 @@ class MemorySubscriptionManager(SubscriptionManager):
             self._lock.release()
 
     def pollMessages(self, topic, cutoff_time, current_time):
-        """Retrieves all qeued messages, and discards expired messages.
+        """Retrieves all queued messages, and discards expired messages.
 
         arguments:
         ===========
@@ -209,10 +212,9 @@ class MemorySubscriptionManager(SubscriptionManager):
              message is expired.
         """
 
-        polled_msgs = []
         topic_map = self._topics.get(topic, None)
         if topic_map is None:
-            return polled_msgs
+            return
 
         self._lock.acquire()
         try:
@@ -226,10 +228,8 @@ class MemorySubscriptionManager(SubscriptionManager):
                     msgs.pop(idx)
                     msg_count -= 1
                 else:
-                    if msg.timestamp > cutoff_time:
-                        polled_msgs.append(msg)
                     idx += 1
+                    if msg.timestamp > cutoff_time:
+                        yield msg
         finally:
             self._lock.release()
-
-        return polled_msgs

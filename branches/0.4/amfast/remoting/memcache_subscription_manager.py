@@ -13,11 +13,31 @@ class MemcacheSubscriptionManager(SubscriptionManager, memcache_manager.Memcache
         SubscriptionManager.__init__(self, secure=secure, ttl=ttl)
 
         self.mc = self.createMcClient(mc_servers, mc_debug)
-        #self.mc.flush_all()
-        if self.mc.get(self.TOPIC_ATTR) is None:
-            self.mc.set(self.TOPIC_ATTR, {})
-
         self._lock = memcache_manager.MemcacheMutex(self.mc)
+
+    def reset(self):
+        self._lock.releaseAll()
+
+        lock_name = self.getLockName('reset')
+        self._lock.acquire(lock_name)
+        try:
+            topics = self.mc.get(self.TOPIC_ATTR)
+            if topics is not None:
+                for topic in topics.iterkeys():
+
+                    msg_key = self.getKeyName(topic, self.MSG_ATTR)
+                    self.mc.delete(msg_key)
+
+                    connection_key = self.getKeyName(topic, self.CONNECTION_ATTR)
+                    connections = self.mc.get(connection_key)
+                    for connection_id in connections:
+                        key = self.getKeyName(connection_id, topic)
+                        self.mc.delete(key)
+               
+                    self.mc.delete(connection_key)
+                self.mc.set(self.TOPIC_ATTR, {})
+        finally:
+            self._lock.release(lock_name)
 
     def _cleanTopic(self, topic):
         """Removes un-needed subscription data for a topic."""
@@ -67,6 +87,8 @@ class MemcacheSubscriptionManager(SubscriptionManager, memcache_manager.Memcache
         self._lock.acquire(lock_name)
         try:
             topics = self.mc.get(self.TOPIC_ATTR)
+            if topics is None:
+                topics = {}
             topic_map = topics.get(topic, None)
             if topic_map is None: 
                 topics[topic] = True
@@ -198,10 +220,7 @@ class MemcacheSubscriptionManager(SubscriptionManager, memcache_manager.Memcache
             key = self.getKeyName(topic, self.CONNECTION_ATTR)
             connections = self.mc.get(key)
             for connection_id in connections.iterkeys():
-                sub_key = self.getKeyName(connection_id, topic)
-                subscriptions = self.mc.get(sub_key)
-                for subscription in subscriptions.itervalues():
-                    yield subscription
+                yield connection_id
 
     def iterConnectionSubscriptions(self, connection):
         """Iterate through all Subscriptions that belong to a specific connection."""
@@ -249,7 +268,7 @@ class MemcacheSubscriptionManager(SubscriptionManager, memcache_manager.Memcache
                 msg.connection = tmp_connection
 
     def pollMessages(self, topic, cutoff_time, current_time):
-        """Retrieves all qeued messages, and discards expired messages.
+        """Retrieves all queued messages, and discards expired messages.
 
         arguments:
         ===========
@@ -260,15 +279,13 @@ class MemcacheSubscriptionManager(SubscriptionManager, memcache_manager.Memcache
              message is expired.
         """
 
-        polled_msgs = []
-
         key = self.getKeyName(topic, self.MSG_ATTR)
         lock_name = self.getLockName(key)
         self._lock.acquire(lock_name)
         try:
             msgs = self.mc.get(key)
             if msgs is None:
-                return polled_msgs
+                return
 
             msg_count = len(msgs)
             set = False
@@ -281,13 +298,11 @@ class MemcacheSubscriptionManager(SubscriptionManager, memcache_manager.Memcache
                     msg_count -= 1
                     set = True
                 else:
-                    if msg.timestamp > cutoff_time:
-                        polled_msgs.append(msg)
                     idx += 1
+                    if msg.timestamp > cutoff_time:
+                        yield msg
 
             if set is True:
                 self.mc.set(key, msgs)
         finally:
             self._lock.release(lock_name)
-
-        return polled_msgs

@@ -27,6 +27,15 @@ class GaeMessage(db.Model):
 class GaeSubscriptionManager(SubscriptionManager):
     """Stores subscriptions in Google DataStore."""
 
+    def reset(self):
+        query = GaeSubscription.all(keys_only=True)
+        for result in query:
+            db.delete(result)
+
+        query = GaeMessage.all(keys_only=True)
+        for result in query:
+            db.delete(result)
+
     def subscribe(self, connection_id, client_id, topic, sub_topic=None, selector=None):
         """Add a subscription to a topic."""
 
@@ -97,7 +106,6 @@ class GaeSubscriptionManager(SubscriptionManager):
              message is expired.
         """
 
-        polled_msgs = []
         remove_msgs = []
 
         query = GaeMessage.all()
@@ -108,9 +116,7 @@ class GaeSubscriptionManager(SubscriptionManager):
                 remove_msgs.append(message)
             else:
                 if msg.timestamp > cutoff_time:
-                    polled_msgs.append(msg)
+                    yield msg
 
         for message in remove_msgs:
             message.delete()
-
-        return polled_msgs

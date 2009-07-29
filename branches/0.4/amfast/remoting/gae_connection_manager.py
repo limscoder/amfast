@@ -4,7 +4,7 @@ import pickle
 from google.appengine.ext import db
 
 from connection import Connection, ConnectionError
-from connection_manager import ConnectionManager, NotConnectedError
+from connection_manager import ConnectionManager, NotConnectedError, SessionAttrError
 
 class GaeConnection(Connection):
     """A connection stored in Google Datastore."""
@@ -13,11 +13,20 @@ class GaeConnection(Connection):
         Connection.__init__(self, *args, **kwargs)
         self.key = None
 
-class GaeConnectionModel(db.Model):
-    """Connection data that is stored in a Google Datastore."""
-
+class GaeModel(object):
     # Prefix id with this string to make a key_name
-    KEY = 'K'
+    KEY = 'K' 
+
+    @classmethod
+    def getKeyNameFromId(cls, id):
+        return cls.KEY + id
+
+    @classmethod
+    def getIdFromKeyName(cls, key_name):
+        return key_name.replace(cls.KEY, '', 1)
+
+class GaeConnectionModel(db.Model, GaeModel):
+    """Connection data that is stored in a Google Datastore."""
 
     # Stored attributes.
     channel_name = db.StringProperty(required=True)
@@ -29,13 +38,10 @@ class GaeConnectionModel(db.Model):
     flex_user = db.StringProperty(required=False)
     p_session = db.BlobProperty(required=False)
 
-    @classmethod
-    def getKeyNameFromId(cls, id):
-        return cls.KEY + id
+class GaeChannelModel(db.Model, GaeModel):
 
-    @classmethod
-    def getIdFromKeyName(cls, key_name):
-        return key_name.replace(cls.KEY, '', 1)
+    name = db.StringProperty(required=True)
+    count = db.IntegerProperty(required=True)
 
 class GaeConnectionManager(ConnectionManager):
     """Manages connections stored by Google DataStore."""
@@ -44,6 +50,41 @@ class GaeConnectionManager(ConnectionManager):
         ConnectionManager.__init__(self, connection_class=connection_class,
             connection_params=connection_params)
 
+    def reset(self):
+        query = GaeConnectionModel.all(keys_only=True)
+        for result in query:
+            db.delete(result)
+
+        query = GaeChannelModel.all(keys_only=True)
+        for result in query:
+            db.delete(result)
+
+    def _incrementChannelCount(self, channel_name):
+        key = GaeChannelModel.getKeyNameFromId(channel_name)
+        channel = GaeChannelModel.get_by_key_name(key)
+        if channel is None:
+            channel = GaeChannelModel(key_name=key,
+                name=channel_name, count=1)
+        else:
+            channel.count += 1
+
+        channel.put()
+
+    def _decrementChannelCount(self, channel_name):
+        key = GaeChannelModel.getKeyNameFromId(channel_name)
+        channel = GaeChannelModel.get_by_key_name(key)
+        if channel is not None:
+            channel.count -= 1
+            channel.put()
+
+    def getConnectionCount(self, channel_name):
+        key = GaeChannelModel.getKeyNameFromId(channel_name)
+        channel = GaeChannelModel.get_by_key_name(key)
+        if channel is None:
+            return 0
+        else:
+            return channel.count
+ 
     def loadConnection(self, connection_id):
         stored_connection = GaeConnectionModel.get_by_key_name(\
             GaeConnectionModel.getKeyNameFromId(connection_id))
@@ -56,7 +97,7 @@ class GaeConnectionManager(ConnectionManager):
         connection.key = stored_connection.key()
         return connection
 
-    def initConnection(self, connection):
+    def initConnection(self, connection, channel):
         params = {
             'key_name': GaeConnectionModel.getKeyNameFromId(connection.id),
             'channel_name': connection.channel_name,
@@ -70,6 +111,9 @@ class GaeConnectionManager(ConnectionManager):
         stored_connection = GaeConnectionModel(**params)
         stored_connection.put()
 
+        db.run_in_transaction(self._incrementChannelCount,
+            connection.channel_name)
+
         connection.key = stored_connection.key()
 
     def iterConnectionIds(self):
@@ -81,7 +125,10 @@ class GaeConnectionManager(ConnectionManager):
 
     def getConnected(self, connection):
         stored_connection = GaeConnectionModel.get(connection.key)
-        return stored_connection.connected
+        if stored_connection is None:
+            return False
+        else:
+            return stored_connection.connected
 
     def getLastActive(self, connection):
         stored_connection = GaeConnectionModel.get(connection.key)
@@ -110,7 +157,26 @@ class GaeConnectionManager(ConnectionManager):
 
     def deleteConnection(self, connection):
         db.run_in_transaction(self._deleteConnection, connection)
+        db.run_in_transaction(self._decrementChannelCount, connection.channel_name)
         ConnectionManager.deleteConnection(self, connection)
+
+    def _connectConnection(self, connection):
+        stored_connection = GaeConnectionModel.get(connection.key)
+        if stored_connection is not None:
+            stored_connection.connected = True
+            stored_connection.put()
+
+    def connectConnection(self, connection):
+        db.run_in_transaction(self._connectConnection, connection)
+
+    def _disconnectConnection(self, connection):
+        stored_connection = GaeConnectionModel.get(connection.key)
+        if stored_connection is not None:
+            stored_connection.connected = False
+            stored_connection.put()
+
+    def disconnectConnection(self, connection):
+        db.run_in_transaction(self._disconnectConnection, connection)
 
     def _touchConnection(self, connection):
         stored_connection = GaeConnectionModel.get(connection.key)
@@ -164,7 +230,10 @@ class GaeConnectionManager(ConnectionManager):
 
     def getConnectionSessionAttr(self, connection, name):
         stored_connection = self.initSession(connection)
-        return stored_connection._session[name]
+        try:
+            return stored_connection._session[name]
+        except KeyError:
+            raise SessionAttrError("Attribute '%s' not found." % name)
 
     def _setConnectionSessionAttr(self, connection, name, val):
         stored_connection = self.initSession(connection)
@@ -176,8 +245,11 @@ class GaeConnectionManager(ConnectionManager):
 
     def _delConnectionSessionAttr(self, connection, name):
         stored_connection = self.initSession(connection)
-        del stored_connection._session[name]
-        self.saveSession(stored_connection)
+        try:
+            del stored_connection._session[name]
+            self.saveSession(stored_connection)
+        except KeyError:
+            pass
 
     def delConnectionSessionAttr(self, connection, name):
         db.run_in_transaction(self._delConnectionSessionAttr, connection, name)

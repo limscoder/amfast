@@ -2,13 +2,13 @@ import time
 
 import memcache_manager
 from connection import Connection, ConnectionError
-from connection_manager import ConnectionManager, NotConnectedError
+from connection_manager import ConnectionManager, NotConnectedError, SessionAttrError
 
 class MemcacheConnectionManager(ConnectionManager, memcache_manager.MemcacheManager):
     """Manages connections stored by Memcache."""
 
     CONNECTIONS_ATTR = '_connection_ids'
-
+    CHANNELS_ATTR = '_channels'
     ATTRIBUTES = ('connection_info', 'connected', 'last_active',
         'last_polled', 'authenticated', 'flex_user', 'session', 'notify_func_id')
 
@@ -18,9 +18,63 @@ class MemcacheConnectionManager(ConnectionManager, memcache_manager.MemcacheMana
             connection_params=connection_params)
 
         self.mc = self.createMcClient(mc_servers, mc_debug)
-        if self.mc.get(self.CONNECTIONS_ATTR) is None:
-            self.mc.set(self.CONNECTIONS_ATTR, [])
         self._lock = memcache_manager.MemcacheMutex(self.mc)
+
+    def reset(self):
+        self._lock.releaseAll()
+
+        lock_name = self.getLockName('reset')
+        self._lock.acquire(lock_name)
+        try:
+            connection_ids = self.mc.get(self.CONNECTIONS_ATTR)
+            if connection_ids is not None:
+                for connection_id in connection_ids:
+                    keys = [self.getKeyName(connection_id, attr) for attr in self.ATTRIBUTES]
+                    self.mc.delete_multi(keys)
+
+                self.mc.set(self.CONNECTIONS_ATTR, [])
+                self.mc.set(self.CHANNELS_ATTR, {})
+        finally:
+            self._lock.release(lock_name)
+
+    def incrementChannelCount(self, channel_name):
+        lock_name = self.getLockName(self.CHANNELS_ATTR)
+        self._lock.acquire(lock_name)
+        try:
+            channels = self.mc.get(self.CHANNELS_ATTR)
+            if channels is None:
+                channels = {}
+            if channel_name in channels:
+                channels[channel_name] += 1
+            else:
+                channels[channel_name] = 1
+            
+            self.mc.set(self.CHANNELS_ATTR, channels)
+        finally:
+            self._lock.release(lock_name)
+
+    def decrementChannelCount(self, channel_name):
+        lock_name = self.getLockName(self.CHANNELS_ATTR)
+        self._lock.acquire(lock_name)
+        try:
+            channels = self.mc.get(self.CHANNELS_ATTR)
+            if channels is None:
+                channels = {}
+            if channel_name in channels:
+                channels[channel_name] -= 1
+                self.mc.set(self.CHANNELS_ATTR, channels)
+        finally:
+            self._lock.release(lock_name)
+
+    def getConnectionCount(self, channel_name):
+        channels = self.mc.get(self.CHANNELS_ATTR)
+        if channels is None:
+            return 0
+
+        if channel_name in channels:
+            return channels[channel_name]
+        else:
+            return 0
 
     def checkMultiSetResults(self, results):
         if len(results) > 0:
@@ -36,7 +90,7 @@ class MemcacheConnectionManager(ConnectionManager, memcache_manager.MemcacheMana
         return self.connection_class(self, connection_info['channel_name'],
             connection_id, connection_info['timeout'])
 
-    def initConnection(self, connection):
+    def initConnection(self, connection, channel):
         params = {
             'connected': True,
             'last_active': time.time() * 1000,
@@ -61,10 +115,14 @@ class MemcacheConnectionManager(ConnectionManager, memcache_manager.MemcacheMana
         self._lock.acquire(lock_name)
         try:
             connection_ids = self.mc.get(self.CONNECTIONS_ATTR)
+            if connection_ids is None:
+                connection_ids = []
             connection_ids.append(connection.id)
             self.mc.set(self.CONNECTIONS_ATTR, connection_ids)
         finally:
             self._lock.release(lock_name)
+
+        self.incrementChannelCount(connection.channel_name)
 
     def iterConnectionIds(self):
         connection_ids = self.mc.get(self.CONNECTIONS_ATTR)
@@ -113,6 +171,16 @@ class MemcacheConnectionManager(ConnectionManager, memcache_manager.MemcacheMana
         keys = [self.getKeyName(connection.id, attr) for attr in self.ATTRIBUTES]
         self.mc.delete_multi(keys)
 
+        self.decrementChannelCount(connection.channel_name)
+
+        ConnectionManager.deleteConnection(self, connection)
+
+    def connectConnection(self, connection):
+        self.mc.set(self.getKeyName(connection.id, 'connected'), True)
+
+    def disconnectConnection(self, connection):
+        self.mc.set(self.getKeyName(connection.id, 'connected'), False)
+
     def touchConnection(self, connection):
         self.mc.set(self.getKeyName(connection.id, 'last_active'), time.time() * 1000)
 
@@ -125,7 +193,7 @@ class MemcacheConnectionManager(ConnectionManager, memcache_manager.MemcacheMana
             self.getKeyName(connection.id, 'flex_user'): user
         }
 
-        self.checkMultiSetResults(self.mc.multi_set(params))
+        self.checkMultiSetResults(self.mc.set_multi(params))
 
     def unAuthenticateConnection(self, connection):
         self.mc.set(self.getKeyName(connection.id, 'authenticated'), False)
@@ -140,7 +208,10 @@ class MemcacheConnectionManager(ConnectionManager, memcache_manager.MemcacheMana
 
     def getConnectionSessionAttr(self, connection, name):
         session = self.mc.get(self.getKeyName(connection.id, 'session'))
-        return session[name]
+        try:
+            return session[name]
+        except KeyError:
+            raise SessionAttrError("Attribute '%s' not found." % name)
 
     def setConnectionSessionAttr(self, connection, name, val):
         key = self.getKeyName(connection.id, 'session')
@@ -161,7 +232,10 @@ class MemcacheConnectionManager(ConnectionManager, memcache_manager.MemcacheMana
         self._lock.acquire(lock_name)
         try:
             session = self.mc.get(key)
-            del session[name]
-            self.mc.set(key, session)
+            try:
+                del session[name]
+                self.mc.set(key, session)
+            except KeyError:
+                pass
         finally:
             self._lock.release(lock_name)

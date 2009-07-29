@@ -8,6 +8,9 @@ import flex_messages as messaging
 class NotConnectedError(ConnectionError):
     pass
 
+class SessionAttrError(ConnectionError):
+    pass
+
 class ConnectionManager(object):
     """Keeps track of all current connections.
 
@@ -60,18 +63,18 @@ class ConnectionManager(object):
             connection_id = self.generateId()
 
         connection = self.connection_class(self, channel.name, connection_id, **self.connection_params)
-        self.initConnection(connection)
+        self.initConnection(connection, channel)
         return connection
 
     def deleteConnection(self, connection):
-        if hasattr(connection, 'notify_func') and \
-            connection.notify_func is not None:
+        if connection.notify_func is not None:
             # Call notify function,
             # which should check for
             # a disconnection.
             connection.notify_func()
+            connection.unSetNotifyFunc()
 
-        connection.unSetNotifyFunc()
+        connection.disconnect()
 
     def setNotifyFunc(self, connection, func):
         raise ConnectionError('Not implemented')
@@ -86,8 +89,18 @@ class MemoryConnectionManager(ConnectionManager):
         ConnectionManager.__init__(self, connection_class=connection_class,
             connection_params=connection_params)
 
-        self._connections = {} # Currently connected clients
         self._lock = amfast.mutex_cls()
+        self.reset()
+
+    def reset(self):
+        self._connections = {}
+        self._channels = {}
+
+    def getConnectionCount(self, channel_name):
+        try:
+            return self._channels[channel_name]
+        except KeyError:
+            return 0
 
     def loadConnection(self, connection_id):
         connection = self._connections.get(connection_id, None)
@@ -96,18 +109,24 @@ class MemoryConnectionManager(ConnectionManager):
 
         return connection
 
-    def createConnection(self, channel, connection_id=None):
-        connection = ConnectionManager.createConnection(self, channel, connection_id)
+    def initConnection(self, connection, channel):
         connection._session = {}
-        self._connections[connection.id] = connection
-        return connection
-
-    def initConnection(self, connection):
         connection._connected = True
         connection._last_active = time.time() * 1000
         connection._last_polled = 0.0
         connection._authenticated = False
         connection._flex_user = None
+
+        self._connections[connection.id] = connection
+
+        self._lock.acquire()
+        try:
+            try:
+                self._channels[channel.name] += 1
+            except KeyError:
+                self._channels[channel.name] = 1
+        finally:
+            self._lock.release()
 
     def iterConnectionIds(self):
         return self._connections.keys()
@@ -137,13 +156,20 @@ class MemoryConnectionManager(ConnectionManager):
 
     # --- proxies for connection methods --- #
 
+    def connectConnection(self, connection):
+        connection._connected = True
+
+    def disconnectConnection(self, connection):
+        connection._connected = False
+
     def deleteConnection(self, connection):
         self._lock.acquire()
         try:
             if connection.id in self._connections:
                 del self._connections[connection.id]
 
-            connection._connected = False
+            if connection.channel_name in self._channels:
+                self._channels[connection.channel_name] -= 1
         finally:
             self._lock.release()
 
@@ -161,8 +187,7 @@ class MemoryConnectionManager(ConnectionManager):
 
     def unAuthenticateConnection(self, connection):
         connection._authenticated = False
-        if hasattr(connection, '_flex_user'):
-            del connection._flex_user
+        connection._flex_user = None
 
     def setNotifyFunc(self, connection, func):
         connection._notify_func_id = connection._setNotifyFunc(func)
@@ -173,10 +198,16 @@ class MemoryConnectionManager(ConnectionManager):
             del connection._notify_func_id
 
     def getConnectionSessionAttr(self, connection, name):
-        return connection._session[name]
+        try:
+            return connection._session[name]
+        except KeyError:
+            raise SessionAttrError("Attribute '%s' not found." % name)
 
     def setConnectionSessionAttr(self, connection, name, val):
         connection._session[name] = val
 
     def delConnectionSessionAttr(self, connection, name):
-        del connection._session[name]
+        try:
+            del connection._session[name]
+        except KeyError:
+            pass

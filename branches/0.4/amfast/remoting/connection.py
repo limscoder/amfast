@@ -112,6 +112,14 @@ class Connection(object):
         """Update last_polled."""
         self._manager.touchPolled(self)
 
+    def connect(self):
+        """Set connected=True."""
+        self._manager.connectConnection(self)
+
+    def disconnect(self):
+        """Set connected=False."""
+        self._manager.disconnectConnection(self)
+
     def delete(self):
         """Delete connection."""
         self._manager.deleteConnection(self)
@@ -132,7 +140,7 @@ class Connection(object):
 
     def getSessionAttr(self, name):
         """Get a session attribute."""
-        self._manager.getConnectionSessionAttr(self, name)
+        return self._manager.getConnectionSessionAttr(self, name)
 
     def setSessionAttr(self, name, val):
         """Set a session attribute."""
