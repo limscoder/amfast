@@ -184,6 +184,9 @@
 					'sender': consumer.clientId,
 					'msg': publishInput.text
 				};
+				
+				// Let message live for 5 minutes after publishing
+				msg.timeToLive = 300000; 
 				producer.send(msg);
 				
 				publishInput.text = '';
