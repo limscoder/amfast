@@ -1,0 +1,36 @@
+from channel import HttpChannel, ChannelError
+
+class DjangoChannel(HttpChannel):
+    """A channel that works with Django."""
+
+    def __call__(self, http_request):
+        if http_request.method != 'POST':
+            http.HttpResponseNotAllowed(['POST'])
+
+        print http_request.raw_post_data
+
+        try:
+            request_packet = self.decode(http_request.raw_post_data)
+        except AmFastError, exc:
+            return http.HttpResponseBadRequest(mimetype='text/plain', content=self.getBadEncodingMsg())
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception, exc:
+            amfast.log_exc(exc)
+            return http.HttpResponseServerError(mimetype='text/plain', content=self.getBadServerMsg())
+
+        try:
+            response_packet = self.invoke(request_packet)
+            raw_response = self.encode(response_packet)
+
+            http_response = http.HttpResponse(mimetype=self.CONTENT_TYPE)
+            http_response['Content-Length'] = str(len(raw_response))
+            http_response.write(raw_response)
+            return http_response
+        except AmFastError, exc:
+            return http.HttpResponseServerError(mimetype='text/plain', content=self.getBadServerMsg())
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception, exc:
+            amfast.log_exc(exc)
+            return http.HttpResponseServerError(mimetype='text/plain', content=self.getBadServerMsg())

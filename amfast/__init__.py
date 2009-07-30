@@ -47,18 +47,39 @@ class NullHandler(logging.Handler):
 
 log_debug = False # True to log verbose debug strings.
 log_raw = False # True to log raw AMF byte strings.
+logged_attr = '_amfast_logged' # Add to exceptions to indicate that it has been logged.
 logger = logging.getLogger('AmFast')
 logger.addHandler(NullHandler())
 logger.setLevel(logging.DEBUG)
 
-def log_exc():
+month_names = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+def get_log_timestamp():
+    dt = datetime.now()
+    return '[%s/%s/%s:%s:%s:%s]' % (dt.day, month_names[dt.month - 1],
+        dt.year, dt.hour, dt.minute, dt.second)
+
+def log_exc(e):
     """Log an exception."""
+    if hasattr(e, logged_attr):
+        return
+    else:
+        setattr(e, logged_attr, True)
+
     error_type, error_value, trbk = sys.exc_info()
     tb_list = traceback.format_tb(trbk)
-    msg = "Exception: %s -\n-\nDescription: %s -\n-\nTraceback: " %\
-        (error_type.__name__, error_value)
-    msg += "-\n".join(tb_list)
-    logger.error(msg)
+    
+    msg = [get_log_timestamp() + " EXCEPTION"]
+    msg.append("# ---- EXCEPTION DESCRIPTION BEGIN ---- #")
+    
+    msg.append("# ---- Type ---- #\n%s\n# ---- Detail ---- #\n%s" % \
+        (error_type.__name__, error_value))
+    msg.append("# ---- Traceback ---- #")
+    msg.append("-\n".join(tb_list))
+    msg.append("# ---- EXCEPTION DESCRIPTION END ---- #")
+    return "\n".join(msg)
 
 # --- Setup threading implementation --- #
 

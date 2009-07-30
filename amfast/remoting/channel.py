@@ -54,7 +54,7 @@ class Channel(object):
             return self.endpoint.encodePacket(*args, **kwargs)
         except amfast.AmFastError, exc:
             # Not much we can do if packet is not encoded properly
-            amfast.log_exc()
+            amfast.log_exc(exc)
             raise exc
 
     def decode(self, *args, **kwargs):
@@ -63,7 +63,7 @@ class Channel(object):
             return self.endpoint.decodePacket(*args, **kwargs)
         except amfast.AmFastError, exc:
             # Not much we can do if packet is not decoded properly
-            amfast.log_exc()
+            amfast.log_exc(exc)
             raise exc
 
     def invoke(self, request):
@@ -140,6 +140,21 @@ class HttpChannel(Channel):
         Channel.__init__(self, name, max_connections, endpoint)
 
         self.wait_interval = wait_interval
+
+    def getBadMethodMsg(self):
+        return "405 Method Not Allowed\n\nAMF request must use 'POST' method."
+
+    def getBadEncodingMsg(self):
+        return self.getBadRequestMsg('AMF packet could not be decoded.')
+
+    def getBadRequestMsg(self, msg=''):
+        return "400 Bad Request\n\n%s" % msg
+
+    def getBadPageMsg(self, msg=''):
+        return "404 Not Found\n\n%s" % msg
+
+    def getBadServerMsg(self, msg=''):
+        return "500 Internal Server Error\n\nAmFast server error.%s" % msg
 
     def waitForMessage(self, packet, message, connection):
         """Waits for a new message.
@@ -272,11 +287,8 @@ class ChannelSet(object):
  
         try: 
             connection = self.connection_manager.getConnection(connection_id, False) 
-        except cm.NotConnectedError: 
-            # Connection was already disconnected 
-            # from channel, but has not been disconnected 
-            # from the connection_manager. 
-            self.disconnect(connection) 
+        except cm.NotConnectedError:
+            pass
  
         if connection.last_active + connection.timeout < current_time: 
             channel = self.getChannel(connection.channel_name) 

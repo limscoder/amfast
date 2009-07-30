@@ -195,7 +195,7 @@ class Message(object):
             else:
                 raise RemotingError("Cannot invoke message: '%s'." % self)
         except Exception, exc:
-            amfast.log_exc()
+            amfast.log_exc(exc)
             self.response_msg = self.fail(request, exc)
 
         return self.response_msg
@@ -305,7 +305,7 @@ class Packet(object):
                 self.response.messages.append(message.invoke(self))
         except Exception, exc:
             # Fail all messages
-            amfast.log_exc()
+            amfast.log_exc(exc)
             self.response = self.fail(exc)
 
         if amfast.log_debug:

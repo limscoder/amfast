@@ -45,21 +45,21 @@ class WsgiChannel(HttpChannel):
         try:
             request_packet = self.decode(raw_request)
         except AmFastError, exc:
-            return self.badRequest(start_response, "AMF packet could not be decoded.")
+            return self.badRequest(start_response, self.getBadEncodingMsg())
         except (KeyboardInterrupt, SystemExit):
             raise
-        except:
-            amfast.log_exc()
-            return self.badServer(start_response, "AMF server error.")
+        except Exception, exc:
+            amfast.log_exc(exc)
+            return self.badServer(start_response, self.getBadServerMsg())
 
         try:
             content = self.invoke(request_packet)
             response = self.encode(content)
         except (KeyboardInterrupt, SystemExit):
             raise
-        except:
-            amfast.log_exc()
-            return self.badServer(start_response, "AMF server error.")
+        except Exception, exc:
+            amfast.log_exc(exc)
+            return self.badServer(start_response, self.getBadServerMsg())
 
         return self.getResponse(start_response, response)
 
@@ -72,7 +72,7 @@ class WsgiChannel(HttpChannel):
         return [response]
 
     def badMethod(self, start_response):
-        response = "405 Method Not Allowed\n\nAMF request must use 'POST' method."
+        response = self.getBadMethodMsg()
 
         start_response('405 Method Not Allowed', [
             ('Content-Type', 'text/plain'),
@@ -81,9 +81,7 @@ class WsgiChannel(HttpChannel):
 
         return [response]
 
-    def badRequest(self, start_response, msg):
-        response = "400 Bad Request\n\n%s" % msg
-
+    def badRequest(self, start_response, response):
         start_response('400 Bad Request', [
             ('Content-Type', 'text/plain'),
             ('Content-Length', str(len(response)))
@@ -91,9 +89,7 @@ class WsgiChannel(HttpChannel):
 
         return [response]
 
-    def badPage(self, start_response, msg):
-        response = "404 Not Found\n\n%s" % msg
-
+    def badPage(self, start_response, response):
         start_response('404 Not Found', [
             ('Content-Type', 'text/plain'),
             ('Content-Length', str(len(response)))
@@ -101,9 +97,7 @@ class WsgiChannel(HttpChannel):
 
         return [response]
 
-    def badServer(self, start_response, msg):
-        response = "500 Internal Server Error\n\n%s" % msg
-
+    def badServer(self, start_response, response):
         start_response('500 Internal Server Error', [
             ('Content-Type', 'text/plain'),
             ('Content-Length', str(len(response)))
@@ -136,7 +130,7 @@ class StreamingWsgiChannel(WsgiChannel):
             raise
         except Exception, exc:
             amfast.log_exc()
-            return self.badServer(start_response, "AMF server error.")
+            return self.badServer(start_response, self.getBadServerMsg())
 
         if msg.operation == msg.OPEN_COMMAND:
             return self.startStream(environ, start_response, msg)
@@ -144,7 +138,7 @@ class StreamingWsgiChannel(WsgiChannel):
         if msg.operation == msg.CLOSE_COMMAND:
             return self.stopStream(msg)
 
-        return self.badRequest(start_response, 'Streaming operation unknown: %s' % msg.operation)
+        return self.badRequest(start_response, self.getBadRequestMsg('Streaming operation unknown: %s' % msg.operation))
 
     def startStream(self, environ, start_response, msg):
         """Start streaming response."""
@@ -155,7 +149,7 @@ class StreamingWsgiChannel(WsgiChannel):
             raise
         except Exception, exc:
             amfast.log_exc()
-            return self.badServer(start_response, "AMF server error.")
+            return self.badServer(start_response, self.getBadServerMsg())
 
         write = start_response('200 OK', [
             ('Content-Type', self.CONTENT_TYPE)
