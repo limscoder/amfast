@@ -4,8 +4,6 @@ import os
 from amfast.remoting.channel import ChannelSet
 from amfast.remoting.django_channel import DjangoChannel
 
-sys.path.append(os.path.join('..', '..'))
-
 import utils
 
 channel_set = ChannelSet()
