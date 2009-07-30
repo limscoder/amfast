@@ -17,7 +17,7 @@ urlpatterns = patterns('',
     # Uncomment the next line to enable the admin:
     # (r'^admin/', include(admin.site.urls)),
     (r'^$', 'django.views.generic.simple.redirect_to', {'url': '/static/hello_world.html'}),
-    (r'^amf/', 'django_amf_example.hello_world.django_channels.rpc_channel'),
+    (r'^amf', 'django_amf_example.hello_world.django_channels.rpc_channel'),
     (r'^static/(?P<path>.*)$', 'django.views.static.serve', {
         'document_root': os.path.join('flex', 'deploy'),
         'show_indexes': True}),

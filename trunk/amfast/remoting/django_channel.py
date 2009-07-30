@@ -1,3 +1,5 @@
+from django import http
+
 from channel import HttpChannel, ChannelError
 
 class DjangoChannel(HttpChannel):
@@ -5,9 +7,7 @@ class DjangoChannel(HttpChannel):
 
     def __call__(self, http_request):
         if http_request.method != 'POST':
-            http.HttpResponseNotAllowed(['POST'])
-
-        print http_request.raw_post_data
+            return http.HttpResponseNotAllowed(['POST'])
 
         try:
             request_packet = self.decode(http_request.raw_post_data)
