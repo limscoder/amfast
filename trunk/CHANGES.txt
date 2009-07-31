@@ -4,6 +4,8 @@ CHANGES
 0.4.0
 ======
  * Added GaeChannelSet and GaeChannel to work with Google App Engine.
+ * Added live Google App Engine demo app (http://amfastchat.appspot.com/flash/chat.html).
+ * Added DjangoChannel to work with Django framework.
  * Published messages are now dispatched to clients that subscribe
    after the message is published (assuming the message has not expired yet).
  * Added ConnectionManager and SubscriptionManager classes.
