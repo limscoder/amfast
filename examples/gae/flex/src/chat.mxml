@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <mx:Application xmlns:mx="http://www.adobe.com/2006/mxml">
 	<mx:Panel width="100%" height="100%"
-		title="AmFast -- Google App Engine -- Chat">
+		title="Flex -- AmFast -- Google App Engine -- Chat">
 		<mx:HBox width="100%">
 			<mx:Form
 				defaultButton="{publishBtn}"
@@ -11,6 +11,11 @@
 						id="messagingUrl"
 						text="http://localhost:8000/amf"
 						width="400"/>
+						
+					<!--<mx:Label
+						id="messagingUrl"
+						text="http://amfastchat.appspot.com/amf"
+						width="400"/>-->
 				</mx:FormItem>
 				
 				<mx:FormItem label="username:">
@@ -46,8 +51,9 @@
 			<mx:Form width="100%">
 				<mx:FormItem width="100%">
 					<mx:TextArea
-						width="100%"
-						text="This application was created with AmFast, a Flash remoting framework for Python." />
+						id="appDescription"
+						height="60"
+						width="100%" />
 				</mx:FormItem>
 				
 				<mx:FormItem>
@@ -110,6 +116,10 @@
 			 */
 			protected function init():void
 			{
+				appDescription.text  = "This application is a hosted on Google App Engine.\n";
+				appDescription.text += "The client is a Flex/Flash applicaion.\n";
+				appDescription.text += "The server was created with AmFast, a Flash remoting framework for Python.";
+				
 				// Create a channel set and add channel(s) to it
 				channelSet = new ChannelSet();
 				channelSet.addChannel(new AMFChannel("amf-channel", messagingUrl.text));
@@ -152,7 +162,7 @@
 				msgDate.setTime(event.message.timestamp);
 				
 				var item:* = event.message.body;
-				item.time = msgDate.toDateString();
+				item.time = msgDate.toString();
 				
 				if (item.sender == consumer.clientId) {
 					// Colorize messages published by this client.
