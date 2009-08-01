@@ -288,7 +288,7 @@ class ChannelSet(object):
         try: 
             connection = self.connection_manager.getConnection(connection_id, False) 
         except cm.NotConnectedError:
-            pass
+            return
  
         if connection.last_active + connection.timeout < current_time: 
             channel = self.getChannel(connection.channel_name) 

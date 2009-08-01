@@ -50,6 +50,7 @@ class ConnectionManager(object):
         # Check for timeout
         current_time = time.time() * 1000
         if connection.last_active < (current_time - connection.timeout):
+            connection.delete()
             raise NotConnectedError("Connection '%s' is not connected." % connection_id)
 
         if touch is True:
