@@ -41,7 +41,7 @@ if __name__ == '__main__':
         }
     }
 
-    channel_set = app()
+    channel_set = App()
     rpc_channel = CherryPyChannel('amf')
     channel_set.mapChannel(rpc_channel)
     utils.setup_channel_set(channel_set)
