@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Application xmlns:mx="http://www.adobe.com/2006/mxml">
+	<mx:Panel width="100%" height="100%"
+		title="Flex -- AmFast -- SQLAlchemy Example">
+		<mx:Form>
+			<mx:FormItem label="remoting url:">
+				<mx:TextInput
+					id="remotingUrl"
+					text="http://localhost:8000/amf"
+					width="300"/>
+			</mx:FormItem>
+		</mx:Form>
+		
+		<mx:DataGrid
+			id="userGrid"
+			width="100%"
+			height="100%"
+			doubleClickEnabled="true"
+			doubleClick="editUser()"
+			dataProvider="{users}"
+			toolTip="Double click on a user to edit their details."
+			allowMultipleSelection="true">
+			<mx:columns>
+				<mx:DataGridColumn headerText="Key" dataField="sa_key" labelFunction="getKeyLabel"/>
+				<mx:DataGridColumn headerText="First Name" dataField="first_name" />
+				<mx:DataGridColumn headerText="Last Name" dataField="last_name" />
+			</mx:columns>
+		</mx:DataGrid>
+		
+		<mx:HBox width="100%" horizontalAlign="center">
+			<mx:Button
+				label="Add"
+				click="addUser()"
+				toolTip="Add a new user." />
+			<mx:Button
+				label="Reload"
+				click="loadUsers()"
+				toolTip="Reload users from server." />
+			<mx:Button
+				label="Insert Default"
+				click="insertDefaultData()"
+				toolTip="Insert default data." />
+			<mx:Button
+				label="Remove"
+				click="removeUser()"
+				toolTip="Remove selected users." />
+		</mx:HBox>
+	</mx:Panel>
+	
+	<mx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.collections.ItemResponder;
+			import mx.controls.Alert;
+			import mx.managers.PopUpManager;
+			import mx.messaging.ChannelSet;
+			import mx.messaging.channels.AMFChannel;
+			import mx.rpc.AsyncToken;
+			import mx.rpc.remoting.mxml.RemoteObject;
+			import mx.rpc.events.*;
+			
+			import components.*;
+			import models.*;
+
+			protected var service:RemoteObject;
+			protected var serviceUrl:String;
+			
+			[Bindable]
+			protected var users:ArrayCollection;
+			
+			/**
+			 * Gets the id label for a contact.
+			 */
+			protected function getKeyLabel(item:*, col:*):String
+			{
+				return String(item.sa_key.getItemAt(0));
+			}
+			
+			/**
+			 * Create a RemoteObject with url from user input.
+			 */
+			public function getService():RemoteObject
+			{
+				if (remotingUrl.text == serviceUrl && service != null) {
+					// Use existing service
+					return service;
+				}
+				
+				// Create the AMF Channel
+				serviceUrl = remotingUrl.text;
+				var channel:AMFChannel = new AMFChannel("amf-channel", serviceUrl);
+
+				// Create a channel set and add your channel(s) to it
+				var channels:ChannelSet = new ChannelSet();
+				channels.addChannel(channel);
+
+				// Create a new remote object and set channels
+				var remoteObject:RemoteObject = new RemoteObject("ExampleService");
+				remoteObject.showBusyCursor = true;
+				remoteObject.channelSet = channels;
+				service = remoteObject;
+				return remoteObject;
+			}
+			
+			/**
+			 * Insert default data
+			 */
+			protected function insertDefaultData():void
+			{
+				var remoteObj:RemoteObject = getService();
+				var token:AsyncToken = remoteObj.insertDefaultData();
+				
+				token.addResponder(new ItemResponder(insertDefaultData_resultHandler,
+					faultHandler, token));
+			}
+			
+			protected function insertDefaultData_resultHandler(event:Event,
+				token:AsyncToken):void
+			{
+				loadUsers();
+			}
+			
+			/**
+			 * Handle a RemoteObject fault.
+			 */
+			protected function faultHandler(event:FaultEvent,
+				token:AsyncToken):void
+			{
+				Alert.show(String(event.fault.faultString), "Error:");
+			}
+			
+			/**
+			 * Load list of persistent users from server.
+			 */
+			public function loadUsers():void
+			{
+				var remoteObj:RemoteObject = getService();
+				var token:AsyncToken = remoteObj.loadAll(SaObject.getRemoteAlias(
+					models.User));
+				
+				token.addResponder(new ItemResponder(loadAll_resultHandler,
+					faultHandler, token));
+			}
+			
+			protected function loadAll_resultHandler(event:ResultEvent,
+				token:AsyncToken):void
+			{
+				users = ArrayCollection(event.result);
+			}
+
+			protected function editUser():void
+			{
+				if (userGrid.selectedItem == null) {
+					return;
+				}
+				
+				var dlg:EditUserDlg = new EditUserDlg();
+				dlg.user = User(userGrid.selectedItem);
+				PopUpManager.addPopUp(dlg, DisplayObject(this));
+			}
+			
+			protected function addUser():void
+			{
+				var user:User = new User();
+				var dlg:EditUserDlg = new EditUserDlg();
+				dlg.user = user;
+				PopUpManager.addPopUp(dlg, DisplayObject(this));
+			}
+			
+			protected function removeUser():void
+			{
+				if (userGrid.selectedItems == null || userGrid.selectedItems.length < 1) {
+					return;
+				}
+				
+				var removeKeys:Array = [];
+				for each (var item:Object in userGrid.selectedItems) {
+					removeKeys.push(item.sa_key);
+				}
+				
+				var remoteObj:RemoteObject = getService();
+				var token:AsyncToken = remoteObj.removeList(
+					SaObject.getRemoteAlias(models.User), removeKeys);
+					
+				token.addResponder(new ItemResponder(remove_resultHandler,
+					faultHandler, token));
+			}
+			
+			protected function remove_resultHandler(event:ResultEvent,
+				token:AsyncToken):void
+			{
+				loadUsers();
+			}
+		]]>
+	</mx:Script>
+</mx:Application>
