@@ -173,7 +173,7 @@ def remote_function(packet, message, connection_id):
 
 ==== Persistent Connection and Subscription Data ====
  * By default !ChannelSets use the !MemoryConnectionManager and !MemorySubscriptionManager classes to store connection and message information in memory.
- * Use !GaeConnectionManager and !GaeSubscriptionManager to store data in Google DataStore.
+ * Use !GaeConnectionManager and !GaeSubscriptionManager to store data in Google !DataStore.
  * Use !SaConnectionManager and !SaSubscriptionManager to store data in a SQL database.
  * Use !MemcacheConnectionManager and !MemcacheSubscriptionManager to store data in a Memcache instance.
 
@@ -216,7 +216,7 @@ channel_set.publishObject("Hello World", "topic-name",
 ----
 
 == Authentication ==
- * Authentication can be used with both !NetConnection and !RemoteObject
+ * Authentication can be used with both !NetConnection and !RemoteObject.
  * Targets and !MessageAgents can be secured.
 
 {{{
