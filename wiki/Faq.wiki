@@ -24,3 +24,7 @@
  1. Select 'Tools->Visual Studio 2008 Command Prompt'.
  1. In the directory you've unpacked !AmFast type:
   1. {{{python setup.py install}}}
+
+=== Trouble Shooting ===
+ * If you experience problems compiling AmFast on Windows, you may want to take a look at some of these links.
+ * [http://www.zope.org/Members/als/tips/win32_mingw_modules]
