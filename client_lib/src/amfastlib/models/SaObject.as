@@ -1,7 +1,7 @@
-package models
+package amfastlib.models
 {
-	import events.SaAttrEvent;
-	import events.SaEvent;
+	import amfastlib.events.SaAttrEvent;
+	import amfastlib.events.SaEvent;
 	
 	import flash.events.*;
 	import flash.utils.*;
@@ -20,11 +20,14 @@ package models
 	 */
 	public class SaObject extends EventDispatcher
 	{
-		protected const LOAD_ERROR_MSG:String = 'Cannot load attribute of un-persisted object.';
-		protected const SAVE_ERROR_MSG:String = 'Cannot save attribute of un-persisted object.';
+		protected const SAVE_ERROR_MSG:String = 'Cannot save un-persisted object.';
 		protected const REMOVE_ERROR_MSG:String = 'Cannot remove un-persisted object.';
+		protected const LOAD_ATTR_ERROR_MSG:String = 'Cannot load attribute of un-persisted object.';
+		protected const SAVE_ATTR_ERROR_MSG:String = 'Cannot save attribute of un-persisted object.';
 		
-		// The static attributes of this object.
+		/**
+		 * The names of static attributes of the mapped class.
+		 */
 		protected static var staticAttrs:Array;
 		
 		/**
@@ -44,6 +47,8 @@ package models
 				return staticAttrs;
 			}
 			
+			// Hacky way to introspect for
+			// public read/write attributes.
 			staticAttrs = [];
 			var typeInfo:XML = describeType(obj);
 			for each (var accessor:XML in typeInfo..accessor) {
@@ -60,19 +65,20 @@ package models
 		}
 		
 		/**
-		 * Attributes mapped with SA.
-		 */
-		public function get mappedAttrs():Array
-		{
-			return getMappedAttrs(this);
-		}
-		
-		/**
 		 * Get the remote alias for a class.
 		 */
 		public static function getRemoteAlias(obj:*):String
 		{
 			return ObjectUtil.getClassInfo(obj).alias;
+		}
+		
+		/**
+		 * Attributes mapped with SA.
+		 */
+		[Transient]
+		public function get mappedAttrs():Array
+		{
+			return getMappedAttrs(this);
 		}
 		
 		/**
@@ -93,21 +99,21 @@ package models
 			return Application.application.getService();
 		}
 		
-		protected var _sa_key:ArrayCollection = new ArrayCollection();
+		protected var _sa_key:Array;
 		
 		/**
 		 * Primary key of the persistent object.
 		 */
 		[Transient]
-		public function get sa_key():ArrayCollection
+		public function get sa_key():Array
 		{
 			return _sa_key;
 		}
 		
-		public function set sa_key(val:ArrayCollection):void
+		public function set sa_key(value:Array):void
 		{
-			if (val != _sa_key) {
-				_sa_key = val;
+			if (value != _sa_key) {
+				_sa_key = value;
 				dispatchEvent(new SaEvent(SaEvent.PERSISTENCE_CHANGED));
 			}
 		}
@@ -115,13 +121,13 @@ package models
 		/**
 		 * Attributes that are lazy-loaded.
 		 */
-		public var sa_lazy:ArrayCollection = new ArrayCollection();
+		public var sa_lazy:Array;
 		
 		/**
 		 * Attributes that are in the process
 		 * of being loaded from the server.
 		 */
-		protected var sa_loading:ArrayCollection = new ArrayCollection();
+		protected var sa_loading:Array;
 
 		/**
 		 * Returns true if object is persistent.
@@ -129,11 +135,8 @@ package models
 		[Bindable("saEvent_PERSISTENCE_CHANGED")]
 		public function get isPersistent():Boolean
 		{
-			if (sa_key == null || sa_key.length < 1) {
-				return false;
-			}
-			
-			if (sa_key.getItemIndex(null) > -1) {
+			if (_sa_key == null || _sa_key.length < 1 ||
+				_sa_key.indexOf(null) > -1) {
 				return false;
 			}
 			
@@ -146,15 +149,12 @@ package models
 		 */
 		public function isAttrLazy(attr:String):Boolean
 		{
-			if (!isPersistent) {
+			if (!isPersistent || sa_lazy == null ||
+				sa_lazy.indexOf(attr) < 0) {
 				return false;
 			}
 			
-			if (sa_lazy.getItemIndex(attr) > -1) {
-				return true;
-			}
-			
-			return false
+			return true;
 		}
 		
 		/**
@@ -163,12 +163,15 @@ package models
 		 */
 		public function setAttr(attr:String, value:*):void
 		{
-			var i:int = sa_lazy.getItemIndex(attr);
-			if (i > -1) {
-				sa_lazy.removeItemAt(i);
+			this[attr] = value;
+			
+			if (sa_lazy != null) {
+				var i:int = sa_lazy.indexOf(attr);
+				if (i > -1) {
+					sa_lazy.splice(i);
+				}
 			}
 			
-			this[attr] = value;
 			dispatchEvent(new SaAttrEvent(attr, SaAttrEvent.SET));
 		}
 		
@@ -180,13 +183,16 @@ package models
 		{
 			this[attr] = null;
 			
-			var i:int = sa_lazy.getItemIndex(attr);
-			if (i > -1) {
-				return;
-			} else {
-				sa_lazy.addItem(attr);
-				dispatchEvent(new SaAttrEvent(attr, SaAttrEvent.UNSET));
+			if (sa_lazy == null) {
+				sa_lazy = [];
 			}
+			
+			var i:int = sa_lazy.indexOf(attr);
+			if (i < 0) {
+				sa_lazy.push(attr);
+			}
+			
+			dispatchEvent(new SaAttrEvent(attr, SaAttrEvent.UNSET));
 		}
 		
 		/**
@@ -195,11 +201,11 @@ package models
 		 */
 		public function isAttrLoading(attr:String):Boolean
 		{
-			if (sa_loading.getItemIndex(attr) > -1) {
-				return true;
+			if (sa_loading == null || sa_loading.indexOf(attr) < 0) {
+				return false;
 			}
 			
-			return false
+			return true;
 		}
 		
 		/**
@@ -208,13 +214,16 @@ package models
 		 */
 		public function setAttrLoading(attr:String):void
 		{
-			var i:int = sa_loading.getItemIndex(attr);
-			if (i > -1) {
-				return;
-			} else {
-				sa_loading.addItem(attr);
-				dispatchEvent(new SaAttrEvent(attr, SaAttrEvent.LOAD));
+			if (sa_loading == null) {
+				sa_loading = [];
 			}
+			
+			var i:int = sa_loading.indexOf(attr);
+			if (i < 0) {
+				sa_loading.push(attr);
+			}
+			
+			dispatchEvent(new SaAttrEvent(attr, SaAttrEvent.LOAD));
 		}
 		
 		/**
@@ -222,9 +231,13 @@ package models
 		 */
 		public function unSetAttrLoading(attr:String):void
 		{
-			var i:int = sa_loading.getItemIndex(attr);
+			if (sa_loading == null) {
+				return;
+			}
+			
+			var i:int = sa_loading.indexOf(attr);
 			if (i > -1) {
-				sa_loading.removeItemAt(i);
+				sa_loading.splice(i);
 			}
 		}
 
@@ -234,10 +247,10 @@ package models
 		public function loadAttr(attr:String):void
 		{
 			if (!isPersistent) {
-				throw new Error(LOAD_ERROR_MSG);
+				throw new Error(LOAD_ATTR_ERROR_MSG);
 			}
 			
-			/**
+			/*
 			 * Make sure not to call the same
 			 * RPC multiple times.
 			 */
@@ -246,8 +259,7 @@ package models
 			}
 			
 			setAttrLoading(attr);
-			var token:AsyncToken = service.loadAttr(remoteAlias, sa_key, attr);
-			
+			var token:AsyncToken = service.loadAttr(remoteAlias, _sa_key, attr);
 			token.addResponder(new ItemResponder(loadAttr_resultHandler,
 				faultHandler, token));
 		}
@@ -270,7 +282,7 @@ package models
 		protected function faultHandler(event:FaultEvent,
 			token:AsyncToken):void
 		{
-			Alert.show(String(event.fault.faultString), "SA Error:");
+			throw new Error(String(event.fault.faultString));
 		}
 
 		/**
@@ -279,12 +291,11 @@ package models
 		public function saveAttr(attr:String):void
 		{
 			if (!isPersistent) {
-				throw new Error(SAVE_ERROR_MSG);
+				throw new Error(SAVE_ATTR_ERROR_MSG);
 			}
 			
 			dispatchEvent(new SaAttrEvent(attr, SaAttrEvent.SAVE));
 			var token:AsyncToken = service.saveAttr(remoteAlias, sa_key, attr, this[attr]);
-			
 			token.addResponder(new ItemResponder(saveAttr_resultHandler,
 				faultHandler, token));
 		}
@@ -304,7 +315,6 @@ package models
 		{
 			dispatchEvent(new SaEvent(SaEvent.SAVE));
 			var token:AsyncToken = service.save(this);
-			
 			token.addResponder(new ItemResponder(save_resultHandler,
 				faultHandler, token));
 		}
@@ -312,6 +322,11 @@ package models
 		protected function save_resultHandler(event:ResultEvent,
 			token:AsyncToken):void
 		{
+			/*
+			 * We have to replace all attributes,
+			 * because newly-saved attributes will
+			 * now have sa_keys.
+			 */
 			var saved:SaObject = SaObject(event.result);
 			for each(var attr:String in mappedAttrs) {
 				if (saved.hasOwnProperty(attr)) {
@@ -332,7 +347,6 @@ package models
 			}
 			
 			var token:AsyncToken = service.remove(remoteAlias, sa_key);
-			
 			token.addResponder(new ItemResponder(remove_resultHandler,
 				faultHandler, token));
 		}

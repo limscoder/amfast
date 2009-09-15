@@ -1,6 +1,7 @@
 """ClassDef for dealing with classes mapped with SQLAlchemy."""
 
 from amfast import class_def
+from amfast.class_def.as_types import AsNoProxy
 
 # Import from different places depending on which 
 # version of SA is being used.
@@ -27,6 +28,10 @@ class SaClassDef(class_def.ClassDef):
     """
     KEY_ATTR = 'sa_key' # sa instance key
     LAZY_ATTR = 'sa_lazy' # list of lazy attribute names
+
+    # Set to True to always encode
+    # KEY_ATTR and LAZY_ATTR as Array objects.
+    no_proxy_sa_attrs = True
 
     def __init__(self, class_, alias=None, static_attrs=None, amf3=None,
         encode_types=None, decode_types=None):
@@ -64,7 +69,11 @@ class SaClassDef(class_def.ClassDef):
     def getStaticAttrVals(self, obj):
         # Set key and lazy
         lazy_attrs = []
-        vals = [self.mapper.primary_key_from_instance(obj), lazy_attrs]
+        
+        if self.__class__.no_proxy_sa_attrs is True:
+            vals = [AsNoProxy(self.mapper.primary_key_from_instance(obj)), AsNoProxy(lazy_attrs)]
+        else:
+            vals = [self.mapper.primary_key_from_instance(obj), lazy_attrs]
 
         # Set mapped values
         attr_count = len(self.mapped_attrs)
@@ -72,8 +81,7 @@ class SaClassDef(class_def.ClassDef):
             attr = self.mapped_attrs[i]
  
             # Look at __dict__ directly,
-            # otherwise SA will touch the attr
-            # TODO: what about attrs defined in __slots__ or as properties??
+            # otherwise SA will touch the attr.
             if attr in obj.__dict__:
                 vals.append(getattr(obj, attr))
             else:
@@ -92,12 +100,11 @@ class SaClassDef(class_def.ClassDef):
     def applyAttrVals(self, obj, vals):
         # Delete lazy-loaded attrs from vals
         if self.LAZY_ATTR in vals:
-            for lazy_attr in vals[self.LAZY_ATTR]:
-                if lazy_attr in vals:
-                    del vals[lazy_attr]
+            lazy_attrs = vals[self.LAZY_ATTR]
+            if lazy_attrs is not None:
+                for lazy_attr in lazy_attrs:
+                    if lazy_attr in vals:
+                        del vals[lazy_attr]
             del vals[self.LAZY_ATTR]
-            
-        if self.KEY_ATTR in vals:
-            del vals[self.KEY_ATTR]
 
         class_def.ClassDef.applyAttrVals(self, obj, vals)

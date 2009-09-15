@@ -1,6 +1,12 @@
 CHANGES
 ========
 
+0.4.1
+======
+ * Added no_proxy_as_attrs to SaClassDef to use Arrays instead of
+   ArrayCollections on client side.
+ * Added amfastlib Flash client lib.
+
 0.4.0
 ======
  * Added GaeChannelSet and GaeChannel to work with Google App Engine.

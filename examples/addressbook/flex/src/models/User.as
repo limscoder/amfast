@@ -2,6 +2,8 @@ package models
 {
 	import mx.collections.ArrayCollection;
 	
+	import amfastlib.models.SaObject;
+	
 	[RemoteClass(alias="models.User")]
 	[Bindable]
 	public class User extends SaObject

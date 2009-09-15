@@ -104,7 +104,7 @@
 			import mx.rpc.AbstractOperation;
 			import mx.rpc.events.*;
 			
-			import events.SaEvent;
+			import amfastlib.events.SaEvent;
 			
 			import models.User;
 			import models.Email;
