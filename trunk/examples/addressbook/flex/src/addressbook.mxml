@@ -59,6 +59,8 @@
 			import mx.rpc.remoting.mxml.RemoteObject;
 			import mx.rpc.events.*;
 			
+			import amfastlib.models.SaObject;
+			
 			import components.*;
 			import models.*;
 
@@ -73,7 +75,13 @@
 			 */
 			protected function getKeyLabel(item:*, col:*):String
 			{
-				return String(item.sa_key.getItemAt(0));
+				var keyLabel:String;
+				if (!item.isPersistent) {
+					keyLabel = 'Not Persisted';
+				} else {
+					keyLabel = String(item.sa_key[0]);
+				}
+				return keyLabel;
 			}
 			
 			/**

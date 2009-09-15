@@ -1,5 +1,7 @@
 package models
 {
+	import amfastlib.models.SaObject;
+	
 	[RemoteClass(alias="models.Email")]
 	[Bindable]
 	public class Email extends SaObject

@@ -1,4 +1,4 @@
-package events
+package amfastlib.events
 {
 	import mx.events.FlexEvent;
 	

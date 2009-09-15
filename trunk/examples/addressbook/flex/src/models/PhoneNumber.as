@@ -1,5 +1,7 @@
 package models
 {
+	import amfastlib.models.SaObject;
+	
 	[RemoteClass(alias="models.PhoneNumber")]	
 	[Bindable]
 	public class PhoneNumber extends SaObject
