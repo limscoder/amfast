@@ -15,7 +15,7 @@ def amfhook():
     cherrypy.request.show_tracebacks = False
 
     if cherrypy.request.method != 'POST':
-        raise cherrypy.HTTPError(405, self.getBadMethodMsg());
+        raise cherrypy.HTTPError(405, "405 Method Not Allowed\n\nAMF request must use 'POST' method.");
 cherrypy.tools.amfhook = cherrypy.Tool('before_request_body', amfhook, priority=0)
 
 class CherryPyChannelSet(ChannelSet):
