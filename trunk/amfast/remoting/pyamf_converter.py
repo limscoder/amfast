@@ -4,9 +4,20 @@ import pyamf
 import pyamf.remoting as pyamf_remoting
 import pyamf.flex.messaging as pyamf_messaging
 
+import amfast
 import amfast.class_def as class_def
 import amfast.remoting as amfast_remoting
 import amfast.remoting.flex_messages as amfast_messaging
+
+class PyAmfConversionError(amfast.AmFastError):
+    """Raised when conversion to/from PyAmf datatype fails."""
+    pass
+
+class PyAmfVersionError(PyAmfConversionError):
+    """Raised when installed version of PyAmf is not compatible."""
+
+if pyamf.__version__[1] < 4:
+    raise PyAmfVersionError('PyAmf version is not compatible.')
 
 #---------- FROM PyAmf TO AmFast -----------#
 def packet_to_amfast(pyamf_packet):
@@ -99,9 +110,12 @@ def register_class_def(class_def):
      * class_def - amfast.class_def.ClassDef
     """
     if class_def.alias in pyamf.CLASS_CACHE:
-        raise ValueError("Alias '%s' is already registered." % class_def.alias)
+        raise PyAmfConversionError("Alias '%s' is already registered." % class_def.alias)
 
-    pyamf.CLASS_CACHE[class_def.alias] = class_def_alias(class_def)
+    class_alias = class_def_alias(class_def)
+    if pyamf.__version__[1] > 4:
+        pyamf.CLASS_CACHE[class_alias.klass] = class_alias
+    pyamf.CLASS_CACHE[class_alias.alias] = class_alias
 
 def register_class_mapper(class_mapper):
     """Maps all ClassDefs in a ClassDefMapper to PyAmf.
@@ -189,10 +203,10 @@ class ClassDefAlias(pyamf.ClassAlias):
     """
 
     def checkClass(kls, klass):
-        # Override's parent method, because
+        # Override parent method, because
         # AmFast does not require that mapped
-        # classes' __init__ methods can't
-        # have required arguments.
+        # classes' __init__ methods
+        # have no required arguments.
         pass
 
     def getAttrs(self, obj, *args, **kwargs):
@@ -393,26 +407,75 @@ class SmallCommandMsg(amfast_messaging.CommandMessage):
         raise pyamf.EncodeError("__writeamf__ is not implemented for this class: %s." % self)
 
 #----- Map Flex message classes with PyAmf -----#
-pyamf.unregister_class('flex.messaging.messages.AbstractMessage')
+
+# Clear existing message class mappings,
+# then re-map with AmFast ClassDefs.
+
+#---- AbstractMessage ---#
+try:
+    pyamf.unregister_class('flex.messaging.messages.AbstractMessage')
+except pyamf.UnknownClassAlias:
+    pass
 register_class_def(class_def.ClassDef(amfast_messaging.AbstractMessage))
 
-pyamf.unregister_class('flex.messaging.messages.AsyncMessage')
+#---- AsyncMessage ----#
+try:
+    pyamf.unregister_class('flex.messaging.messages.AsyncMessage')
+except pyamf.UnknownClassAlias:
+    pass
+
+try:
+    pyamf.unregister_class('DSA')
+except pyamf.UnknownClassAlias:
+    pass
+
 register_class_def(class_def.ClassDef(amfast_messaging.AsyncMessage))
 register_class_def(PyamfAsyncSmallMsgDef(SmallAsyncMsg, 'DSA',
     ('body', 'clientId', 'destination', 'headers', 'messageId',
         'timeToLive', 'timestamp', 'correlationId')))
 
-pyamf.unregister_class('flex.messaging.messages.AcknowledgeMessage')
+#---- AcknowledgeMessage --#
+try:
+    pyamf.unregister_class('flex.messaging.messages.AcknowledgeMessage')
+except pyamf.UnknownClassAlias:
+    pass
+
+try:
+    pyamf.unregister_class('DSK')
+except pyamf.UnknownClassAlias:
+    pass
+
 register_class_def(class_def.ClassDef(amfast_messaging.AcknowledgeMessage))
 
-pyamf.unregister_class('flex.messaging.messages.CommandMessage')
+#---- CommandMessage ----#
+try:
+    pyamf.unregister_class('flex.messaging.messages.CommandMessage')
+except pyamf.UnknownClassAlias:
+    pass
+
+try:
+    pyamf.unregister_class('DSC')
+except pyamf.UnknownClassAlias:
+    pass
+
 register_class_def(class_def.ClassDef(amfast_messaging.CommandMessage))
 register_class_def(PyamfCommandSmallMsgDef(SmallCommandMsg, 'DSC',
     ('body', 'clientId', 'destination', 'headers', 'messageId',
         'timeToLive', 'timestamp', 'correlationId', 'operation')))
 
-pyamf.unregister_class('flex.messaging.messages.ErrorMessage')
+#---- ErrorMessage ----#
+try:
+    pyamf.unregister_class('flex.messaging.messages.ErrorMessage')
+except pyamf.UnknownClassAlias:
+    pass
+
 register_class_def(class_def.ClassDef(amfast_messaging.ErrorMessage))
 
-pyamf.unregister_class('flex.messaging.messages.RemotingMessage')
+
+#---- RemotingMessage ----#
+try:
+    pyamf.unregister_class('flex.messaging.messages.RemotingMessage')
+except pyamf.UnknownClassAlias:
+    pass
+
 register_class_def(class_def.ClassDef(amfast_messaging.RemotingMessage))
