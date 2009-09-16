@@ -101,7 +101,7 @@ class StreamingCherryPyChannel(CherryPyChannel):
         except (KeyboardInterrupt, SystemExit):
             raise
         except:
-            amfast.log_exc()
+            amfast.log_exc(exc)
             raise ChannelError("AMF server error.")
 
         if msg.operation == msg.OPEN_COMMAND:
@@ -120,7 +120,7 @@ class StreamingCherryPyChannel(CherryPyChannel):
         except (KeyboardInterrupt, SystemExit):
             raise
         except Exception, exc:
-            amfast.log_exc()
+            amfast.log_exc(exc)
             raise ChannelError('Http streaming operation unknown: %s' % msg.operation)
 
         cherrypy.response.headers['Content-Type'] = self.CONTENT_TYPE
@@ -175,7 +175,7 @@ class StreamingCherryPyChannel(CherryPyChannel):
                             except (KeyboardInterrupt, SystemExit):
                                 raise
                             except Exception, exc:
-                                amfast.log_exc()
+                                amfast.log_exc(exc)
                                 self.channel_set.disconnect(connection)
                                 break
 
@@ -206,7 +206,7 @@ class StreamingCherryPyChannel(CherryPyChannel):
         except (KeyboardInterrupt, SystemExit):
             raise
         except Exception, exc:
-            amfast.log_exc()
+            amfast.log_exc(exc)
             self.channel_set.disconnect(connection)
             return
 

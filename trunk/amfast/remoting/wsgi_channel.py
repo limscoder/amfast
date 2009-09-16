@@ -129,7 +129,7 @@ class StreamingWsgiChannel(WsgiChannel):
         except (KeyboardInterrupt, SystemExit):
             raise
         except Exception, exc:
-            amfast.log_exc()
+            amfast.log_exc(exc)
             return self.badServer(start_response, self.getBadServerMsg())
 
         if msg.operation == msg.OPEN_COMMAND:
@@ -148,7 +148,7 @@ class StreamingWsgiChannel(WsgiChannel):
         except (KeyboardInterrupt, SystemExit):
             raise
         except Exception, exc:
-            amfast.log_exc()
+            amfast.log_exc(exc)
             return self.badServer(start_response, self.getBadServerMsg())
 
         write = start_response('200 OK', [
@@ -166,7 +166,7 @@ class StreamingWsgiChannel(WsgiChannel):
             except (KeyboardInterrupt, SystemExit):
                 raise
             except Exception, exc:
-                amfast.log_exc()
+                amfast.log_exc(exc)
                 return []
 
             # Start heart beat
@@ -210,7 +210,7 @@ class StreamingWsgiChannel(WsgiChannel):
                             except (KeyboardInterrupt, SystemExit):
                                 raise
                             except Exception, exc:
-                                amfast.log_exc()
+                                amfast.log_exc(exc)
                                 self.channel_set.disconnect(connection)
                                 break
 
@@ -241,7 +241,7 @@ class StreamingWsgiChannel(WsgiChannel):
         except (KeyboardInterrupt, SystemExit):
             raise
         except Exception, exc:
-            amfast.log_exc()
+            amfast.log_exc(exc)
             self.channel_set.disconnect(connection)
             return []
 
