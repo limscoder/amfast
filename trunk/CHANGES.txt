@@ -6,6 +6,7 @@ CHANGES
  * Added no_proxy_as_attrs to SaClassDef to use Arrays instead of
    ArrayCollections on client side.
  * Added amfastlib Flash client lib.
+ * Added support for PyAmf 0.5.
 
 0.4.0
 ======
