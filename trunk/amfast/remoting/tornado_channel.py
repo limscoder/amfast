@@ -99,15 +99,18 @@ class TornadoChannel(HttpChannel):
             @tornado.web.asynchronous
             def post(inner_self):
                 """Process an incoming request."""
-                inner_self.set_header('Content-Type', self.CONTENT_TYPE)
-
-                call_chain = CallbackChain()
-                call_chain.addCallback(self.decode)
-                call_chain.addCallback(self.invoke)
-                call_chain.addCallback(self.checkComplete, (inner_self,))
-                call_chain.execute(inner_self)
+		self.processRequest(inner_self)
 
         self.request_handler = requestHandler
+
+    def processRequest(self, request_handler):
+        request_handler.set_header('Content-Type', self.CONTENT_TYPE)
+
+        call_chain = CallbackChain()
+        call_chain.addCallback(self.decode)
+        call_chain.addCallback(self.invoke)
+        call_chain.addCallback(self.checkComplete, (inner_self,))
+        call_chain.execute(inner_self)
 
     def decode(self, request_handler):
         """Overridden to add Tornado's request object onto the packet."""
@@ -173,4 +176,83 @@ class TornadoChannel(HttpChannel):
         # Setup timeout
         if self.wait_interval > -1:
             timeout_call = IOLoop.instance().add_timeout(
-                time.gmtime() + self.wait_interval, _notify)
+                time.time() + self.wait_interval, _notify)
+
+class StreamingTornadoChannel(TornadoChannel):
+	"""Handles streaming http connections."""
+
+    def __init__(self, name, max_connections=-1, endpoint=None,
+        timeout=1200, wait_interval=0, heart_interval=5):
+        TornadoChannel.__init__(self, name, max_connections, endpoint,
+            timeout, wait_interval)
+
+        self.heart_interval = heart_interval
+	
+    def processRequest(self, request_handler):
+        if request_handler.request.headers['Content-Type'] == self.CONTENT_TYPE:
+	    # Regular AMF message
+	    return TornadoChannel.processRequest(self, request_handler)
+
+        msg = messaging.StreamingMessage()
+	msg.parseArgs(request_handler.request.arguments)
+
+	if msg.operation == msg.OPEN_COMMAND:
+	    def _open():
+	        self.startStream(msg, request_handler)
+	    IOLoop.instance().add_callback(self.async_callback(_open))
+	elif msg.operation == msg.CLOSE_COMMAND:
+            def _close():
+		self.stopStream(msg, request_handler)
+	    IOLoop.instance().add_callback(self.async_callback(_open))
+
+    def startStream(self, msg, request_handler):
+        """Get this stream rolling!"""
+        connection = self.channel_set.connection_manager.getConnection(msg.headers.get(msg.FLEX_CLIENT_ID_HEADER))
+
+        # Handle new message.
+	def _notify():
+            if connection.connected is False:
+	        connection.unSetNotifyFunc()
+		if request_handler.request.connection.stream.closed() is False:
+		    msg = messaging.StreamingMessage.getDisconnectMsg()
+		    self.sendMsgs((msg,), request_handler)
+		    request_handler.finish()
+		return
+		    
+	    msgs = self.channel_set.subscription_manager.pollConnection(connection)
+	    self.sendMsgs(msgs, request_handler)
+	connection.setNotifyFunc(_notify)
+
+        # Handle dropped connection.
+	def _connectionLost():
+	    self.channel_set.disconnect(connection)
+	    connection.unSetNotifyFunc()   
+        request.connection.stream.set_close_callback(connectionLost)
+
+	# Send acknowledge message
+	response = msg.acknowledge()
+	response.body = connection.id
+	self.sendMsgs((response,), request_handler)
+
+	self.startBeat(connection, request_handler)
+
+    def sendMsgs(self, msgs, request_handler):
+        """Send messages to the client."""
+	for msg in msgs:
+	    request_handler.write(messaging.StreamingMessage.prepareMsg(msg, self.endpoint))
+	request_handler.flush()
+
+    def stopStream(self, msg, request_handler):
+        connection = self.channel_set.connection_manager.getConnection(msg.headers.get(msg.FLEX_CLIENT_ID_HEADER))
+	self.channel_set.disconnect(connection)
+
+    def startBeat(self, connection, request_handler):
+        beater = PeriodicCallback(None, self.heart_interval, IOLoop.instance())
+        def _beat():
+            if connection.connected is False:
+	        beater.stop()
+	    else:
+		request_handler.write(chr(messaging.StreamingMessage.NULL_BYTE))
+		request_handler.flush()
+	beater.callback = _beat
+	beater.start()
