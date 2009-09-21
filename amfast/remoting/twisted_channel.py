@@ -76,14 +76,12 @@ class TwistedChannel(Resource, HttpChannel):
     def render_POST(self, request):
         """Process an incoming AMF packet."""
         if request.content:
-            content_len = request.getHeader('Content-Length')
-            raw_request = request.content.read(int(content_len))
-
             d = defer.Deferred()
+            d.addCallbacks(request.content.read, self.fail, errbackArgs=(request,))
             d.addCallbacks(self.decode, self.fail, callbackArgs=(request,), errbackArgs=(request,))
             d.addCallbacks(self.invoke, self.fail, errbackArgs=(request,))
             d.addCallbacks(self.checkComplete, self.fail, callbackArgs=(request,), errbackArgs=(request,))
-            d.callback(raw_request)
+            d.callback(int(request.getHeader('Content-Length')))
 
             request.setHeader('Content-Type', self.CONTENT_TYPE)
             return server.NOT_DONE_YET
