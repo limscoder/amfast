@@ -7,6 +7,7 @@ import amfast
 from amfast.class_def.as_types import AsNoProxy
 from channel import ChannelSet, HttpChannel
 from endpoint import AmfEndpoint
+import flex_messages as messaging
 import connection_manager as cm
 
 class TornadoChannelSet(ChannelSet):
@@ -26,11 +27,14 @@ class TornadoChannelSet(ChannelSet):
 
     def notifyConnections(self, topic, sub_topic):
         for connection_id in self.subscription_manager.iterSubscribers(topic, sub_topic):
-            def _notify():
-                self.notifyConnection(connection_id)
-            IOLoop.instance().add_callback(_notify)
+            self.notifyConnection(connection_id)
 
     def notifyConnection(self, connection_id):
+        def _notify():
+            self._notifyConnection(connection_id)
+        IOLoop.instance().add_callback(_notify)
+
+    def _notifyConnection(self, connection_id):
         try:
             connection = self.connection_manager.getConnection(connection_id, False)
         except cm.NotConnectedError:
@@ -109,8 +113,8 @@ class TornadoChannel(HttpChannel):
         call_chain = CallbackChain()
         call_chain.addCallback(self.decode)
         call_chain.addCallback(self.invoke)
-        call_chain.addCallback(self.checkComplete, (inner_self,))
-        call_chain.execute(inner_self)
+        call_chain.addCallback(self.checkComplete, (request_handler,))
+        call_chain.execute(request_handler)
 
     def decode(self, request_handler):
         """Overridden to add Tornado's request object onto the packet."""
@@ -179,7 +183,7 @@ class TornadoChannel(HttpChannel):
                 time.time() + self.wait_interval, _notify)
 
 class StreamingTornadoChannel(TornadoChannel):
-	"""Handles streaming http connections."""
+    """Handles streaming http connections."""
 
     def __init__(self, name, max_connections=-1, endpoint=None,
         timeout=1200, wait_interval=0, heart_interval=5):
@@ -199,11 +203,9 @@ class StreamingTornadoChannel(TornadoChannel):
 	if msg.operation == msg.OPEN_COMMAND:
 	    def _open():
 	        self.startStream(msg, request_handler)
-	    IOLoop.instance().add_callback(self.async_callback(_open))
+	    IOLoop.instance().add_callback(request_handler.async_callback(_open))
 	elif msg.operation == msg.CLOSE_COMMAND:
-            def _close():
-		self.stopStream(msg, request_handler)
-	    IOLoop.instance().add_callback(self.async_callback(_open))
+            pass
 
     def startStream(self, msg, request_handler):
         """Get this stream rolling!"""
@@ -227,7 +229,7 @@ class StreamingTornadoChannel(TornadoChannel):
 	def _connectionLost():
 	    self.channel_set.disconnect(connection)
 	    connection.unSetNotifyFunc()   
-        request.connection.stream.set_close_callback(connectionLost)
+        request_handler.request.connection.stream.set_close_callback(_connectionLost)
 
 	# Send acknowledge message
 	response = msg.acknowledge()
@@ -241,10 +243,6 @@ class StreamingTornadoChannel(TornadoChannel):
 	for msg in msgs:
 	    request_handler.write(messaging.StreamingMessage.prepareMsg(msg, self.endpoint))
 	request_handler.flush()
-
-    def stopStream(self, msg, request_handler):
-        connection = self.channel_set.connection_manager.getConnection(msg.headers.get(msg.FLEX_CLIENT_ID_HEADER))
-	self.channel_set.disconnect(connection)
 
     def startBeat(self, connection, request_handler):
         beater = PeriodicCallback(None, self.heart_interval, IOLoop.instance())
