@@ -21,9 +21,12 @@ class TornadoChannelSet(ChannelSet):
 
         current_time = time.time()
         for connection_id in self.connection_manager.iterConnectionIds():
-            def _callback():
-                self.cleanConnection(connection_id, current_time)
-            IOLoop.instance().add_callback(_callback)
+            self.cleanConnection(connection_id, current_time)
+
+    def cleanConnection(self, connection_id, current_time):
+        def _callback():
+            ChannelSet.cleanConnection(self, connection_id, current_time)
+        IOLoop.instance().add_callback(_callback)
 
     def notifyConnections(self, topic, sub_topic):
         for connection_id in self.subscription_manager.iterSubscribers(topic, sub_topic):
