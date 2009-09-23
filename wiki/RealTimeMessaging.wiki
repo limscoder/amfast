@@ -24,19 +24,19 @@ If you change the messaging url, you must un-subscribe and re-subscribe to start
 
 Use [http://www.cherrypy.org/ CherryPy] web framework and WSGI to serve the example with the following command:
 {{{
-python messaging/python/cp_server.py
+python streaming/python/cp_server.py
 }}}
 
 == Twisted ==
 Use [http://twistedmatrix.com/trac/ Twisted] web framework to serve the example with the following command:
 {{{
-twistd -noy messaging/python/twisted_server.tac
+twistd -noy streaming/python/twisted_server.tac
 }}}
 Point your browser to: [http://localhost:8000/streaming.html].
 
 == Tornado ==
 Use Facebook's [http://www.tornadoweb.org/ Tornado] web framework to serve the example  with the following command:
 {{{
-python messaging/python/tornado_server.py
+python streaming/python/tornado_server.py
 }}}
 Point your browser to: [http://localhost:8000/static/streaming.html].
