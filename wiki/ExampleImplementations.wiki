@@ -7,4 +7,3 @@
  * AuthExample - An example using authentication.
  * PyAmfExample - An example using the !PyAmf package.
  * SqlAlchemy - An example using [http://sqlalchemy.org SQLAlchemy] for persistence.
- * DjangoExample - An example using the [http://www.djangoproject.com/ Django] framework.
