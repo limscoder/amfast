@@ -1,0 +1,12 @@
+#summary Django example.
+
+= Django Example =
+
+This example demonstrates a very simple service and a Flex client.
+
+The remote method can be invoked using !NetConnection or !RemoteObject.
+
+The example is located in SVN within the [http://code.google.com/p/amfast/source/browse/trunk/examples/hello_world examples/hello_world] directory
+
+
+Start the server and point your browser to http://localhost:8000
