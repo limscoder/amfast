@@ -1500,13 +1500,19 @@ static PyObject* py_decode(PyObject *self, PyObject *args, PyObject *kwargs)
         return NULL;
     }
 
+    if (dec_context->used) {
+        PyErr_SetString(amfast_DecodeError, "DecoderContext cannot be reused");
+        return NULL;
+    }
+
     PyObject *result;
     if (dec_context->amf3 == Py_True) {
         result = decode_AMF3(dec_context);
     } else {
         result = decode_AMF0(dec_context);
     }
- 
+
+    dec_context->used = 1; 
     Py_DECREF(dec_context);
     return result;
 }

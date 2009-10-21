@@ -285,6 +285,18 @@ class Amf3DecoderTestCase(unittest.TestCase):
     def testBadArgRaisesException(self):
         self.assertRaises(decode.DecodeError, decode.decode, 1)
 
+    def testReusableDecoderContext(self):
+        import amfast.encoder
+        encoder = amfast.encoder.Encoder(amf3=True)
+        pre = {'foo' : 'bar'}
+        post = encoder.encode(pre)
+        ct = DecoderContext(post, amf3=True)
+
+        result = decode.decode(ct)
+        assert result == pre
+
+        self.assertRaises(decode.DecodeError, decode.decode, ct) 
+
 def suite():
     return unittest.TestLoader().loadTestsFromTestCase(Amf3DecoderTestCase)
 

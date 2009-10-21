@@ -25,8 +25,8 @@ extensions = Feature(
     ])
 
 setup(name="AmFast",
-    version = "0.4.1",
-    description = "Flash remoting framework. Includes support for NetConnection, RemoteObject, IExternizeable, custom type serialization, and a C-based AMF encoder/decoder.",
+    version = "0.4.2",
+    description = "Flash remoting framework. Includes support for NetConnection, RemoteObject, IExternizeable, Flex Producer/Consumer messaging, custom type serialization, and a C-based AMF encoder/decoder.",
     url = "http://code.google.com/p/amfast/",
     author = "Dave Thompson",
     author_email = "dthomp325@gmail.com",
@@ -44,7 +44,7 @@ setup(name="AmFast",
         "Programming Language :: Python :: 2.4",
         "Programming Language :: Python :: 2.5",
         "Programming Language :: Python :: 2.6",
-        "Development Status :: 4 - Beta",
+        "Development Status :: 5 - Production",
         "Intended Audience :: Developers",
         "License :: OSI Approved :: MIT License",
         "Topic :: Utilities"
