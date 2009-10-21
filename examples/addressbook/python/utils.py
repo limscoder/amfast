@@ -18,6 +18,13 @@ import persistent
 import controller
 import models
 
+class SaCallableTarget(CallableTarget):
+    def invoke(self, packet, msg, args):
+        result = CallableTarget.invoke(self, packet, msg, args)
+        session = persistent.Schema().session
+        session.close()
+        return result
+
 def setup_channel_set(channel_set):
     """Configures an amfast.remoting.channel.ChannelSet object."""
 
@@ -68,14 +75,14 @@ def setup_channel_set(channel_set):
 
     # Map service targets to controller methods
     service = Service('ExampleService')
-    service.mapTarget(CallableTarget(sa_obj.load, 'load'))
-    service.mapTarget(CallableTarget(sa_obj.loadAttr, 'loadAttr'))
-    service.mapTarget(CallableTarget(sa_obj.loadAll, 'loadAll'))
-    service.mapTarget(CallableTarget(sa_obj.saveList, 'saveList'))
-    service.mapTarget(CallableTarget(sa_obj.save, 'save'))
-    service.mapTarget(CallableTarget(sa_obj.remove, 'remove'))
-    service.mapTarget(CallableTarget(sa_obj.removeList, 'removeList'))
-    service.mapTarget(CallableTarget(sa_obj.insertDefaultData, 'insertDefaultData'))
+    service.mapTarget(SaCallableTarget(sa_obj.load, 'load'))
+    service.mapTarget(SaCallableTarget(sa_obj.loadAttr, 'loadAttr'))
+    service.mapTarget(SaCallableTarget(sa_obj.loadAll, 'loadAll'))
+    service.mapTarget(SaCallableTarget(sa_obj.saveList, 'saveList'))
+    service.mapTarget(SaCallableTarget(sa_obj.save, 'save'))
+    service.mapTarget(SaCallableTarget(sa_obj.remove, 'remove'))
+    service.mapTarget(SaCallableTarget(sa_obj.removeList, 'removeList'))
+    service.mapTarget(SaCallableTarget(sa_obj.insertDefaultData, 'insertDefaultData'))
     channel_set.service_mapper.mapService(service)
 
     # Generate source code for mapped models
