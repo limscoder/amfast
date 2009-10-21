@@ -1,6 +1,10 @@
 CHANGES
 ========
 
+0.4.2
+======
+ * Bug fixes for tickets #41, #42, #43.
+
 0.4.1
 ======
  * Added TornadoChannelSet and TornadoChannel for compatibility with Tornado server/framework.
