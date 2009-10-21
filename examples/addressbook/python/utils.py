@@ -20,10 +20,12 @@ import models
 
 class SaCallableTarget(CallableTarget):
     def invoke(self, packet, msg, args):
-        result = CallableTarget.invoke(self, packet, msg, args)
-        session = persistent.Schema().session
-        session.close()
-        return result
+        try:
+            result = CallableTarget.invoke(self, packet, msg, args)
+            return result
+        finally:
+            session = persistent.Schema().session
+            session.close()
 
 def setup_channel_set(channel_set):
     """Configures an amfast.remoting.channel.ChannelSet object."""
