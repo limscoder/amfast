@@ -62,7 +62,7 @@ def get_log_timestamp():
         dt.year, dt.hour, dt.minute, dt.second)
 
 def log_exc(e):
-    """Log an exception."""
+    """Format an exception for logging."""
     if hasattr(e, logged_attr):
         return
     else:
@@ -79,17 +79,20 @@ def log_exc(e):
     msg.append("# ---- Traceback ---- #")
     msg.append("-\n".join(tb_list))
     msg.append("# ---- EXCEPTION DESCRIPTION END ---- #")
-    return "\n".join(msg)
+    logger.error("\n".join(msg))
 
 # --- Setup threading implementation --- #
 
 try:
     import threading
 except ImportError:
+    import dummy_threading
+    mutex_cls = dummy_threading.RLock
+
     if log_debug:
         logger.debug("AmFast is using dummy_threading module.")
-
-# Set this to dummy_threading.RLock
-# to skip locking when using Twisted
-# or any other single threaded implementation. 
-mutex_cls = threading.RLock
+else:
+    # Set this to dummy_threading.RLock
+    # to skip locking when using Twisted
+    # or any other single threaded implementation.
+    mutex_cls = threading.RLock
