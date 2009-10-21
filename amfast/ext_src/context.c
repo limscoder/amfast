@@ -390,6 +390,7 @@ static PyObject* Decoder_new(PyTypeObject *type, PyObject *args, PyObject *kwarg
         self->class_def_name = NULL;
         self->extern_name = NULL;
         self->int_buf = 0;
+        self->used = 0;
     }
 
     return (PyObject *)self;
@@ -452,6 +453,7 @@ static int Decoder_init(PyObject *self_raw, PyObject *args, PyObject *kwargs)
             return -1;
         self->buf = buf;
         self->int_buf = 1;
+        self->used = 0;
     } else {
         Py_INCREF(self->buf);
     }
@@ -569,6 +571,7 @@ static PyObject* Decoder_copy(DecoderObj *self, int amf3)
     new_decoder->type_map = self->type_map;
     Py_XINCREF(new_decoder->type_map);
     new_decoder->int_buf = self->int_buf;
+    new_decoder->used = self->used;
     if (amf3 == 1) {
         new_decoder->amf3 = Py_True;
     } else {
