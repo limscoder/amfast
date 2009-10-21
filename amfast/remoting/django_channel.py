@@ -1,5 +1,6 @@
 from django import http
 
+import amfast
 from channel import HttpChannel, ChannelError
 
 class DjangoChannel(HttpChannel):
@@ -17,7 +18,7 @@ class DjangoChannel(HttpChannel):
         try:
             request_packet = self.decode(http_request.raw_post_data)
             setattr(request_packet, self.DJANGO_REQUEST, http_request)
-        except AmFastError, exc:
+        except amfast.AmFastError, exc:
             return http.HttpResponseBadRequest(mimetype='text/plain', content=self.getBadEncodingMsg())
         except (KeyboardInterrupt, SystemExit):
             raise
@@ -33,7 +34,7 @@ class DjangoChannel(HttpChannel):
             http_response['Content-Length'] = str(len(raw_response))
             http_response.write(raw_response)
             return http_response
-        except AmFastError, exc:
+        except amfast.AmFastError, exc:
             return http.HttpResponseServerError(mimetype='text/plain', content=self.getBadServerMsg())
         except (KeyboardInterrupt, SystemExit):
             raise
