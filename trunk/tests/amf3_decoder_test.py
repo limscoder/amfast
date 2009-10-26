@@ -5,6 +5,7 @@ from StringIO import StringIO
 
 from amfast.context import DecoderContext
 import amfast.decode as decode
+import amfast.buffer as buffer
 import amfast.class_def as class_def
 
 class Amf3DecoderTestCase(unittest.TestCase):
@@ -295,7 +296,7 @@ class Amf3DecoderTestCase(unittest.TestCase):
         result = decode.decode(ct)
         assert result == pre
 
-        self.assertRaises(decode.DecodeError, decode.decode, ct) 
+        self.assertRaises(buffer.BufferError, decode.decode, ct) 
 
 def suite():
     return unittest.TestLoader().loadTestsFromTestCase(Amf3DecoderTestCase)

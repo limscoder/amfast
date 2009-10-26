@@ -122,7 +122,7 @@ static char* Buffer_read(BufferObj *self, int len)
 static PyObject* Buffer_readPyString(BufferObj *self, int len)
 {
     char *str = Buffer_read(self, len);
-    if (str == NULL)
+    if (!str)
        return NULL;
 
     return PyString_FromStringAndSize(str, (Py_ssize_t)len);

@@ -70,7 +70,6 @@ typedef struct {
     PyObject *class_def_name; // PyString name of method to retrieve a ClassDef
     PyObject *extern_name; // PyString name of method to read externalizable objects
     int int_buf; // 1 if we're using an amfast.buffer.Buffer object as the input, 0 if not
-    int used; // 1 if this object has been used 0 if not
 } DecoderObj;
 
 // Number of exposed functions
@@ -102,7 +101,7 @@ typedef struct {
 #define Decoder_read_PROTO (DecoderObj *self, int amf3)
 
 #define Decoder_readByte_NUM 6
-#define Decoder_readByte_RETURN char
+#define Decoder_readByte_RETURN char*
 #define Decoder_readByte_PROTO (DecoderObj *self)
 
 #ifdef CONTEXT_MODULE

@@ -23,9 +23,9 @@ static int big_endian; // Flag == 1 if architecture is big_endian, == 0 if not
  */
 
 // COMMON
-static unsigned short _decode_ushort(DecoderObj *context);
-static unsigned int _decode_ulong(DecoderObj *context);
-static double _decode_double(DecoderObj *context);
+static int _decode_ushort(DecoderObj *context, unsigned short *val);
+static int _decode_ulong(DecoderObj *context, unsigned int *val);
+static int _decode_double(DecoderObj *context, double *val);
 static PyObject* decode_double(DecoderObj *context);
 static PyObject* decode_string(DecoderObj *context, unsigned int string_size);
 static PyObject* decode_date(DecoderObj *context);
@@ -53,7 +53,7 @@ static PyObject* decode_messages_AMF0(DecoderObj *context);
 static PyObject* decode_reference_AMF3(DecoderObj *context, PyObject *obj_context, int val);
 static int decode_dynamic_dict_AMF3(DecoderObj *context, PyObject *dict);
 static PyObject* decode_int_AMF3(DecoderObj *context);
-static int _decode_int_AMF3(DecoderObj *context);
+static int _decode_int_AMF3(DecoderObj *context, int *val);
 static PyObject* deserialize_string_AMF3(DecoderObj *context);
 static PyObject* deserialize_array_AMF3(DecoderObj *context, int collection);
 static int decode_dynamic_array_AMF3(DecoderObj *context, PyObject *list_val, int array_len);
@@ -80,7 +80,10 @@ static PyObject* py_decode_packet(PyObject *self, PyObject *args, PyObject *kwar
  */
 static PyObject* deserialize_obj_AMF3(DecoderObj *context, int proxy)
 {
-    int header = _decode_int_AMF3(context);
+    int header;
+    int *header_p = &header;
+    if(!_decode_int_AMF3(context, header_p))
+        return NULL;
 
     // Check for obj reference
     PyObject *obj_val = decode_reference_AMF3(context, context->obj_refs, header);
@@ -481,7 +484,10 @@ static int decode_dynamic_dict_AMF3(DecoderObj *context, PyObject *dict)
  */
 static PyObject* deserialize_array_AMF3(DecoderObj *context, int collection)
 {
-    int header = _decode_int_AMF3(context);
+    int header;
+    int *header_p = &header;
+    if(!_decode_int_AMF3(context, header_p))
+        return NULL;
 
     // Check for reference
     PyObject *list_val = decode_reference_AMF3(context, context->obj_refs, header);
@@ -607,7 +613,10 @@ static int decode_dynamic_array_AMF3(DecoderObj *context, PyObject *list_val, in
 /* Deserialize date. */
 static PyObject* deserialize_date(DecoderObj *context)
 {
-    int header = _decode_int_AMF3(context);
+    int header;
+    int *header_p = &header;
+    if(!_decode_int_AMF3(context, header_p))
+        return NULL;
 
     // Check for reference
     PyObject *date_val = decode_reference_AMF3(context, context->obj_refs, header);
@@ -636,7 +645,11 @@ static PyObject* deserialize_date(DecoderObj *context)
 /* Decode a date. */
 static PyObject* decode_date(DecoderObj *context)
 {
-    double epoch_millisecs = _decode_double(context);
+    double epoch_millisecs;
+    double *epoch_p = &epoch_millisecs;
+    if(!_decode_double(context, epoch_p))
+        return NULL;
+
     PyObject *epoch_float = PyFloat_FromDouble(epoch_millisecs / 1000);
     if (!epoch_float)
         return NULL;
@@ -656,7 +669,10 @@ static PyObject* decode_date(DecoderObj *context)
 /* Deserialize a byte array. */
 static PyObject* deserialize_byte_array_AMF3(DecoderObj *context)
 {
-    int header = _decode_int_AMF3(context);
+    int header;
+    int *header_p = &header;
+    if(!_decode_int_AMF3(context, header_p))
+        return NULL;
 
     // Check for reference
     PyObject *byte_array_val = decode_reference_AMF3(context, context->obj_refs, header);
@@ -698,7 +714,10 @@ static PyObject* decode_byte_array_AMF3(DecoderObj *context, int byte_len)
 /* Deserialize an XML Doc. */
 static PyObject* deserialize_xml_AMF3(DecoderObj *context)
 {
-    int header = _decode_int_AMF3(context);
+    int header;
+    int *header_p = &header;
+    if(!_decode_int_AMF3(context, header_p))
+        return NULL;
 
     // Check for reference
     PyObject *xml_val = decode_reference_AMF3(context, context->obj_refs, header);
@@ -757,7 +776,10 @@ static PyObject* byte_array_from_string(PyObject *byte_string)
 /* Deserialize a string. */
 static PyObject* deserialize_string_AMF3(DecoderObj *context)
 {
-    int header = _decode_int_AMF3(context);
+    int header;
+    int *header_p = &header;
+    if(!_decode_int_AMF3(context, header_p))
+        return NULL;
 
     // Check for null string
     if (header == EMPTY_STRING_TYPE) {
@@ -793,6 +815,8 @@ static PyObject* deserialize_string_AMF3(DecoderObj *context)
 static PyObject* decode_string(DecoderObj *context, unsigned int string_size)
 {
     const char *str = Decoder_read(context, (long)string_size);
+    if (!str)
+        return NULL;
     PyObject *unicode_val = PyUnicode_DecodeUTF8(str, (Py_ssize_t)string_size, NULL);
     if (!unicode_val)
         return NULL;
@@ -817,10 +841,14 @@ static PyObject* decode_reference_AMF3(DecoderObj *context, PyObject *obj_contex
     Py_RETURN_FALSE;
 }
 
-/* Decode a double to a native C double. */
-static double _decode_double(DecoderObj *context)
+/* Decode a double to a native C double.
+ * Pass in reference, so we can detect an buffer error.
+ */
+static int _decode_double(DecoderObj *context, double *val)
 {
     const char *bytes = Decoder_read(context, 8);
+    if (!bytes)
+        return 0;
 
     // Put bytes from byte array into double
     union aligned {
@@ -842,13 +870,16 @@ static double _decode_double(DecoderObj *context)
         d.c_val[7] = bytes[0];
     }
 
-    return d.d_val;
+    *val = d.d_val;
+    return 1;
 }
 
 /* Decode a native C unsigned short. */
-static unsigned short _decode_ushort(DecoderObj *context)
+static int _decode_ushort(DecoderObj *context, unsigned short *val)
 {
     const char *bytes = Decoder_read(context, 2);
+    if (!bytes)
+        return 0;
 
     // Put bytes from byte array into short
     union aligned {
@@ -864,13 +895,16 @@ static unsigned short _decode_ushort(DecoderObj *context)
         s.c_val[1] = bytes[0];
     }
 
-    return s.s_val;
+    *val = s.s_val;
+    return 1;
 }
 
 /* Decode a native C unsigned int. */
-static unsigned int _decode_ulong(DecoderObj *context)
+static int _decode_ulong(DecoderObj *context, unsigned int *val)
 {
     const char *bytes = Decoder_read(context, 4);
+    if (!bytes)
+        return 0;
 
     // Put bytes from byte array into short
     union aligned {
@@ -888,27 +922,38 @@ static unsigned int _decode_ulong(DecoderObj *context)
         i.c_val[3] = bytes[0];
     }
 
-    return i.i_val;
+    *val = i.i_val;
+    return 1;
 }
 
 /* Decode a double to a PyFloat. */
 static PyObject* decode_double(DecoderObj *context)
 {
-    return PyFloat_FromDouble(_decode_double(context));
+    double number;
+    double *number_p = &number;
+    if(!_decode_double(context, number_p))
+        return NULL;
+    return PyFloat_FromDouble(number);
 }
 
 /* Decode an int to a native C int. */
-static int _decode_int_AMF3(DecoderObj *context)
+static int _decode_int_AMF3(DecoderObj *context, int *val)
 {
     int result = 0;
     int byte_cnt = 0;
-    char byte = Decoder_readByte(context);
+    char *byte_ref = Decoder_readByte(context);
+    if (!byte_ref)
+        return 0;
+    char byte = byte_ref[0];
 
     // If 0x80 is set, int includes the next byte, up to 4 total bytes
     while ((byte & 0x80) && (byte_cnt < 3)) {
         result <<= 7;
         result |= byte & 0x7F;
-        byte = Decoder_readByte(context);
+        byte_ref = Decoder_readByte(context);
+        if (!byte_ref)
+            return 0;
+        byte = byte_ref[0];
         byte_cnt++;
     }
 
@@ -926,20 +971,29 @@ static int _decode_int_AMF3(DecoderObj *context)
         result -= 0x20000000;
     }
 
-    return result;
+    *val = result;
+    return 1;
 }
 
 /* Decode an int to a PyInt. */
 static PyObject* decode_int_AMF3(DecoderObj *context)
 {
-    return PyInt_FromLong((long)_decode_int_AMF3(context)); 
+    int header;
+    int *header_p = &header;
+    if(!_decode_int_AMF3(context, header_p))
+        return NULL;
+
+    return PyInt_FromLong((long)header); 
 }
 
 /* Decode an AMF0 Boolean. */
 static PyObject* decode_bool_AMF0(DecoderObj *context)
 {
     PyObject *boolean;
-    char byte = Decoder_readByte(context);
+    const char *byte_ref = Decoder_readByte(context);
+    if (!byte_ref)
+        return NULL;
+    const char byte = byte_ref[0];
 
     if (byte == TRUE_AMF0) {
         boolean = Py_True;
@@ -954,21 +1008,30 @@ static PyObject* decode_bool_AMF0(DecoderObj *context)
 /* Decode an AMF0 String. */
 static PyObject* decode_string_AMF0(DecoderObj *context)
 {
-   unsigned short string_size = _decode_ushort(context);
-   return decode_string(context, (unsigned int)string_size); 
+    unsigned short string_size;
+    unsigned short *string_size_p = &string_size;
+    if (!_decode_ushort(context, string_size_p))
+        return NULL;
+    return decode_string(context, (unsigned int)string_size); 
 }
 
 /* Decode a long AMF0 String. */
 static PyObject* decode_long_string_AMF0(DecoderObj *context)
 {
-   unsigned int string_size = _decode_ulong(context);
-   return decode_string(context, string_size);
+    unsigned int string_size;
+    unsigned int *string_size_p = &string_size;
+    if(!_decode_ulong(context, string_size_p))
+        return NULL; 
+    return decode_string(context, string_size);
 }
 
 /* Decode an AMF0 Reference. */
 static PyObject* decode_reference_AMF0(DecoderObj *context)
 {
-    unsigned short idx = _decode_ushort(context);
+    unsigned short idx;
+    unsigned short *idx_p = &idx;
+    if(!_decode_ushort(context, idx_p))
+        return NULL;
     return Idx_ret((IdxObj*)context->obj_refs, (int)idx);
 }
 
@@ -1031,7 +1094,10 @@ static int decode_dynamic_dict_AMF0(DecoderObj *context, PyObject *dict)
  */
 static PyObject* decode_array_AMF0(DecoderObj *context, short map_reference)
 {
-    unsigned int array_len = _decode_ulong(context);
+    unsigned int array_len;
+    unsigned int *array_len_p = &array_len;
+    if(!_decode_ulong(context, array_len_p))
+        return NULL;
 
     PyObject *list_val = PyList_New(array_len);
     if (!list_val)
@@ -1064,7 +1130,10 @@ static PyObject* decode_date_AMF0(DecoderObj *context)
 {
     // TODO: use timezone val to adjust datetime
     PyObject *date_val = decode_date(context);
-    int tz = _decode_ushort(context); // timezone val.
+    unsigned short tz;
+    unsigned short *tz_p = &tz;
+    if(!_decode_ushort(context, tz_p)) // timezone val.
+        return NULL;
 
     // Add date to reference count
     if (Idx_map((IdxObj*)context->obj_refs, date_val) == -1) {
@@ -1166,19 +1235,25 @@ static PyObject* decode_packet(DecoderObj *context)
 
     // Set client type
     PyObject *client_type;
-    unsigned short amf_version = _decode_ushort(context);
-    if (amf_version == FLASH_8) {
-        client_type = PyObject_GetAttrString(packet_class, "FLASH_8"); 
-    } else if (amf_version == FLASH_COM) {
-        client_type = PyObject_GetAttrString(packet_class, "FLASH_COM");
-    } else if (amf_version == FLASH_9) {
-        client_type = PyObject_GetAttrString(packet_class, "FLASH_9");
-    } else {
-        char error_str[100];
-        sprintf(error_str, "Unknown client type: %X", amf_version);
-        PyErr_SetString(amfast_DecodeError, error_str);
-        Py_DECREF(packet_class);
+    unsigned short version;
+    unsigned short *version_p = &version;
+    if(!_decode_ushort(context, version_p))
         return NULL;
+
+    switch (version) {
+        case FLASH_8:
+            client_type = PyObject_GetAttrString(packet_class, "FLASH_8"); 
+            break;
+        case FLASH_COM:
+            client_type = PyObject_GetAttrString(packet_class, "FLASH_COM");
+            break;
+        case FLASH_9:
+            client_type = PyObject_GetAttrString(packet_class, "FLASH_9");
+            break;
+        default:
+            PyErr_SetString(amfast_DecodeError, "Unknown client type.");
+            Py_DECREF(packet_class);
+            return NULL;
     }
 
     if (!client_type) {
@@ -1213,7 +1288,11 @@ static PyObject* decode_packet(DecoderObj *context)
 /* Decode AMF0 packet headers. */
 static PyObject* decode_headers_AMF0(DecoderObj *context)
 {
-    unsigned short header_count = _decode_ushort(context);
+    unsigned short header_count;
+    unsigned short *header_count_p = &header_count;
+    if(!_decode_ushort(context, header_count_p))
+        return NULL;
+
     PyObject *header_list = PyList_New(header_count);
     if (!header_list)
         return NULL;
@@ -1234,7 +1313,11 @@ static PyObject* decode_headers_AMF0(DecoderObj *context)
             return NULL;
         }
 
-        unsigned int byte_len = _decode_ulong(context); // Byte length of header.
+        // Read byte length, but don't do anything with it.
+        unsigned int byte_len;
+        unsigned int *byte_len_p = &byte_len;
+        if(!_decode_ulong(context, byte_len_p))
+            return NULL;
 
         // We need a new context for each header
         DecoderObj *new_context = (DecoderObj*)Decoder_copy(context, 0);
@@ -1283,7 +1366,11 @@ static PyObject* decode_headers_AMF0(DecoderObj *context)
 /* Decode AMF0 packet messages. */
 static PyObject* decode_messages_AMF0(DecoderObj *context)
 {
-    unsigned short message_count = _decode_ushort(context);
+    unsigned short message_count;
+    unsigned short *message_count_p = &message_count;
+    if(!_decode_ushort(context, message_count_p))
+        return NULL;
+
     PyObject *message_list = PyList_New(message_count);
     if (!message_list)
         return NULL;
@@ -1303,7 +1390,11 @@ static PyObject* decode_messages_AMF0(DecoderObj *context)
             return NULL;
         }
 
-        unsigned int byte_len = _decode_ulong(context); // Message byte length
+        // Read byte length, but don't do anything with it.
+        unsigned int byte_len;
+        unsigned int *byte_len_p = &byte_len;
+        if(!_decode_ulong(context, byte_len_p))
+            return NULL;
 
         // We need a new context for each message
         // so that reference indexes are reset
@@ -1371,7 +1462,10 @@ static PyObject* decode_messages_AMF0(DecoderObj *context)
 /* Decode individual AMF0 objs from buffer. */
 static PyObject* decode_AMF0(DecoderObj *context)
 {
-    const char byte = Decoder_readByte(context);
+    const char *byte_ref = Decoder_readByte(context);
+    if (!byte_ref)
+        return NULL;
+    const char byte = byte_ref[0];
 
     switch(byte) {
         case NUMBER_AMF0:
@@ -1430,7 +1524,10 @@ static PyObject* decode_AMF0(DecoderObj *context)
 /* Decode individual AMF3 objs from buffer. */
 static PyObject* decode_AMF3(DecoderObj *context)
 {
-    const char byte = Decoder_readByte(context);
+    const char *byte_ref = Decoder_readByte(context);
+    if (!byte_ref)
+        return NULL;
+    const char byte = byte_ref[0];
 
     switch(byte) {
         case UNDEFINED_TYPE:
@@ -1500,11 +1597,6 @@ static PyObject* py_decode(PyObject *self, PyObject *args, PyObject *kwargs)
         return NULL;
     }
 
-    if (dec_context->used) {
-        PyErr_SetString(amfast_DecodeError, "DecoderContext cannot be reused");
-        return NULL;
-    }
-
     PyObject *result;
     if (dec_context->amf3 == Py_True) {
         result = decode_AMF3(dec_context);
@@ -1512,7 +1604,6 @@ static PyObject* py_decode(PyObject *self, PyObject *args, PyObject *kwargs)
         result = decode_AMF0(dec_context);
     }
 
-    dec_context->used = 1; 
     Py_DECREF(dec_context);
     return result;
 }
