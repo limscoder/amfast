@@ -119,9 +119,13 @@ class_mapper.mapClass(class_def.ClassDef(MyCustomClass, 'class.alias', ('tuple',
 # Object attributes can be automatically converted
 # to/from a specific type with the
 # encode_types and decode_types attributes.
+#
+# encode_types and decode_types are dictionaries where
+# the keys are the names of the attributes to convert,
+# and the values are functions that will perform the conversion.
 mapped_class = class_def.ClassDef(MyCustomClass, 'class.alias'....
-mapped_class.encode_types = {'name_of_attribute_to_convert_to_int_before_encoding', int}
-mapped_class.decode_types = {'name_of_attribute_to_convert_to_int_after_decoding', int}
+mapped_class.encode_types = {'attribute_to_convert_to_int_before_encoding': int}
+mapped_class.decode_types = {'attribute_to_convert_to_int_after_decoding': int}
 
 # Map a custom class with dynamic attributes
 class_mapper.mapClass(class_def.DynamicClassDef(MyCustomClass, 'class.alias', ()))
