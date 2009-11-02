@@ -130,18 +130,25 @@ int type_dict(PyObject* class_def, PyObject *mapper, PyObject* dict, int type)
     if (types == NULL)
         return 0;
 
-    PyObject *key;
-    PyObject *val;
+    if (types == Py_None) {
+        // Types dict is not set,
+        // so we don't need to do any
+        // type conversion.
+        Py_DECREF(types);
+        return 1;
+    }
+
+    // Convert each value to the correct type.
+    PyObject *attr;
+    PyObject *converter;
     Py_ssize_t idx = 0;
 
-    while (PyDict_Next(dict, &idx, &key, &val)) {
-        PyObject *callable = PyDict_GetItem(types, key);
-        if (callable != NULL) {
-            Py_INCREF(callable);
-            PyObject *typed_item = get_typed_val(mapper, callable, val);
-            Py_DECREF(callable);
+    while (PyDict_Next(types, &idx, &attr, &converter)) {
+        PyObject *val = PyDict_GetItem(dict, attr);
+        if (val != NULL) {
+            PyObject *typed_item = get_typed_val(mapper, converter, val);
 
-            if (PyDict_SetItem(dict, key, typed_item) == -1) {
+            if (PyDict_SetItem(dict, attr, typed_item) == -1) {
                 Py_DECREF(types);
                 return 0;
             }
