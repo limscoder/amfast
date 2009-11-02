@@ -74,6 +74,16 @@ static PyObject* PyBuffer_tell(BufferObj *self)
  */
 static int Buffer_seek(BufferObj *self, int pos)
 {
+    if (pos < 0) {
+        PyErr_SetString(amfast_BufferError, "Attempted to seek before start of buffer.");
+        return -1;
+    }
+
+    if (pos > self->len) {
+        PyErr_SetString(amfast_BufferError, "Attempted to seek past end of buffer.");
+        return -1;
+    }
+
     self->pos = pos;
     return pos;
 }
@@ -101,18 +111,19 @@ static PyObject* PyBuffer_seek(BufferObj *self, PyObject *args, PyObject *kwargs
  */
 static char* Buffer_read(BufferObj *self, int len)
 {
-    if ((self->pos + len) < 0) {
+    int new_pos = self->pos + len;
+    if (new_pos < 0) {
         PyErr_SetString(amfast_BufferError, "Attempted to read before start of buffer.");
         return NULL;
     }
 
-    if ((self->pos + len) > self->len) {
+    if (new_pos > self->len) {
         PyErr_SetString(amfast_BufferError, "Attempted to read past end of buffer.");
         return NULL;
     }
 
     char* result = (char*)(self->buf + self->pos);
-    self->pos += len;
+    self->pos = new_pos;
     return result;
 }
 

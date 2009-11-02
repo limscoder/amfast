@@ -56,7 +56,7 @@ static PyObject* decode_int_AMF3(DecoderObj *context);
 static int _decode_int_AMF3(DecoderObj *context, int *val);
 static PyObject* deserialize_string_AMF3(DecoderObj *context);
 static PyObject* deserialize_array_AMF3(DecoderObj *context, int collection);
-static int decode_dynamic_array_AMF3(DecoderObj *context, PyObject *list_val, int array_len);
+static int decode_dynamic_array_AMF3(DecoderObj *context, PyObject *list_val, int array_len, int dict);
 static PyObject* deserialize_xml_AMF3(DecoderObj *context);
 static PyObject* deserialize_byte_array_AMF3(DecoderObj *context);
 static PyObject* decode_byte_array_AMF3(DecoderObj *context, int byte_len);
@@ -509,43 +509,30 @@ static PyObject* deserialize_array_AMF3(DecoderObj *context, int collection)
         Py_DECREF(Py_False);
     }
 
-    // Create list or dict
-    PyObject *key = deserialize_string_AMF3(context);
-    if (key == NULL)
-        return NULL;
-
     int array_len = (int)(header >> 1);
-    if (PyUnicode_GET_SIZE(key) == 0) {
-        // Regular Array
+    // Determine if array is mixed (associative) or not
+    int mixed = 0;
+    char *byte_ref = Decoder_readByte(context);
+    if (byte_ref == NULL)
+        return NULL;
+    if (byte_ref[0] == EMPTY_STRING_TYPE) {
+        // Dense array
         list_val = PyList_New(array_len);
-        Py_DECREF(key);
     } else {
-        // Associative array
-        //
-        // Read 1st value 
-        PyObject *val = decode_AMF3(context);
-        if (!val) {
-            Py_DECREF(key);
-            return NULL;
-        }
-        list_val = PyDict_New();
-        if (list_val == NULL) {
-            Py_DECREF(key);
-            Py_DECREF(val);
-            return NULL;
-        }
-        
-        int result = PyDict_SetItem(list_val, key, val);
-        Py_DECREF(key);
-        Py_DECREF(val);
-        if (result == -1)
+        if (!Decoder_skipBytes(context, -1))
             return NULL;
 
+        list_val = PyDict_New();
+        if (list_val == NULL)
+            return NULL;
+        
         // Get rest of dict
         if (decode_dynamic_dict_AMF3(context, list_val) == 0) {
             Py_DECREF(list_val);
             return NULL;
         }
+
+        mixed = 1;
     }
 
     // Reference must be added before children (to allow for recursion).
@@ -567,7 +554,7 @@ static PyObject* deserialize_array_AMF3(DecoderObj *context, int collection)
     }
 
     // Populate list
-    if (decode_dynamic_array_AMF3(context, list_val, array_len) == 0) {
+    if (decode_dynamic_array_AMF3(context, list_val, array_len, mixed) == 0) {
         Py_DECREF(list_val);
         return NULL;
     }
@@ -576,11 +563,11 @@ static PyObject* deserialize_array_AMF3(DecoderObj *context, int collection)
 }
 
 /* Populate an array with vals from the buffer. */
-static int decode_dynamic_array_AMF3(DecoderObj *context, PyObject *list_val, int array_len)
+static int decode_dynamic_array_AMF3(DecoderObj *context, PyObject *list_val, int array_len, int dict)
 {
-    // Add each item to the list
     int i;
-    if (PyDict_Check(list_val)) {
+    if (dict) {
+        // Object is a dict, set item index as key.
         for (i = 0; i < array_len; i++) {
             PyObject *val = decode_AMF3(context);
             if (!val)
@@ -599,6 +586,7 @@ static int decode_dynamic_array_AMF3(DecoderObj *context, PyObject *list_val, in
                 return 0;
         }
     } else {
+        // Standard array.
         for (i = 0; i < array_len; i++) {
             PyObject *val = decode_AMF3(context);
             if (!val)
