@@ -81,7 +81,7 @@ class SpeedTestCase(unittest.TestCase):
         complex = {'element': 'ignore', 'objects': self.buildComplex()}
         self.context = pyamf.get_context(pyamf.AMF0)
         self.stream = BufferedByteStream()
-        self.pyamf_encoder = pyamf.get_encoder(pyamf.AMF0, data=self.stream, context=self.context)
+        self.pyamf_encoder = pyamf.get_encoder(pyamf.AMF0, stream=self.stream, context=self.context)
 
         self.pyamf_encoder.writeElement(complex)
         encoded = self.pyamf_encoder.stream.getvalue()
@@ -103,14 +103,13 @@ class SpeedTestCase(unittest.TestCase):
             self.pyamfTestComplexDict(amf3=False)
 
     def testSpeedAmf3(self):
+        return
         for i in xrange(self.test_nu):
-            #print i
             self.speedTestComplexDict(amf3=True)
 
     def testPyamfSpeedAmf3(self):
         return
         for i in xrange(self.test_nu):
-            print i
             self.pyamfTestComplexDict(amf3=True)
 
 def suite():

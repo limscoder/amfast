@@ -245,7 +245,6 @@ static int Ref_map(RefObj *self, PyObject *obj)
         return -1;
     }
 
-    
     Py_DECREF(val); // give ownership to dict
 
     // Make sure the mapped object doesn't get
@@ -666,9 +665,8 @@ static int Decoder_skipBytes(DecoderObj *self, int len)
         int pos = Buffer_tell((BufferObj*)self->buf);
         pos += len;
         int result = Buffer_seek((BufferObj*)self->buf, pos);
-        if (result == -1) {
+        if (result == -1)
             return 0;
-        }
         return 1;
     }
 
