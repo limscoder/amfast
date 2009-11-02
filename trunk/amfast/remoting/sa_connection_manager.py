@@ -93,7 +93,7 @@ class SaConnectionManager(ConnectionManager):
         return row[0]
 
     def iterConnectionIds(self):
-        s = sa.select([self.connections.c.id], self.connections.c.id==connection_id)
+        s = sa.select([self.connections.c.id])
         db = self.getDb()
         result = connection.execute(s)
         for row in result:
