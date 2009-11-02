@@ -95,7 +95,7 @@ class SaConnectionManager(ConnectionManager):
     def iterConnectionIds(self):
         s = sa.select([self.connections.c.id])
         db = self.getDb()
-        result = connection.execute(s)
+        result = db.execute(s)
         for row in result:
             yield row[self.connections.c.id]
         db.close()
