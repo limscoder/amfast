@@ -263,7 +263,7 @@ channel_set.subscription_manager.secure = True
 
 === !AmfEndpoint ===
  * !AmfEndpoint uses !AmFast's built-in AMF encoder/decoder.
- * See EncodeAndDecode page for information about configuring Encoder and Decoder objects and how to map custom types.
+ * See [EncodeAndDecode#Custom_Type_Maps EncodeAndDecode] page for information about configuring Encoder and Decoder objects and how to map custom types.
 
 {{{
 # AmFast's default Endpoint
@@ -286,7 +286,7 @@ channel.endpoint = AmfEndpoint(encoder=Encoder(), decoder=Decoder()))
 === !PyAmfEndpoint ===
  * Use the !PyAmfEndpoint for a pure-Python encoder/decoder.
  * See [http://pyamf.org PyAmf] project for details about configuring the !PyAmf encoder/decoder.
- * See EncodeAndDecode page for information about how to map custom types with !AmFast.
+ * See [EncodeAndDecode#Custom_Type_Maps EncodeAndDecode] page for information about how to map custom types with !AmFast.
 
 {{{
 # Use the PyAmfEndpoint
