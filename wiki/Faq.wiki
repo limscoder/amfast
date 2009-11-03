@@ -28,3 +28,8 @@
 === Trouble Shooting ===
  * If you experience problems compiling AmFast on Windows, you may want to take a look at some of these links.
  * [http://www.zope.org/Members/als/tips/win32_mingw_modules]
+
+== How much faster is AmFast compared with PyAmf? ==
+ * AmFast is anywhere from 2x to 12x quicker than cPyAmf version 0.5.1 at encoding and decoding binary AMF streams.
+ * The exact difference depends on system architecture, Python version, and the type of objects in the stream.
+ * Typically the difference between AmFast and PyAmf will be greater for: larger object graphs, object graphs with many references, 64 bit OSes, Python version 2.6.
