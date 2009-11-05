@@ -159,13 +159,13 @@ class SpeedTestCase():
         self.doTest(self.buildComplex, 10000, decode=decode, amf3=amf3, pyamf=pyamf)
 
     def big(self, decode=False, amf3=False, pyamf=False):
-        self.doTest(self.buildBig, 2000, decode=decode, amf3=amf3, pyamf=pyamf)
+        self.doTest(self.buildBig, 1000, decode=decode, amf3=amf3, pyamf=pyamf)
 
     def static(self, decode=False, amf3=False, pyamf=False):
         self.doTest(self.buildStatic, 50000, decode=decode, amf3=amf3, pyamf=pyamf)
 
     def reference(self, decode=False, amf3=False, pyamf=False):
-        self.doTest(self.buildReference, 50000, decode=decode, amf3=amf3, pyamf=pyamf)
+        self.doTest(self.buildReference, 25000, decode=decode, amf3=amf3, pyamf=pyamf)
 
     def doTest(self, obj_func, obj_count=10, decode=False, amf3=False, pyamf=False):
         for i in xrange(obj_count):
@@ -216,6 +216,7 @@ if __name__ == "__main__":
     parser = optparse.OptionParser(usage=usage)
     parser.add_option("-r", "--repeat", dest="repeat", default=1, help="Number of times to repeat each test.")
     parser.add_option("-p", action="store_true", dest="print_result", help="Print live output")
+    parser.add_option("-a", action="store_true", dest="pyamf", help="Test PyAmf")
     (options, args) = parser.parse_args()
 
     tester = SpeedTestCase()
@@ -268,25 +269,31 @@ if __name__ == "__main__":
     results = {}
     tester.runBenchmarks(tests, results, pyamf=False, repeat=options.repeat, print_result=options.print_result)
 
-    pyamf_tests = []
-    for test in tests:
-        pyamf_test = {
-            'test': test['test'],
-            'label': test['label'],
-            'args': [],
-            'kwargs': {}
-        }
+    if options.pyamf:
+        pyamf_tests = []
+        for test in tests:
+            pyamf_test = {
+                'test': test['test'],
+                'label': test['label'],
+                'args': [],
+                'kwargs': {}
+            }
 
-        pyamf_test['args'].extend(test['args'])
-        pyamf_test['kwargs'].update(test['kwargs'])
-        pyamf_test['kwargs']['pyamf'] = True
-        pyamf_tests.append(pyamf_test);
+            pyamf_test['args'].extend(test['args'])
+            pyamf_test['kwargs'].update(test['kwargs'])
+            pyamf_test['kwargs']['pyamf'] = True
+            pyamf_tests.append(pyamf_test);
 
-    # Run PyAmf tests
-    tester.runBenchmarks(pyamf_tests, results, pyamf=True, repeat=options.repeat, print_result=options.print_result)
+        # Run PyAmf tests
+        tester.runBenchmarks(pyamf_tests, results, pyamf=True, repeat=options.repeat, print_result=options.print_result)
 
     # Print results
-    print ",AmFast,PyAmf,Diff"
+    header = ('', 'AmFast')
+    if options.pyamf:
+        header.extend(['PyAmf', 'Diff'])
+    print ','.join(header)
     for label, result in results.iteritems():
-        print "%s,%s,%s,%.2fx" % (label, result['AmFast'], result['PyAmf'], result['diff'])
- 
+        row = [label, '%s' % result['AmFast']]
+        if options.pyamf:
+            row.extend(['%s' % result['PyAmf'], '%s' % result['diff']])
+        print ','.join(row)
