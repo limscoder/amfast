@@ -46,7 +46,7 @@ static int Buffer_init(BufferObj *self, PyObject *args, PyObject *kwargs)
 static void Buffer_dealloc(BufferObj *self)
 {
     Py_XDECREF(self->src_str);
-    if (self->src_str == NULL)
+    if (!self->src_str)
         free(self->buf);
     self->ob_type->tp_free((PyObject*)self);
 }
@@ -149,7 +149,7 @@ static PyObject* PyBuffer_readPyString(BufferObj *self, PyObject *args, PyObject
     if (!PyArg_ParseTuple(args, "i", &len))
         return NULL;
 
-    if (self->src_str == NULL) {
+    if (!self->src_str) {
         PyErr_SetString(amfast_BufferError, "Cannot read from write-only buffer.");
         return NULL;
     }
@@ -178,7 +178,7 @@ static int Buffer_grow(BufferObj *self, int len)
 
     if (current_len != self->len) {
         self->buf = (char*)realloc(self->buf, sizeof(char*) * (size_t)current_len);
-        if (self->buf == NULL) {
+        if (!self->buf) {
             PyErr_SetNone(PyExc_MemoryError);
             return -1;
         }
@@ -246,7 +246,7 @@ static PyObject* PyBuffer_writePyString(BufferObj *self, PyObject *args, PyObjec
  */
 static PyObject* PyBuffer_getPyString(BufferObj *self, PyObject *args, PyObject *kwargs)
 {
-    if (self->src_str == NULL) {
+    if (!self->src_str) {
         return PyString_FromStringAndSize(self->buf, (Py_ssize_t)self->pos);
     } else {
         Py_XINCREF(self->src_str);
@@ -341,11 +341,11 @@ initbuffer(void)
 
     // Setup exceptions
     amfast_Error = PyObject_GetAttrString(amfast_mod, "AmFastError");
-    if (amfast_Error == NULL)
+    if (!amfast_Error)
         return;
 
     amfast_BufferError = PyErr_NewException("amfast.encoder.BufferError", amfast_Error, NULL);
-    if (amfast_BufferError == NULL)
+    if (!amfast_BufferError)
         return;
 
     if (PyModule_AddObject(m, "BufferError", amfast_BufferError) == -1)

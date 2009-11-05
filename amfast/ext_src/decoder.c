@@ -510,6 +510,9 @@ static PyObject* deserialize_array_AMF3(DecoderObj *context, int collection)
     }
 
     int array_len = (int)(header >> 1);
+    // Can't use array_len to create a list of known
+    // length, see ticket #46
+
     // Determine if array is mixed (associative) or not
     int mixed = 0;
     char *byte_ref = Decoder_readByte(context);
@@ -517,7 +520,7 @@ static PyObject* deserialize_array_AMF3(DecoderObj *context, int collection)
         return NULL;
     if (byte_ref[0] == EMPTY_STRING_TYPE) {
         // Dense array
-        list_val = PyList_New(array_len);
+        list_val = PyList_New(0);
     } else {
         if (!Decoder_skipBytes(context, -1))
             return NULL;
@@ -591,7 +594,11 @@ static int decode_dynamic_array_AMF3(DecoderObj *context, PyObject *list_val, in
             PyObject *val = decode_AMF3(context);
             if (!val)
                 return 0;
-            PyList_SET_ITEM(list_val, i, val);
+
+            int result = PyList_Append(list_val, val);
+            Py_DECREF(val);
+            if (result < 0)
+                return 0;
         }
     }
 
@@ -1087,7 +1094,10 @@ static PyObject* decode_array_AMF0(DecoderObj *context, short map_reference)
     if(!_decode_ulong(context, array_len_p))
         return NULL;
 
-    PyObject *list_val = PyList_New(array_len);
+    // Can't use array_len to create list
+    // of known length. See ticket #46.
+
+    PyObject *list_val = PyList_New(0);
     if (!list_val)
         return NULL;
 
@@ -1107,7 +1117,11 @@ static PyObject* decode_array_AMF0(DecoderObj *context, short map_reference)
             Py_DECREF(list_val);
             return NULL;
         }
-        PyList_SET_ITEM(list_val, i, val);
+
+        int result = PyList_Append(list_val, val);
+        Py_DECREF(val);
+        if (result < 0)
+            return NULL;
     }
 
     return list_val;
