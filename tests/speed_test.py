@@ -114,7 +114,8 @@ class SpeedTestCase():
 
     def amfastEncode(self, obj, amf3=False, use_proxies=False):        
         enc_context = EncoderContext(use_collections=use_proxies,
-            use_proxies=use_proxies, class_def_mapper=self.class_mapper, amf3=amf3)
+            use_proxies=use_proxies, class_def_mapper=self.class_mapper,
+            amf3=amf3)
 
         return encode.encode(obj, enc_context)
 
