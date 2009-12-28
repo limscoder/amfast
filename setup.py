@@ -1,8 +1,9 @@
 import os
-from setuptools import setup, Feature
 
 from ez_setup import use_setuptools
 use_setuptools()
+
+from setuptools import setup, Feature
 
 from distutils.core import setup, Extension
 from distutils.command.build_ext import build_ext
@@ -44,7 +45,7 @@ setup(name="AmFast",
         "Programming Language :: Python :: 2.4",
         "Programming Language :: Python :: 2.5",
         "Programming Language :: Python :: 2.6",
-        "Development Status :: 5 - Production",
+        "Development Status :: 5 - Production/Stable",
         "Intended Audience :: Developers",
         "License :: OSI Approved :: MIT License",
         "Topic :: Utilities"
