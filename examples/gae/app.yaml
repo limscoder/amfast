@@ -4,13 +4,15 @@ runtime: python
 api_version: 1
 
 handlers:
+- url: /
+  static_files: static/index.html
+  upload: static/index.html
+
 - url: /flash
   static_dir: flex/deploy
-
 
 - url: /run_tests
   script: run_tests.py
 
 - url: /.*
   script: app.py
-
