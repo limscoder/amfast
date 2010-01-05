@@ -12,3 +12,19 @@ The example is located in SVN within the [http://code.google.com/p/amfast/source
 
  * [http://code.google.com/appengine/downloads.html#Google_App_Engine_SDK_for_Python Download] and install the Google App Engine SDK.
 
+= Setup Application =
+
+ * Check out the example's source code from [http://code.google.com/p/amfast/source/browse/#svn/trunk/examples/gae svn] into a folder named 'chat' with the following command:
+{{{
+svn checkout http://amfast.googlecode.com/svn/trunk/examples/gae chat
+}}}
+
+ * Python extensions cannot be compiled for Google App Engine. You will need to use a pure-python encoder and decoder.
+  * Download and extract the latest version of [http://pyamf.org/wiki/Download PyAmf]
+  * Copy the PyAmf code into the 'chat' folder.
+
+= Run the app =
+ * Use the following command to launch the app:
+{{{
+google_appengine/dev_appserver.py helloworld/
+}}}
