@@ -14,14 +14,14 @@ The example is located in SVN within the [http://code.google.com/p/amfast/source
 
 == Setup Application ==
 
- * Check out the AmFast source code from [http://code.google.com/p/amfast/source/browse/#svn/trunk/] into a folder named 'AmFast' with the following command:
+ * Check out the !AmFast source code from [http://code.google.com/p/amfast/source/browse/#svn/trunk/] into a folder named '!AmFast' with the following command:
 {{{
 svn checkout http://amfast.googlecode.com/svn/trunk/ AmFast
 }}}
 
  * Python extensions cannot be compiled for Google App Engine. You will need to use a pure-python encoder and decoder.
   * Download and extract the latest production version of [http://pyamf.org/wiki/Download PyAmf]
-  * Copy the 'pyamf' folder from the PyAmf distribution into the 'AmFast/examples/gae' folder.
+  * Copy the 'pyamf' folder from the !PyAmf distribution into the '!AmFast/examples/gae' folder.
 
 == Run the app ==
  * Use the following command to launch the app:
