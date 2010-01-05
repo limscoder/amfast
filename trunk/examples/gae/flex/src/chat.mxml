@@ -6,16 +6,16 @@
 			<mx:Form
 				defaultButton="{publishBtn}"
 				creationComplete="init()">
-				<mx:FormItem label="url:">
-					<mx:Label
-						id="messagingUrl"
-						text="http://localhost:8080/amf"
-						width="400"/>
-						
+				<mx:FormItem label="remoting url:">
 					<!--<mx:Label
 						id="messagingUrl"
-						text="http://amfastchat.appspot.com/amf"
+						text="http://localhost:8080/amf"
 						width="400"/>-->
+						
+					<mx:Label
+						id="messagingUrl"
+						text="http://amfastchat.appspot.com/amf"
+						width="400"/>
 				</mx:FormItem>
 				
 				<mx:FormItem label="username:">
@@ -40,7 +40,7 @@
 						id="publishBtn"
 						label="Send Message"
 						click="publishMessage()"
-						toolTip="Send a message."
+						toolTip="Send a message to the chat room."
 						enabled="{subscribed}"
 						width="400"/>
 				</mx:FormItem>
@@ -56,21 +56,43 @@
 						width="100%" />
 				</mx:FormItem>
 				
-				<mx:FormItem>
-					<mx:Button
-						label="View AmFast Project"
-						click="viewProject()"
-						toolTip="View AmFast Project"
-						width="200" />
-				</mx:FormItem>
-
-				<mx:FormItem>
-					<mx:Button
-						label="View Source Code"
-						click="viewSource()"
-						toolTip="View the source code for this demo."
-						width="200" />
-				</mx:FormItem>
+				<mx:HBox width="100%">
+					<mx:VBox>
+						<mx:FormItem>
+							<mx:Button
+								label="View AmFast Project"
+								click="viewProject()"
+								toolTip="View AmFast Project"
+								width="200" />
+						</mx:FormItem>
+						
+						<mx:FormItem>
+							<mx:Button
+								label="View Source Code"
+								click="viewSource()"
+								toolTip="View the source code for this demo."
+								width="200" />
+						</mx:FormItem>
+					</mx:VBox>
+					
+					<mx:VBox>
+						<mx:FormItem>
+							<mx:Button
+								label="View GAE"
+								click="viewGae()"
+								toolTip="View Google App Engine project page."
+								width="200" />
+						</mx:FormItem>
+						
+						<mx:FormItem>
+							<mx:Button
+								label="View Example "
+								click="viewExample()"
+								toolTip="View instructions for creating this application."
+								width="200" />
+						</mx:FormItem>
+					</mx:VBox>
+				</mx:HBox>
 			</mx:Form>
 		</mx:HBox>
 		
@@ -116,8 +138,8 @@
 			 */
 			protected function init():void
 			{
-				appDescription.text  = "This application is a hosted on Google App Engine.\n";
-				appDescription.text += "The client is a Flex/Flash applicaion.\n";
+				appDescription.text  = "This application is hosted on Google App Engine.\n";
+				appDescription.text += "The client is a Flex/Flash application.\n";
 				appDescription.text += "The server was created with AmFast, a Flash remoting framework for Python.";
 				
 				// Create a channel set and add channel(s) to it
@@ -217,6 +239,18 @@
 			protected function viewProject():void
 			{
 				var request:URLRequest = new URLRequest('http://code.google.com/p/amfast/');
+				flash.net.navigateToURL(request, "_blank");
+			}
+			
+			protected function viewGae():void
+			{
+				var request:URLRequest = new URLRequest('http://code.google.com/appengine/');
+				flash.net.navigateToURL(request, "_blank");
+			}
+			
+			protected function viewExample():void
+			{
+				var request:URLRequest = new URLRequest('http://code.google.com/p/amfast/wiki/GaeExample');
 				flash.net.navigateToURL(request, "_blank");
 			}
 		]]>
