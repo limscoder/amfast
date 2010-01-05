@@ -8,12 +8,9 @@ from subscription_manager import Subscription, SubscriptionManager
 class GaeSubscription(db.Model, Subscription):
     """A client's subscription to a topic, persisted in a Google Datastore."""
 
-    # Prefix id with this string to make a key_name
-    KEY = 'K'
-
     @classmethod
     def getKeyName(cls, connection_id, client_id, topic):
-        return cls.KEY.join(('', connection_id, client_id, topic))
+        return ':'.join((connection_id, client_id, topic))
 
     connection_id = db.StringProperty(required=True)
     client_id = db.StringProperty(required=True)

@@ -13,19 +13,7 @@ class GaeConnection(Connection):
         Connection.__init__(self, *args, **kwargs)
         self.key = None
 
-class GaeModel(object):
-    # Prefix id with this string to make a key_name
-    KEY = 'K' 
-
-    @classmethod
-    def getKeyNameFromId(cls, id):
-        return cls.KEY + id
-
-    @classmethod
-    def getIdFromKeyName(cls, key_name):
-        return key_name.replace(cls.KEY, '', 1)
-
-class GaeConnectionModel(db.Model, GaeModel):
+class GaeConnectionModel(db.Model):
     """Connection data that is stored in a Google Datastore."""
 
     # Stored attributes.
@@ -38,7 +26,8 @@ class GaeConnectionModel(db.Model, GaeModel):
     flex_user = db.StringProperty(required=False)
     p_session = db.BlobProperty(required=False)
 
-class GaeChannelModel(db.Model, GaeModel):
+class GaeChannelModel(db.Model):
+    """Channel data that is stored in a Google Datastore."""
 
     name = db.StringProperty(required=True)
     count = db.IntegerProperty(required=True)
@@ -60,10 +49,9 @@ class GaeConnectionManager(ConnectionManager):
             db.delete(result)
 
     def _incrementChannelCount(self, channel_name):
-        key = GaeChannelModel.getKeyNameFromId(channel_name)
-        channel = GaeChannelModel.get_by_key_name(key)
+        channel = GaeChannelModel.get_by_key_name(channel_name)
         if channel is None:
-            channel = GaeChannelModel(key_name=key,
+            channel = GaeChannelModel(key_name=channel_name,
                 name=channel_name, count=1)
         else:
             channel.count += 1
@@ -71,23 +59,20 @@ class GaeConnectionManager(ConnectionManager):
         channel.put()
 
     def _decrementChannelCount(self, channel_name):
-        key = GaeChannelModel.getKeyNameFromId(channel_name)
-        channel = GaeChannelModel.get_by_key_name(key)
+        channel = GaeChannelModel.get_by_key_name(channel_name)
         if channel is not None:
             channel.count -= 1
             channel.put()
 
     def getConnectionCount(self, channel_name):
-        key = GaeChannelModel.getKeyNameFromId(channel_name)
-        channel = GaeChannelModel.get_by_key_name(key)
+        channel = GaeChannelModel.get_by_key_name(channel_name)
         if channel is None:
             return 0
         else:
             return channel.count
  
     def loadConnection(self, connection_id):
-        stored_connection = GaeConnectionModel.get_by_key_name(\
-            GaeConnectionModel.getKeyNameFromId(connection_id))
+        stored_connection = GaeConnectionModel.get_by_key_name(connection_id)
         
         if stored_connection is None:
             raise NotConnectedError("Connection '%s' is not connected." % connection_id)
@@ -99,7 +84,7 @@ class GaeConnectionManager(ConnectionManager):
 
     def initConnection(self, connection, channel):
         params = {
-            'key_name': GaeConnectionModel.getKeyNameFromId(connection.id),
+            'key_name': connection.id,
             'channel_name': connection.channel_name,
             'timeout': connection.timeout,
             'connected': True,
@@ -119,7 +104,7 @@ class GaeConnectionManager(ConnectionManager):
     def iterConnectionIds(self):
         query = GaeConnectionModel.all(keys_only=True)
         for key in query:
-            yield GaeConnectionModel.getIdFromKeyName(key.name())
+            yield key.name()
 
     # --- proxies for connection properties --- #
 
