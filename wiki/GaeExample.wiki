@@ -8,11 +8,11 @@ This example demonstrates using Producer/Consumer messaging with HTTP polling ru
 
 The example is located in SVN within the [http://code.google.com/p/amfast/source/browse/#svn/trunk/examples/gae examples/gae] directory.
 
-= Setup GAE =
+== Setup GAE ==
 
  * [http://code.google.com/appengine/downloads.html#Google_App_Engine_SDK_for_Python Download] and install the Google App Engine SDK.
 
-= Setup Application =
+== Setup Application ==
 
  * Check out the AmFast source code from [http://code.google.com/p/amfast/source/browse/#svn/trunk/] into a folder named 'AmFast' with the following command:
 {{{
@@ -23,8 +23,9 @@ svn checkout http://amfast.googlecode.com/svn/trunk/ AmFast
   * Download and extract the latest production version of [http://pyamf.org/wiki/Download PyAmf]
   * Copy the 'pyamf' folder from the PyAmf distribution into the 'AmFast/examples/gae' folder.
 
-= Run the app =
+== Run the app ==
  * Use the following command to launch the app:
 {{{
 google_appengine/dev_appserver.py AmFast/examples/gae/
 }}}
+ * Point your browser to [http://localhost:8080/flash/chat.html]
