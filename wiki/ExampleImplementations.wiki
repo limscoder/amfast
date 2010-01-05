@@ -7,3 +7,4 @@
  * AuthExample - An example using authentication.
  * PyAmfExample - An example using the !PyAmf package.
  * SqlAlchemy - An example using [http://sqlalchemy.org SQLAlchemy] for persistence.
+ * GaeExample - An example using Google App Engine.
