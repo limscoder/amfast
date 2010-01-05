@@ -2,6 +2,7 @@
 = !AmFast =
 
  * !AmFast is developed and maintained by [http://bcf.arl.arizona.edu/dave-thompson/index.php Dave Thompson].
+ * Several patches have been accepted from the !AmFast community.
  * If you're interested in helping out with the project, send a message out to the [http://groups.google.com/group/amfast/web/amfast AmFast group]
 
 = Thanks =
