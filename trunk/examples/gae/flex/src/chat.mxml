@@ -7,15 +7,15 @@
 				defaultButton="{publishBtn}"
 				creationComplete="init()">
 				<mx:FormItem label="url:">
-					<!--<mx:Label
-						id="messagingUrl"
-						text="http://localhost:8000/amf"
-						width="400"/>-->
-						
 					<mx:Label
 						id="messagingUrl"
-						text="http://amfastchat.appspot.com/amf"
+						text="http://localhost:8080/amf"
 						width="400"/>
+						
+					<!--<mx:Label
+						id="messagingUrl"
+						text="http://amfastchat.appspot.com/amf"
+						width="400"/>-->
 				</mx:FormItem>
 				
 				<mx:FormItem label="username:">
