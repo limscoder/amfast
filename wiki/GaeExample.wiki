@@ -1,4 +1,4 @@
-#summary Google App Engine example.
+#summary Create a chat board for Google App Engine.
 
 = Gae Example =
 
