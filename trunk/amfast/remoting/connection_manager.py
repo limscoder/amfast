@@ -47,14 +47,14 @@ class ConnectionManager(object):
 
         connection = self.loadConnection(connection_id)
 
-        # Check for timeout
-        current_time = time.time() * 1000
-        if connection.last_active < (current_time - connection.timeout):
-            connection.delete()
-            raise NotConnectedError("Connection '%s' is not connected." % connection_id)
-
         if touch is True:
             self.touchConnection(connection)
+        else:
+            # Check for timeout
+            current_time = time.time() * 1000
+            if connection.last_active < (current_time - connection.timeout):
+                connection.delete()
+                raise NotConnectedError("Connection '%s' is not connected." % connection_id)
 
         return connection
 
@@ -68,6 +68,7 @@ class ConnectionManager(object):
         return connection
 
     def deleteConnection(self, connection):
+        """Deletes a connection object."""
         if connection.notify_func is not None:
             # Call notify function,
             # which should check for

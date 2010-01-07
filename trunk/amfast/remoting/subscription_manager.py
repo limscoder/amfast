@@ -37,6 +37,18 @@ class SubscriptionManager(object):
     def splitTopicKey(cls, topic):
         return topic.split(cls.SUBTOPIC_SEPARATOR)
 
+    def getMessageTopicKey(self, msg):
+        """Returns topic key for a message."""
+
+        topic = msg.destination
+        if hasattr(msg, 'headers') and \
+            msg.headers is not None and \
+            messaging.AsyncMessage.SUBTOPIC_HEADER in msg.headers:
+            sub_topic = msg.headers[messaging.AsyncMessage.SUBTOPIC_HEADER]
+        else:
+            sub_topic = None
+        return self.getTopicKey(topic, sub_topic)
+
     def publishMessage(self, msg):
         # Update timestamp to current server time.
         # Is this the correct thing to do???
@@ -184,14 +196,7 @@ class MemorySubscriptionManager(SubscriptionManager):
     def persistMessage(self, msg):
         """Store a message."""
 
-        topic = msg.destination
-        if hasattr(msg, 'headers') and \
-            msg.headers is not None and \
-            messaging.AsyncMessage.SUBTOPIC_HEADER in msg.headers:
-            sub_topic = msg.headers[messaging.AsyncMessage.SUBTOPIC_HEADER]
-        else:
-            sub_topic = None
-        topic = self.getTopicKey(topic, sub_topic)
+        topic = self.getMessageTopicKey(msg)
 
         self._lock.acquire()
         try:

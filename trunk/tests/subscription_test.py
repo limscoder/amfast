@@ -36,10 +36,16 @@ class SubscriptionTestCase(unittest.TestCase):
         self.topic = 'test'
         self.sub_topic = 'tester'
 
-    def makeMessage(self):
+    def makeMessage(self, topic=None, sub_topic=None):
+        if topic is None:
+            topic = self.topic
+
+        if sub_topic is None:
+            sub_topic = self.sub_topic
+
         msg = messaging.AsyncMessage(body='tester', clientId=None,
-            destination=self.topic,
-            headers={messaging.AsyncMessage.SUBTOPIC_HEADER: self.sub_topic},
+            destination=topic,
+            headers={messaging.AsyncMessage.SUBTOPIC_HEADER: sub_topic},
             timeToLive=30000, timestamp=time.time() * 1000, messageId=self.client_id)
         return msg
 
@@ -93,6 +99,23 @@ class SubscriptionTestCase(unittest.TestCase):
             self.topic, self.sub_topic)
 
         self.manager.publishMessage(self.makeMessage())
+
+        msgs = self.manager.pollMessages(self.manager.getTopicKey(self.topic, self.sub_topic),
+            cutoff_time, cutoff_time)
+
+        count = 0
+        for msg in msgs:
+            count += 1
+        self.assertEquals(1, count)
+
+    def testPollIgnoresDifferentTopics(self):
+        cutoff_time = time.time() * 1000
+
+        self.manager.subscribe(self.connection_id, self.client_id,
+            self.topic, self.sub_topic)
+
+        self.manager.publishMessage(self.makeMessage())
+        self.manager.publishMessage(self.makeMessage('different', 'topic'))
 
         msgs = self.manager.pollMessages(self.manager.getTopicKey(self.topic, self.sub_topic),
             cutoff_time, cutoff_time)

@@ -1,5 +1,6 @@
-import time
 import pickle
+import random
+import time
 
 from google.appengine.ext import db
 
@@ -11,23 +12,47 @@ class GaeConnection(Connection):
 
     def __init__(self, *args, **kwargs):
         Connection.__init__(self, *args, **kwargs)
-        self.key = None
+        self.model = None
+
+class GaeConnectionLastActive(db.Model):
+    value = db.FloatProperty(required=True)
+
+class GaeConnectionConnected(db.Model):
+    value = db.BooleanProperty(required=True)
+
+class GaeConnectionLastPolled(db.Model):
+    value = db.FloatProperty(required=True)
+
+class GaeConnectionAuthentication(db.Model):
+    authenticated = db.BooleanProperty(required=True)
+    flex_user = db.StringProperty(required=False)
+
+class GaeConnectionSession(db.Model):
+    value = db.BlobProperty(required=True)
 
 class GaeConnectionModel(db.Model):
     """Connection data that is stored in a Google Datastore."""
 
-    # Stored attributes.
+    # These values never change
     channel_name = db.StringProperty(required=True)
     timeout = db.IntegerProperty(required=True)
-    connected = db.BooleanProperty(required=True)
-    last_active = db.FloatProperty(required=True)
-    last_polled = db.FloatProperty(required=True)
-    authenticated = db.BooleanProperty(required=True)
-    flex_user = db.StringProperty(required=False)
-    p_session = db.BlobProperty(required=False)
+
+    # Every changeable property is it's own model,
+    # So we can update each property
+    # without affecting any other.
+
+    # Referenced properties.
+    last_active = db.ReferenceProperty(reference_class=GaeConnectionLastActive, required=True)
+    connected = db.ReferenceProperty(reference_class=GaeConnectionConnected, required=True)
+    last_polled = db.ReferenceProperty(reference_class=GaeConnectionLastPolled, required=True)
+    authentication = db.ReferenceProperty(reference_class=GaeConnectionAuthentication, required=False)
+    session = db.ReferenceProperty(reference_class=GaeConnectionSession, required=False)
 
 class GaeChannelModel(db.Model):
     """Channel data that is stored in a Google Datastore."""
+
+    # Shard counter into multiple entities to avoid conflicts.
+    NUM_SHARDS = 20
 
     name = db.StringProperty(required=True)
     count = db.IntegerProperty(required=True)
@@ -44,62 +69,98 @@ class GaeConnectionManager(ConnectionManager):
         for result in query:
             db.delete(result)
 
+        query = GaeConnectionLastActive.all(keys_only=True)
+        for result in query:
+            db.delete(result)
+
+        query = GaeConnectionConnected.all(keys_only=True)
+        for result in query:
+            db.delete(result)
+
+        query = GaeConnectionLastPolled.all(keys_only=True)
+        for result in query:
+            db.delete(result)
+
+        query = GaeConnectionAuthentication.all(keys_only=True)
+        for result in query:
+            db.delete(result)
+
+        query = GaeConnectionSession.all(keys_only=True)
+        for result in query:
+            db.delete(result)
+
         query = GaeChannelModel.all(keys_only=True)
         for result in query:
             db.delete(result)
 
-    def _incrementChannelCount(self, channel_name):
-        channel = GaeChannelModel.get_by_key_name(channel_name)
-        if channel is None:
-            channel = GaeChannelModel(key_name=channel_name,
-                name=channel_name, count=1)
-        else:
-            channel.count += 1
+    def _getChannelShardName(self, channel_name):
+        index = random.randint(0, GaeChannelModel.NUM_SHARDS - 1)
+        return ":".join((channel_name, str(index)))
 
-        channel.put()
+    def _incrementChannelCount(self, channel_name):
+        shard_name = self._getChannelShardName(channel_name)
+        counter = GaeChannelModel.get_by_key_name(shard_name)
+        if counter is None:
+            counter = GaeChannelModel(key_name=shard_name,
+                name=channel_name, count=0)
+        counter.count += 1
+        counter.put()
 
     def _decrementChannelCount(self, channel_name):
-        channel = GaeChannelModel.get_by_key_name(channel_name)
-        if channel is not None:
-            channel.count -= 1
-            channel.put()
+        shard_name = self._getChannelShardName(channel_name)
+        counter = GaeChannelModel.get_by_key_name(shard_name)
+        if counter is None:
+            counter = GaeChannelModel(key_name=shard_name,
+                name=channel_name, count=0)
+        counter.count -= 1
+        counter.put()
 
     def getConnectionCount(self, channel_name):
-        channel = GaeChannelModel.get_by_key_name(channel_name)
-        if channel is None:
-            return 0
-        else:
-            return channel.count
+        query = GaeChannelModel.all()
+        query.filter('name = ', channel_name)
+        total = 0
+        for result in query:
+            total += result.count
+        return total
  
     def loadConnection(self, connection_id):
-        stored_connection = GaeConnectionModel.get_by_key_name(connection_id)
+        connection_model = GaeConnectionModel.get_by_key_name(connection_id)
         
-        if stored_connection is None:
+        if connection_model is None:
             raise NotConnectedError("Connection '%s' is not connected." % connection_id)
 
-        connection = self.connection_class(self, stored_connection.channel_name,
-            connection_id, timeout=stored_connection.timeout)
-        connection.key = stored_connection.key()
+        connection = self.connection_class(self, connection_model.channel_name,
+            connection_id, timeout=connection_model.timeout)
+        connection.model = connection_model
         return connection
 
     def initConnection(self, connection, channel):
+        last_active = GaeConnectionLastActive(key_name=connection.id,
+            value=(time.time() * 1000))
+        last_active.put()
+
+        connected = GaeConnectionConnected(key_name=connection.id, value=True)
+        connected.put()
+
+        last_polled = GaeConnectionLastPolled(key_name=connection.id, value=0.0)
+        last_polled.put()
+
         params = {
             'key_name': connection.id,
             'channel_name': connection.channel_name,
             'timeout': connection.timeout,
-            'connected': True,
-            'last_active': time.time() * 1000,
-            'last_polled': 0.0,
-            'authenticated': False
+            'connected': connected,
+            'last_active': last_active,
+            'last_polled': last_polled
         }
 
-        stored_connection = GaeConnectionModel(**params)
-        stored_connection.put()
+        connection_model = GaeConnectionModel(**params)
+        connection_model.put()
 
         db.run_in_transaction(self._incrementChannelCount,
             connection.channel_name)
 
-        connection.key = stored_connection.key()
+        connection.model = connection_model
 
     def iterConnectionIds(self):
         query = GaeConnectionModel.all(keys_only=True)
@@ -109,132 +170,138 @@ class GaeConnectionManager(ConnectionManager):
     # --- proxies for connection properties --- #
 
     def getConnected(self, connection):
-        stored_connection = GaeConnectionModel.get(connection.key)
-        if stored_connection is None:
+        if connection.model is None:
             return False
         else:
-            return stored_connection.connected
+            return connection.model.connected.value
 
     def getLastActive(self, connection):
-        stored_connection = GaeConnectionModel.get(connection.key)
-        return stored_connection.last_active
+        return connection.model.last_active.value
 
     def getLastPolled(self, connection):
-        stored_connection = GaeConnectionModel.get(connection.key)
-        return stored_connection.last_polled
+        return connection.model.last_polled.value
 
     def getAuthenticated(self, connection):
-        stored_connection = GaeConnectionModel.get(connection.key)
-        return stored_connection.authenticated
+        if connection.model.authentication is None:
+            return False
+       
+        return connection.model.authentication.authenticated
 
     def getFlexUser(self, connection):
-        stored_connection = GaeConnectionModel.get(connection.key)
-        return stored_connection.flex_user
+        if connection.model.authentication is None:
+            return None
+
+        return connection.model.authentication.flex_user
 
     def getNotifyFunc(self, connection):
         return None
 
     # --- proxies for connection methods --- #
 
-    def _deleteConnection(self, connection):
-        stored_connection = GaeConnectionModel.get(connection.key)
-        stored_connection.delete()
-
     def deleteConnection(self, connection):
-        db.run_in_transaction(self._deleteConnection, connection)
-        db.run_in_transaction(self._decrementChannelCount, connection.channel_name)
+        # Delete referenced properties 1st
+        db.delete(GaeConnectionModel.last_active.get_value_for_datastore(connection.model))
+        db.delete(GaeConnectionModel.connected.get_value_for_datastore(connection.model))
+        db.delete(GaeConnectionModel.last_polled.get_value_for_datastore(connection.model))
+
+        # Optional referenced properties
+        authentication_key = GaeConnectionModel.authentication.get_value_for_datastore(connection.model)
+        if authentication_key is not None:
+            db.delete(authentication_key)
+
+        session_key = GaeConnectionModel.session.get_value_for_datastore(connection.model)
+        if session_key is not None:
+            db.delete(session_key)
+
+        # Delete connection
+        connection.model.delete()
+        connection.model = None
         ConnectionManager.deleteConnection(self, connection)
 
-    def _connectConnection(self, connection):
-        stored_connection = GaeConnectionModel.get(connection.key)
-        if stored_connection is not None:
-            stored_connection.connected = True
-            stored_connection.put()
+        db.run_in_transaction(self._decrementChannelCount, connection.channel_name)
 
     def connectConnection(self, connection):
-        db.run_in_transaction(self._connectConnection, connection)
-
-    def _disconnectConnection(self, connection):
-        stored_connection = GaeConnectionModel.get(connection.key)
-        if stored_connection is not None:
-            stored_connection.connected = False
-            stored_connection.put()
+        if connection.model is not None:
+            connected = GaeConnectionConnected(key_name=connection.id, value=True)
+            connected.put()
+            connection.model.connected = connected
 
     def disconnectConnection(self, connection):
-        db.run_in_transaction(self._disconnectConnection, connection)
-
-    def _touchConnection(self, connection):
-        stored_connection = GaeConnectionModel.get(connection.key)
-        stored_connection.last_active = time.time() * 1000
-        stored_connection.put()
+        if connection.model is not None:
+            connected = GaeConnectionConnected(key_name=connection.id, value=False)
+            connected.put()
+            connection.model.connected = connected
 
     def touchConnection(self, connection):
-        db.run_in_transaction(self._touchConnection, connection)
-
-    def _touchPolled(self, connection):
-        stored_connection = GaeConnectionModel.get(connection.key)
-        stored_connection.last_polled = time.time() * 1000
-        stored_connection.put()
+        if connection.model is not None:
+            last_active = GaeConnectionLastActive(key_name=connection.id,
+                value=(time.time() * 1000))
+            last_active.put()
+            connection.model.last_active = last_active
 
     def touchPolled(self, connection):
-        db.run_in_transaction(self._touchPolled, connection)
-
-    def _authenticateConnection(self, connection, user):
-        stored_connection = GaeConnectionModel.get(connection.key)
-        stored_connection.authenticated = True
-        stored_connection.flex_user = user
-        stored_connection.put()
+        if connection.model is not None:
+            last_polled = GaeConnectionLastPolled(key_name=connection.id,
+                value=(time.time() * 1000))
+            last_polled.put()
+            connection.model.last_polled = last_polled
 
     def authenticateConnection(self, connection, user):
-        db.run_in_transaction(self._authenticateConnection, connection, user)
-
-    def _unAuthenticateConnection(self, connection):
-        stored_connection = GaeConnectionModel.get(connection.key)
-        stored_connection.authenticated = False
-        stored_connection.flex_user = None
-        stored_connection.put()
+        if connection.model is not None:
+            if connection.model.authentication is None:
+                authentication = GaeConnectionAuthentication(
+                    key_name=connection.id, authenticated=True, flex_user=user)
+                authentication.put()
+                connection.model.authentication = authentication
+                connection.model.put()
+            else:
+                connection.model.authentication.authenticated = True
+                connection.model.authentication.flex_user = user
+                connection.model.authentication.authenticated.put()
 
     def unAuthenticateConnection(self, connection):
-        db.run_in_transaction(self._unAuthenticateConnection, connection)
+        if connection.model is not None:
+            if connection.model.authentication is not None:
+                connection.model.authentication.authenticated = False
+                connection.model.authentication.flex_user = None
+                connection.model.authentication.put()
 
     def initSession(self, connection):
-        stored_connection = GaeConnectionModel.get(connection.key)
+        if connection.model is not None:
+            if connection.model.session is None or \
+                connection.model.session.value is None:
+                connection._session = {}
+            else:
+                connection._session = pickle.loads(connection.model.session.value)
 
-        if not hasattr(stored_connection, 'p_session') or \
-            stored_connection.p_session is None:
-            stored_connection._session = {}
-        else:
-            stored_connection._session = pickle.loads(stored_connection.p_session)
-
-        return stored_connection
-
-    def saveSession(self, stored_connection):
-        if hasattr(stored_connection, '_session'):
-            stored_connection.p_session = pickle.dumps(stored_connection._session)
-            stored_connection.put()
+    def saveSession(self, connection):
+        if connection.model is not None:
+            value = pickle.dumps(connection._session)
+            if connection.model.session is None:
+                session = GaeConnectionSession(key_name=connection.id, value=value)
+                session.put()
+                connection.model.session = session
+                connection.model.put()
+            else:
+                connection.model.session.value = value
+                connection.model.session.put()
 
     def getConnectionSessionAttr(self, connection, name):
-        stored_connection = self.initSession(connection)
+        self.initSession(connection)
         try:
-            return stored_connection._session[name]
+            return connection._session[name]
         except KeyError:
             raise SessionAttrError("Attribute '%s' not found." % name)
 
-    def _setConnectionSessionAttr(self, connection, name, val):
-        stored_connection = self.initSession(connection)
-        stored_connection._session[name] = val
-        self.saveSession(stored_connection)
-
     def setConnectionSessionAttr(self, connection, name, val):
-        db.run_in_transaction(self._setConnectionSessionAttr, connection, name, val)
-
-    def _delConnectionSessionAttr(self, connection, name):
-        stored_connection = self.initSession(connection)
-        try:
-            del stored_connection._session[name]
-            self.saveSession(stored_connection)
-        except KeyError:
-            pass
+        self.initSession(connection)
+        connection._session[name] = val
+        self.saveSession(connection)
 
     def delConnectionSessionAttr(self, connection, name):
-        db.run_in_transaction(self._delConnectionSessionAttr, connection, name)
+        self.initSession(connection)
+        try:
+            del connection._session[name]
+            self.saveSession(connection)
+        except KeyError:
+            pass
