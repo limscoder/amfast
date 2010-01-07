@@ -137,16 +137,10 @@ class SaSubscriptionManager(SubscriptionManager):
     def persistMessage(self, msg):
         """Store a message."""
 
-        topic = msg.destination
-        if hasattr(msg, 'headers') and \
-            msg.headers is not None and \
-            messaging.AsyncMessage.SUBTOPIC_HEADER in msg.headers:
-            sub_topic = msg.headers[messaging.AsyncMessage.SUBTOPIC_HEADER]
+        if hasattr(msg, 'headers') and (msg.headers is not None):
             enc_headers = pickle.dumps(msg.headers)
         else:
-            sub_topic = None
             enc_headers = None
-        topic = self.getTopicKey(topic, sub_topic)
 
         if hasattr(msg, 'correlationId'):
             correlation_id = msg.correlationId
@@ -154,7 +148,7 @@ class SaSubscriptionManager(SubscriptionManager):
             correlation_id = None
 
         ins = self.messages.insert().values(
-            topic=topic,
+            topic=self.getMessageTopicKey(msg),
             clientId=msg.clientId,
             messageId=msg.messageId,
             correlationId=correlation_id,
@@ -195,7 +189,9 @@ class SaSubscriptionManager(SubscriptionManager):
         self.deleteExpiredMessages(current_time)
 
         # Poll new messages
-        s = sa.select([self.messages], self.messages.c.timestamp > cutoff_time)
+        s = sa.select((self.messages,),
+                and_(self.messages.c.topic == topic,
+                    self.messages.c.timestamp > cutoff_time))
         db = self.getDb()
         results = db.execute(s)
         for row in results:
