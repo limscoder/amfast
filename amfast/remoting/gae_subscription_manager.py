@@ -16,10 +16,18 @@ class GaeSubscription(db.Model, Subscription):
     client_id = db.StringProperty(required=True)
     topic = db.StringProperty(required=True)
 
-class GaeMessage(db.Model):
-    """A Flex message, persisted in a Google Datastore."""
+class GaeMessageBody(db.Model):
+    """Flex message body persisted in a Google Datastore."""
 
     p_message = db.BlobProperty(required=True)
+
+class GaeMessageMetadata(db.Model):
+    """Flex message metadata persisted in a Google Datastore."""
+
+    time_to_live = db.FloatProperty(required=True)
+    timestamp = db.FloatProperty(required=True)
+    topic = db.StringProperty(required=True)
+    message_body = db.ReferenceProperty(reference_class=GaeMessageBody, required=True)
 
 class GaeSubscriptionManager(SubscriptionManager):
     """Stores subscriptions in Google DataStore."""
@@ -29,7 +37,11 @@ class GaeSubscriptionManager(SubscriptionManager):
         for result in query:
             db.delete(result)
 
-        query = GaeMessage.all(keys_only=True)
+        query = GaeMessageMetadata.all(keys_only=True)
+        for result in query:
+            db.delete(result)
+
+        query = GaeMessageBody.all(keys_only=True)
         for result in query:
             db.delete(result)
 
@@ -44,27 +56,36 @@ class GaeSubscriptionManager(SubscriptionManager):
 
     def unSubscribe(self, connection_id, client_id, topic, sub_topic=None):
         """Remove a subscription from a topic."""
+
         topic = SubscriptionManager.getTopicKey(topic, sub_topic)
         key_name = GaeSubscription.getKeyName(connection_id, client_id, topic)
 
         subscription = GaeSubscription.get_by_key_name(key_name)
-        if subscription is not None:
-            subscription.delete()
+        db.delete(subscription)
 
     def deleteConnection(self, connection):
-        query = GaeSubscription.all()
+        """Delete connection-subscription information."""
+
+        query = GaeSubscription.all(keys_only=True)
         query.filter('connection_id = ', connection.id)
         db.delete(query)
 
     def persistMessage(self, msg):
+        """Save message object."""
+
         # Remove connection data,
         # so that it is not pickled
         tmp_connection = getattr(msg, 'connection', None)
         if tmp_connection is not None:
             msg.connection = None
+
+        message_body = GaeMessageBody(p_message=pickle.dumps(msg))
+        message_body.put()
        
-        message = GaeMessage(p_message=pickle.dumps(msg))
-        message.put()
+        message_data = GaeMessageMetadata(timestamp=msg.timestamp,
+            time_to_live=float(msg.timeToLive), topic=self.getMessageTopicKey(msg),
+            message_body=message_body)
+        message_data.put()
 
         # Restore connection attr.
         if tmp_connection is not None:
@@ -78,6 +99,8 @@ class GaeSubscriptionManager(SubscriptionManager):
         return query
 
     def iterSubscribers(self, topic, sub_topic=None):
+        """Iterate through all connection ids subscribed to a topic."""
+
         topic = SubscriptionManager.getTopicKey(topic, sub_topic)
 
         connection_ids = {} # Keep track of unique IDs.
@@ -105,15 +128,16 @@ class GaeSubscriptionManager(SubscriptionManager):
 
         remove_msgs = []
 
-        query = GaeMessage.all()
-        for message in query:
-            msg = pickle.loads(message.p_message)
-            if current_time > (msg.timestamp + msg.timeToLive):
-                # Remove expired message
-                remove_msgs.append(message)
+        query = GaeMessageMetadata.all()
+        query.filter('topic = ', topic)
+        query.order('timestamp')
+        for message_data in query:
+            if current_time > (message_data.timestamp + message_data.time_to_live):
+                remove_msgs.append(message_data)
             else:
-                if msg.timestamp > cutoff_time:
-                    yield msg
+                if message_data.timestamp > cutoff_time:
+                    yield pickle.loads(message_data.message_body.p_message) 
 
-        for message in remove_msgs:
-            message.delete()
+        for message_data in remove_msgs:
+            db.delete(GaeMessageMetadata.message_body.get_value_for_datastore(message_data))
+            message_data.delete()
