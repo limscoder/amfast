@@ -23,7 +23,7 @@ class MemcacheConnectionManager(ConnectionManager, memcache_manager.MemcacheMana
     def reset(self):
         self._lock.releaseAll()
 
-        lock_name = self.getLockName('reset')
+        lock_name = self.getLockName('connection_reset')
         self._lock.acquire(lock_name)
         try:
             connection_ids = self.mc.get(self.CONNECTIONS_ATTR)

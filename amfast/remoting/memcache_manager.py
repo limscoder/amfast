@@ -11,7 +11,7 @@ except ImportError:
     google = False
 
 class MemcacheMutex(object):
-    """Blocks access to a specific key."""
+    """Blocks access to a specific key. Locking will fail if lock element is pushed out of cache."""
 
     def __init__(self, mc):
         self.mc = mc
