@@ -18,7 +18,7 @@ class MemcacheSubscriptionManager(SubscriptionManager, memcache_manager.Memcache
     def reset(self):
         self._lock.releaseAll()
 
-        lock_name = self.getLockName('reset')
+        lock_name = self.getLockName('subscription_reset')
         self._lock.acquire(lock_name)
         try:
             topics = self.mc.get(self.TOPIC_ATTR)
@@ -67,6 +67,59 @@ class MemcacheSubscriptionManager(SubscriptionManager, memcache_manager.Memcache
             finally:
                 self._lock.release(lock_name)
 
+    def _createTopic(self, topic):
+        lock_name = self.getLockName(self.TOPIC_ATTR)
+        self._lock.acquire(lock_name)
+        try:
+            topics = self.mc.get(self.TOPIC_ATTR)
+            if topics is None:
+                topics = {}
+            topic_map = topics.get(topic, None)
+            if topic_map is None:
+                topics[topic] = True
+                self.mc.set(self.TOPIC_ATTR, topics)
+        finally:
+            self._lock.release(lock_name)
+
+    def _createTopicMessageQeue(self, topic):
+        key = self.getKeyName(topic, self.MSG_ATTR)
+        lock_name = self.getLockName(key)
+        self._lock.acquire(lock_name)
+        try:
+            messages = self.mc.get(key)
+            if messages is None:
+                self.mc.set(key, [])
+        finally:
+            self._lock.release(lock_name)
+
+    def _createConnectionList(self, topic, connection_id):
+        key = self.getKeyName(topic, self.CONNECTION_ATTR)
+        lock_name = self.getLockName(key)
+        self._lock.acquire(lock_name)
+        try:
+            connections = self.mc.get(key)
+            if connections is None:
+                connections = {}
+
+            connections[connection_id] = True
+            self.mc.set(key, connections)
+        finally:
+            self._lock.release(lock_name)
+
+    def _createClientList(self, topic, connection_id, client_id, subscription):
+        key = self.getKeyName(connection_id, topic)
+        lock_name = self.getLockName(key)
+        self._lock.acquire(lock_name)
+        try:
+            connection_map = self.mc.get(key)
+            if connection_map is None:
+                connection_map = {}
+
+            connection_map[client_id] = subscription
+            self.mc.set(key, connection_map)
+        finally:
+            self._lock.release(lock_name)
+
     def subscribe(self, connection_id, client_id, topic, sub_topic=None, selector=None):
         """Subscribe a client to a topic.
 
@@ -82,58 +135,10 @@ class MemcacheSubscriptionManager(SubscriptionManager, memcache_manager.Memcache
         subscription = Subscription(connection_id=connection_id,
             client_id=client_id, topic=topic)
 
-        # Create topic
-        lock_name = self.getLockName(self.TOPIC_ATTR)
-        self._lock.acquire(lock_name)
-        try:
-            topics = self.mc.get(self.TOPIC_ATTR)
-            if topics is None:
-                topics = {}
-            topic_map = topics.get(topic, None)
-            if topic_map is None: 
-                topics[topic] = True
-                self.mc.set(self.TOPIC_ATTR, topics)
-        finally:
-            self._lock.release(lock_name)
-
-        # Create topic message qeue
-        key = self.getKeyName(topic, self.MSG_ATTR)
-        lock_name = self.getLockName(key)
-        self._lock.acquire(lock_name)
-        try:
-            messages = self.mc.get(key)
-            if messages is None:
-                self.mc.set(key, [])
-        finally:
-            self._lock.release(lock_name)
-
-        # Create connection list
-        key = self.getKeyName(topic, self.CONNECTION_ATTR)
-        lock_name = self.getLockName(key)
-        self._lock.acquire(lock_name)
-        try:
-            connections = self.mc.get(key)
-            if connections is None:
-                connections = {}
-
-            connections[connection_id] = True
-            self.mc.set(key, connections)
-        finally:
-            self._lock.release(lock_name)
-
-        # Create client list
-        key = self.getKeyName(connection_id, topic)
-        lock_name = self.getLockName(key)
-        self._lock.acquire(lock_name)
-        try:
-            connection_map = self.mc.get(key)
-            if connection_map is None:
-                connection_map = {}
-
-            connection_map[client_id] = subscription
-            self.mc.set(key, connection_map)
-        finally:
-            self._lock.release(lock_name)
+        self._createTopic(topic)
+        self._createTopicMessageQeue(topic)
+        self._createConnectionList(topic, connection_id)
+        self._createClientList(topic, connection_id, client_id, subscription)
 
     def unSubscribe(self, connection_id, client_id, topic, sub_topic=None):
         """Un-Subscribe a client from a topic.
@@ -258,6 +263,8 @@ class MemcacheSubscriptionManager(SubscriptionManager, memcache_manager.Memcache
         self._lock.acquire(lock_name)
         try:
             messages = self.mc.get(key)
+            if messages is None:
+                messages = []
             messages.append(msg)
             self.mc.set(key, messages)
         finally:
