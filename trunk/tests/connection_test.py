@@ -6,23 +6,6 @@ import unittest
 from amfast.remoting.connection_manager import NotConnectedError, \
     SessionAttrError, MemoryConnectionManager
 
-try:
-    from amfast.remoting.gae_connection_manager import GaeConnectionManager
-except ImportError:
-    # Skip if we're not in Gae environment.
-    pass
-
-try:
-    from amfast.remoting.memcache_connection_manager import MemcacheConnectionManager
-except ImportError:
-    pass
-
-try:
-    import sqlalchemy as sa
-    from amfast.remoting.sa_connection_manager import SaConnectionManager
-except ImportError:
-    pass
-
 class ConnectionTestCase(unittest.TestCase):
 
     class TestChannel(object):
@@ -72,7 +55,7 @@ class ConnectionTestCase(unittest.TestCase):
         self._testCompare(connection, new_connection)
 
     def testGetConnectionRaisesNotConnectedError(self):
-        self.assertRaises(NotConnectedError, self.manager.getConnection, 'not connected')
+        self.assertRaises(NotConnectedError, self.manager.getConnection, 'not_connected')
 
     def testDeleteConnection(self):
         connection = self.manager.createConnection(self.channel)
@@ -171,6 +154,7 @@ class MemoryTestCase(ConnectionTestCase):
 class GaeTestCase(ConnectionTestCase):
 
     def setUp(self):
+        from amfast.remoting.gae_connection_manager import GaeConnectionManager
         self.manager = GaeConnectionManager()
         ConnectionTestCase.setUp(self)
 
@@ -180,6 +164,7 @@ class GaeTestCase(ConnectionTestCase):
 class MemcacheTestCase(ConnectionTestCase):
 
     def setUp(self):
+        from amfast.remoting.memcache_connection_manager import MemcacheConnectionManager
         self.manager = MemcacheConnectionManager()
         ConnectionTestCase.setUp(self)
 
@@ -189,6 +174,9 @@ class MemcacheTestCase(ConnectionTestCase):
 class SaTestCase(ConnectionTestCase):
 
     def setUp(self):
+        import sqlalchemy as sa
+        from amfast.remoting.sa_connection_manager import SaConnectionManager
+
         engine = sa.create_engine('sqlite:///sa_test_case.db', echo=False)
         metadata = sa.MetaData()
 
@@ -197,10 +185,51 @@ class SaTestCase(ConnectionTestCase):
         ConnectionTestCase.setUp(self)
 
 def suite():
-    return unittest.TestSuite((
-        unittest.TestLoader().loadTestsFromTestCase(MemoryTestCase),
-        unittest.TestLoader().loadTestsFromTestCase(SaTestCase),
-    ))
+    tests = [
+        unittest.TestLoader().loadTestsFromTestCase(MemoryTestCase)
+    ]
+
+    print "\n---- Optional Connection Tests ----"
+    try:
+        from amfast.remoting.gae_connection_manager import GaeConnectionManager
+    except Exception:
+        # Skip if we're not in Gae environment.
+        print "Skipping GAE test."
+    else:
+        print "Running GAE test."
+        tests.append(unittest.TestLoader().loadTestsFromTestCase(GaeTestCase))
+
+    try:
+        import sqlalchemy as sa
+        from amfast.remoting.sa_connection_manager import SaConnectionManager
+    except Exception:
+        # Skip if SQLAlchemy is not installed.
+        print "Skipping SA test."
+    else:
+        print "Running SA test."
+        tests.append(unittest.TestLoader().loadTestsFromTestCase(SaTestCase))
+
+    try:
+        from amfast.remoting.memcache_connection_manager import MemcacheConnectionManager
+
+        # Check connection
+        manager = MemcacheConnectionManager()
+        if manager.mc.set("test", True) is not True:
+            print "Memcache set failed."
+            raise Error("Memcache connection failed.")
+        if manager.mc.get("test") != True:
+            print "Memcache get failed."
+            raise Error("Memcache connection failed.")
+    except Exception:
+        # Skip if memcache support is not installed.
+        print "Skipping Memcache test."
+    else:
+        print "Running Memcache test."
+        tests.append(unittest.TestLoader().loadTestsFromTestCase(MemcacheTestCase))
+
+    print "--------"
+
+    return unittest.TestSuite(tests)
 
 if __name__ == '__main__':
     unittest.TextTestRunner().run(suite())   

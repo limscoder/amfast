@@ -20,13 +20,12 @@ class MemcacheMutex(object):
 
     def acquire(self, key):
         lock_holder = self.mc.get(key)
-        
         while lock_holder != self.id:
             if lock_holder is None:
-                self.mc.set(key, self.id) 
-                lock_holder = self.mc.get(key)
+                self.mc.set(key, self.id)
             else:
                 time.sleep(0.1)
+            lock_holder = self.mc.get(key)
 
         self.acquired_locks[key] = True
 
@@ -40,21 +39,21 @@ class MemcacheMutex(object):
         self.acquired_locks = {}
 
 class MemcacheManager(object):
-    KEY_SEPARATOR = ':'
+    KEY_SEPARATOR = '_'
 
     LOCK = '_lock'
 
     @classmethod
-    def createMcClient(cls, mc_servers=['127.0.0.1:11211'], mc_debug=0):
+    def createMcClient(cls, mc_servers=("127.0.0.1:11211",), mc_debug=0):
         if google is True:
             return memcache.Client()
         else:
-            return memcache(mc_servers, mc_debug)
+            return memcache.Client(mc_servers, mc_debug)
 
     @classmethod
     def getKeyName(cls, connection_id, attr):
-        return cls.KEY_SEPARATOR.join((connection_id, attr))
+        return str(cls.KEY_SEPARATOR.join(connection_id, str(attr))))
 
     @classmethod
     def getLockName(cls, attr):
-        return cls.KEY_SEPARATOR.join((cls.LOCK, attr))
+        return str(cls.KEY_SEPARATOR.join((cls.LOCK, attr)))
