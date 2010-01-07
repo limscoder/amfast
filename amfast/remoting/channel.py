@@ -258,10 +258,10 @@ class ChannelSet(object):
         self.subscription_manager.deleteConnection(connection)
         self.connection_manager.deleteConnection(connection)
 
-    def scheduleClean(self, dummy=True):
+    def scheduleClean(self):
         """Schedule connection cleaning procedure to run sometime in the future."""
 
-        if dummy is True:
+        if amfast.dummy_threading is True:
             amfast.logger.warn('Connection cleaning was NOT scheduled.')
             return
 

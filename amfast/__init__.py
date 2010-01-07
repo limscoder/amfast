@@ -87,6 +87,7 @@ try:
     import threading
 except ImportError:
     import dummy_threading
+    dummy_threading = True
     mutex_cls = dummy_threading.RLock
 
     if log_debug:
@@ -95,4 +96,5 @@ else:
     # Set this to dummy_threading.RLock
     # to skip locking when using Twisted
     # or any other single threaded implementation.
+    dummy_threading = False
     mutex_cls = threading.RLock
