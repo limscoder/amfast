@@ -13,7 +13,7 @@ import autoretry
 # This code gets run once per webserver.
 amfast.log_debug = False # Set to True to log AmFast debug messages
 channel_set = GaeChannelSet()
-channel_set.mapChannel(GaeChannel('amf'))
+channel_set.mapChannel(GaeChannel('amf', wait_interval=20000, poll_interval=1000))
 
 def main():
     """

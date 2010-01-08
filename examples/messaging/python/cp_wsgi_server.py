@@ -44,7 +44,7 @@ if __name__ == '__main__':
         }
     }
 
-    channel_set = WsgiChannelSet(notify_connections=True)
+    channel_set = WsgiChannelSet(notify_connections=False)
 
     # Clients connect every x seconds
     # to polling channels to check for messages.

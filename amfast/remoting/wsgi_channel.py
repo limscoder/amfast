@@ -16,7 +16,14 @@ class WsgiChannelSet(ChannelSet):
 class WsgiChannel(HttpChannel):
     """WSGI app channel."""
 
-    def __init__(self, name, max_connections=-1, endpoint=None, wait_interval=0):
+    def __init__(self, *args, **kwargs):
+
+        if len(args) > 3:
+            wait_interval = args[3]
+        elif 'wait_interval' in kwargs:
+            wait_interval = kwargs['wait_interval']
+        else:
+            wait_interval = 0
 
         if wait_interval < 0:
             # The only reliable way to detect
@@ -32,8 +39,7 @@ class WsgiChannel(HttpChannel):
             # zombie threads.
             raise ChannelError('wait_interval < 0 is not supported by WsgiChannel')
             
-        HttpChannel.__init__(self, name, max_connections=max_connections,
-            endpoint=endpoint, wait_interval=wait_interval)
+        HttpChannel.__init__(self, *args, **kwargs)
 
     def __call__(self, environ, start_response):
         if environ['REQUEST_METHOD'] != 'POST':

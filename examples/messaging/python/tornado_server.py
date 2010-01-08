@@ -9,7 +9,6 @@ import tornado.ioloop
 import amfast
 from amfast.remoting.tornado_channel import TornadoChannelSet, TornadoChannel
 
-
 class MainHandler (tornado.web.RequestHandler):
     def get(self):
         self.write("Hello World!")
@@ -50,7 +49,7 @@ if __name__ == '__main__':
     # a response to the client until
     # a message is available, or channel.max_interval
     # is reached.
-    long_poll_channel = TornadoChannel('longPoll', wait_interval=90)
+    long_poll_channel = TornadoChannel('longPoll', wait_interval=90000)
     channel_set.mapChannel(long_poll_channel)
 
     static_path = os.path.join(os.path.dirname(__file__), '..', 'flex', 'deploy')

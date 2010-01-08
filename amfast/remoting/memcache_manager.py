@@ -52,7 +52,7 @@ class MemcacheManager(object):
 
     @classmethod
     def getKeyName(cls, connection_id, attr):
-        return str(cls.KEY_SEPARATOR.join(connection_id, str(attr))))
+        return str(cls.KEY_SEPARATOR.join((connection_id, str(attr))))
 
     @classmethod
     def getLockName(cls, attr):

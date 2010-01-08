@@ -95,10 +95,9 @@ class TornadoChannel(HttpChannel):
     # so that it can be available to targets.
     TORNADO_REQUEST = '_tornado_request'
 
-    def __init__(self, name, max_connections=-1, endpoint=None,
-        timeout=1200, wait_interval=0):
+    def __init__(self, *args, **kwargs):
 
-        HttpChannel.__init__(self, name, max_connections, endpoint, wait_interval)
+        HttpChannel.__init__(self, *args, **kwargs)
 
         class requestHandler(tornado.web.RequestHandler):
             """The RequestHandler class for this Channel."""
@@ -140,50 +139,101 @@ class TornadoChannel(HttpChannel):
             return
 
         if request_handler.request.connection.stream.closed():
-           # Client is not connected.
+            # Client is not connected.
             return
 
         # Message is complete, encode and return
         request_handler.finish(self.encode(response))
 
-    def waitForMessage(self, packet, message, connection):
-        """Overridden to be non-blocking."""
+    def setupPollRequest(self, packet):
+        """Setup a request for a long-poll operation."""
+
         # Set flag so self.checkComplete
         # does not finish the message.
         setattr(packet.response, self.MSG_NOT_COMPLETE, True)
 
-        request = getattr(packet, self.TORNADO_REQUEST)
+        return getattr(packet, self.TORNADO_REQUEST)
 
-        # This function gets called when a message is published,
-        # or wait_interval is reached.
-        timeout_call = None
+    def finishPoll(self, request, packet, message, messages):
+        """Finish a request that has been waiting for messages."""
+
+        if isinstance(packet.channel.endpoint, AmfEndpoint):
+            # Make sure messages are not encoded as an ArrayCollection
+            messages = AsNoProxy(messages)
+        message.response_msg.body.body = messages
+
+        if hasattr(packet.response, self.MSG_NOT_COMPLETE):
+            delattr(packet.response, self.MSG_NOT_COMPLETE)
+        self.checkComplete(packet.response, request)
+
+    def _waitForMessage(self, packet, message, connection):
+        """Overridden to be non-blocking."""
+
+        request = self.setupPollRequest(packet)
+
         def _notify():
-            if timeout_call is not None:
-                IOLoop.instance().remove_timeout(timeout_call)
-
+            # This function gets called when a message is published,
+            # or wait_interval is reached.
             connection.unSetNotifyFunc()
 
             # Get messages and add them
             # to the response message
             messages = self.channel_set.subscription_manager.pollConnection(connection)
+            self.finishPoll(request, packet, message, messages)
 
-            if isinstance(packet.channel.endpoint, AmfEndpoint):
-                # Make sure messages are not encoded as an ArrayCollection
-                messages = AsNoProxy(messages)
-            message.response_msg.body.body = messages
-
-            delattr(packet.response, self.MSG_NOT_COMPLETE)
-            self.checkComplete(packet.response, request)
-
-        connection.setNotifyFunc(_notify)
-
-        # Remove notify function if client drops connection.
-        request.connection.stream.set_close_callback(connection.unSetNotifyFunc())
- 
         # Setup timeout
         if self.wait_interval > -1:
             timeout_call = IOLoop.instance().add_timeout(
-                time.time() + self.wait_interval, _notify)
+                time.time() + float(self.wait_interval) / 1000, _notify)
+
+        def _notifyTimeout():
+            # Notifies, plus cancels the timeout
+            if timeout_call is not None:
+                IOLoop.instance().remove_timeout(timeout_call)
+            _notify()
+        connection.setNotifyFunc(_notifyTimeout)
+
+        # Remove notify function if client drops connection.
+        request.request.connection.stream.set_close_callback(connection.unSetNotifyFunc)
+ 
+        return ()
+
+    def _pollForMessage(self, packet, message, connection):
+        """Overridden to be non-blocking."""
+
+        request = self.setupPollRequest(packet)
+
+        # Polls for messages every self.poll_interval
+        poller = PeriodicCallback(None, float(self.poll_interval) / 1000, IOLoop.instance())
+
+        def _timeout():
+            # Executed when timeout is reached.
+            poller.stop()
+            messages = self.channel_set.subscription_manager.pollConnection(connection)
+            self.finishPoll(request, packet, message, messages)
+
+        if self.wait_interval > -1:
+            timeout_call = IOLoop.instance().add_timeout(
+                time.time() + float(self.wait_interval) / 1000, _timeout)
+        else:
+            timeout_call = None
+
+        # Timeout if client drops connection.
+        request.request.connection.stream.set_close_callback(_timeout)
+
+        def _poll():
+            messages = self.channel_set.subscription_manager.pollConnection(connection)
+            if len(messages) > 0:
+                poller.stop()
+                if timeout_call is not None:
+                    # Disable time out callback
+                    IOLoop.instance().remove_timeout(timeout_call)
+                self.finishPoll(request, packet, message, messages)
+
+        poller.callback = _poll
+	poller.start()
+
+        return ()
 
 class StreamingTornadoChannel(TornadoChannel):
     """Handles streaming http connections."""
