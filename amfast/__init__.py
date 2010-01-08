@@ -85,16 +85,12 @@ def log_exc(e):
 
 try:
     import threading
+    mutex_cls = threading.RLock
+    use_dummy_threading = False
 except ImportError:
     import dummy_threading
-    dummy_threading = True
     mutex_cls = dummy_threading.RLock
+    use_dummy_threading = True
 
     if log_debug:
         logger.debug("AmFast is using dummy_threading module.")
-else:
-    # Set this to dummy_threading.RLock
-    # to skip locking when using Twisted
-    # or any other single threaded implementation.
-    dummy_threading = False
-    mutex_cls = threading.RLock
