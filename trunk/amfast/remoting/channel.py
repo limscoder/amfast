@@ -261,7 +261,7 @@ class ChannelSet(object):
     def scheduleClean(self):
         """Schedule connection cleaning procedure to run sometime in the future."""
 
-        if amfast.dummy_threading is True:
+        if amfast.use_dummy_threading is True:
             amfast.logger.warn('Connection cleaning was NOT scheduled.')
             return
 
