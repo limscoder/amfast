@@ -185,13 +185,12 @@ class SaSubscriptionManager(SubscriptionManager):
              message is expired.
         """
 
-        # Delete expired messages
-        self.deleteExpiredMessages(current_time)
-
-        # Poll new messages
+        # Poll for new messages
         s = sa.select((self.messages,),
                 and_(self.messages.c.topic == topic,
-                    self.messages.c.timestamp > cutoff_time))
+                    self.messages.c.timestamp > cutoff_time)).\
+            order_by(self.messages.c.timestamp)
+
         db = self.getDb()
         results = db.execute(s)
         for row in results:

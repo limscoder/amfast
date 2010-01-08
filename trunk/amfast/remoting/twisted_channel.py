@@ -67,11 +67,10 @@ class TwistedChannel(Resource, HttpChannel):
     # so that it can be available to targets.
     TWISTED_REQUEST = '_twisted_request'
 
-    def __init__(self, name, max_connections=-1, endpoint=None,
-        timeout=1200, wait_interval=0):
+    def __init__(self, *args, **kwargs):
 
         Resource.__init__(self)
-        HttpChannel.__init__(self, name, max_connections, endpoint, wait_interval)
+        HttpChannel.__init__(self, *args, **kwargs)
 
     def render_POST(self, request):
         """Process an incoming AMF packet."""
@@ -167,8 +166,9 @@ class TwistedChannel(Resource, HttpChannel):
         request.setResponseCode(500, message)
         self.finish(message, request)
 
-    def waitForMessage(self, packet, message, connection):
-        """Overridden to be non-blocking."""
+    def setupPollRequest(self, packet, connection):
+        """Setup a request for a long-poll operation."""
+
         # Set flag so self.finish
         # does not get called when
         # response packet is returned 
@@ -177,45 +177,99 @@ class TwistedChannel(Resource, HttpChannel):
 
         request = getattr(packet, self.TWISTED_REQUEST)
 
-        # Remove notify function if client drops connection.
-        _connectionLost = request.connectionLost
-        def _connection_lost(reason):
-            connection.unSetNotifyFunc()
-            _connectionLost(reason)
-            request.finish()
-        request.connectionLost = _connection_lost
+        return request
 
-        # This function gets called when a message is published,
-        # or wait_interval is reached.
+    def finishPoll(self, request, packet, message, messages):
+        """Finish a request that has been waiting for messages."""
+
+        if request.finished:
+            # Someone else has already called this function,
+            # or twisted has finished the request for some other reason.
+            return
+
+        if isinstance(self.endpoint, AmfEndpoint):
+            # Make sure messages are not encoded as an ArrayCollection
+            messages = AsNoProxy(messages)
+        message.response_msg.body.body = messages
+ 
+        delattr(packet.response, self.MSG_NOT_COMPLETE)
+        self.checkComplete(packet.response, request)
+
+    def _waitForMessage(self, packet, message, connection):
+        """Overridden to be non-blocking."""
+
+        request = self.setupPollRequest(packet, connection)
+
         timeout_call = None
         def _notify():
-            if request.finished:
-                # Someone else has already called this function,
-                # or twisted has finished the request for some other reason.
-                return
-
+            # This function gets called when a message is published,
+            # or wait_interval is reached.
             if timeout_call is not None and timeout_call.active():
+                # Disable time out callback
                 timeout_call.cancel()
-            
+
+            # Disable notify function.
             connection.unSetNotifyFunc()
 
             # Get messages and add them
             # to the response message
             messages = self.channel_set.subscription_manager.pollConnection(connection)
-            
-            if isinstance(packet.channel.endpoint, AmfEndpoint):
-                # Make sure messages are not encoded as an ArrayCollection
-                messages = AsNoProxy(messages)
-            message.response_msg.body.body = messages
- 
-            delattr(packet.response, self.MSG_NOT_COMPLETE)
-            self.checkComplete(packet.response, request)
-
+            self.finishPoll(request, packet, message, messages)
         connection.setNotifyFunc(_notify)
 
         # Notify when wait_interval is reached
         if self.wait_interval > -1:
-            timeout_call = reactor.callLater(self.wait_interval, _notify)
+            timeout_call = reactor.callLater(float(self.wait_interval) / 1000, _notify)
+
+        # Cleanup if client drops connection.
+        _connectionLost = request.connectionLost
+        def _connection_lost(reason):
+            _connectionLost(reason)
+            _notify()
+        request.connectionLost = _connection_lost
+
+        return ()
+
+    def _pollForMessage(self, packet, message, connection):
+        """Overridden to be non-blocking."""
+
+        request = self.setupPollRequest(packet, connection)
+
+        poller = task.LoopingCall(None)
+        
+        def _timeout():
+            poller.stop()
+            messages = self.channel_set.subscription_manager.pollConnection(connection)
+            self.finishPoll(request, packet, message, messages)
+
+        # Cleanup if client drops connection.
+        _connectionLost = request.connectionLost
+        def _connection_lost(reason):
+            _connectionLost(reason)
+            _timeout()
+        request.connectionLost = _connection_lost
+
+        if self.wait_interval > -1:
+            timeout_call = reactor.callLater(float(self.wait_interval) / 1000, _timeout)
+        else:
+            timeout_call = None
+
+        def _poll():
+            messages = self.channel_set.subscription_manager.pollConnection(connection)
+            if len(messages) > 0:
+                poller.stop()
+                if timeout_call is not None and timeout_call.active():
+                    # Disable time out callback
+                    timeout_call.cancel()
+
+                self.finishPoll(request, packet, message, messages)
+            elif connection.connected is False:
+                _timeout()
+
+        poller.f = _poll
+        poller.start(float(self.poll_interval) / 1000)
+
+        return ()
 
 class StreamingTwistedChannel(TwistedChannel):
     """Handles streaming http connections."""

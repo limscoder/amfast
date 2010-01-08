@@ -41,9 +41,9 @@ class GaeChannelSet(WsgiChannelSet):
         pass
 
 class GaeChannel(WsgiChannel):
-    def __init__(self, name, max_connections=-1, endpoint=None):
-        if endpoint is None:
-            endpoint = PyAmfEndpoint()
+    def __init__(self, *args, **kwargs):
+        # Overriden to set default endpoint as PyAmfEndpoint.
+        if len(args) < 3 and ('endpoint' not in kwargs):
+            kwargs['endpoint'] = PyAmfEndpoint()
 
-        WsgiChannel.__init__(self, name, max_connections=max_connections,
-            endpoint=endpoint, wait_interval=0)
+        WsgiChannel.__init__(self, *args, **kwargs)

@@ -126,18 +126,15 @@ class GaeSubscriptionManager(SubscriptionManager):
              message is expired.
         """
 
-        remove_msgs = []
-
         query = GaeMessageMetadata.all()
         query.filter('topic = ', topic)
+        query.filter('timestamp > ', cutoff_time)
         query.order('timestamp')
         for message_data in query:
-            if current_time > (message_data.timestamp + message_data.time_to_live):
-                remove_msgs.append(message_data)
-            else:
-                if message_data.timestamp > cutoff_time:
-                    yield pickle.loads(message_data.message_body.p_message) 
+            yield pickle.loads(message_data.message_body.p_message) 
 
-        for message_data in remove_msgs:
-            db.delete(GaeMessageMetadata.message_body.get_value_for_datastore(message_data))
-            message_data.delete()
+    def deleteExpiredMessages(self, cutoff_time):
+        query = GaeMessageMetadata.all(keys_only=True)
+        query.filter('timestamp < ', cutoff_time)
+        for result in query:
+            db.delete(result)

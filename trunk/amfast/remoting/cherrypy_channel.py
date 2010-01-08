@@ -75,7 +75,8 @@ class CherryPyChannel(HttpChannel):
 class StreamingCherryPyChannel(CherryPyChannel):
     """Allows HTTP streaming."""
 
-    def __init__(self, name, max_connections=-1, endpoint=None, wait_interval=0, heart_interval=30):
+    def __init__(self, name, max_connections=-1, endpoint=None,
+        wait_interval=0, heart_interval=30):
         CherryPyChannel.__init__(self, name, max_connections=max_connections,
             endpoint=endpoint, wait_interval=wait_interval)
 
@@ -87,7 +88,6 @@ class StreamingCherryPyChannel(CherryPyChannel):
         if cherrypy.request.headers['Content-Type'] == self.CONTENT_TYPE:
             # Regular AMF message
             return CherryPyChannel.__call__(self)
-
 
         # Create streaming message command
         cherrypy.response.stream = True

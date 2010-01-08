@@ -127,19 +127,23 @@ class HttpChannel(Channel):
 
     attributes
     ===========
-     * wait_interval - int, Number of seconds to wait before sending response to client
-         when a polling request is received. Set to -1 to configure channel as a
-         long-polling channel.
+     * wait_interval - int, Number of millisecondsseconds to wait before sending
+         response to client when a polling request is received. Set to -1 to
+         configure channel as a long-polling channel. Default = 0
+     * poll_interval - int, Number of milliseconds between message polling operations
+         when channel_set.notify == False
     """
 
     # Content type for amf messages
     CONTENT_TYPE = 'application/x-amf'
 
-    def __init__(self, name, max_connections=-1, endpoint=None, wait_interval=0):
+    def __init__(self, name, max_connections=-1, endpoint=None,
+        wait_interval=0, poll_interval=500):
 
         Channel.__init__(self, name, max_connections, endpoint)
 
         self.wait_interval = wait_interval
+        self.poll_interval = poll_interval
 
     def getBadMethodMsg(self):
         return "405 Method Not Allowed\n\nAMF request must use 'POST' method."
@@ -157,20 +161,58 @@ class HttpChannel(Channel):
         return "500 Internal Server Error\n\nAmFast server error.%s" % msg
 
     def waitForMessage(self, packet, message, connection):
-        """Waits for a new message.
+        """Waits until a new message is published to this connection.
+        Returns list of messages.
+        """
+
+        if self.channel_set.notify_connections is True:
+            return self._waitForMessage(packet, message, connection)
+        else:
+            return self._pollForMessage(packet, message, connection)
+
+    def _waitForMessage(self, packet, message, connection):
+        """Waits until notified that a new message is available, then returns messages.
 
         This is blocking, and should only be used
         for Channels where each connection is a thread.
+
+        Synchronous servers should override this method.
         """
+
         event = threading.Event()
         connection.setNotifyFunc(event.set)
         
         if (self.wait_interval > -1):
-            event.wait(self.wait_interval)
+            event.wait(float(self.wait_interval) / 1000)
 
         # Event.set has been called,
         # or timeout has been reached.
         connection.unSetNotifyFunc()
+
+        return self.channel_set.subscription_manager.pollConnection(connection)
+
+    def _pollForMessage(self, packet, message, connection):
+        """Repeatedly polls for a new message until
+        message is available or wait_interval is reached.
+
+        This is blocking, and should only be used
+        for Channels where each connection is a thread.
+
+        Synchronous servers should override this method.
+        """
+        total_time = 0
+        poll_secs = float(self.poll_interval) / 1000
+        wait_secs = float(self.wait_interval) / 1000
+        while True:
+            event = threading.Event()
+            event.wait(poll_secs)
+            msgs = self.channel_set.subscription_manager.pollConnection(connection)
+            if len(msgs) > 0:
+                return msgs
+            
+            total_time += poll_secs
+            if total_time > wait_secs or connection.connected is False:
+                return ()
 
 class ChannelSet(object):
     """A collection of Channels.
@@ -280,6 +322,13 @@ class ChannelSet(object):
         current_time = time.time() * 1000
         for connection_id in self.connection_manager.iterConnectionIds():
             self.cleanConnection(connection_id, current_time)
+
+        if hasattr(self.subscription_manager, 'deleteExpiredMessages'):
+            # TODO: better interface for deleting expired messages.
+            #
+            # Some subscriptions managers auto-delete expired messages,
+            # others require a method to be called.
+            subscription_manager.deleteExpiredMessages(current_time)
 
     def cleanConnection(self, connection_id, current_time): 
         if amfast.log_debug is True: 

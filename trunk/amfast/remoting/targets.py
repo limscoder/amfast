@@ -94,8 +94,7 @@ def poll_operation(packet, msg, *args):
     if len(msgs) < 1 and channel.wait_interval != 0:
         # Long polling channel, don't return response
         # until a message is available.
-        channel.waitForMessage(packet, msg, connection)
-        msgs = channel.channel_set.subscription_manager.pollConnection(connection)
+        msgs = channel.waitForMessage(packet, msg, connection)
 
     if isinstance(channel.endpoint, AmfEndpoint):
         # Make sure messages are not encoded as an ArrayCollection
