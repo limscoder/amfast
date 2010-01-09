@@ -326,9 +326,12 @@ class ChannelSet(object):
         if hasattr(self.subscription_manager, 'deleteExpiredMessages'):
             # TODO: better interface for deleting expired messages.
             #
+            # Perhaps iterate through messages and delete expired
+            # similar to how connection cleaning works??
+            #
             # Some subscriptions managers auto-delete expired messages,
             # others require a method to be called.
-            subscription_manager.deleteExpiredMessages(current_time)
+            self.subscription_manager.deleteExpiredMessages(current_time)
 
     def cleanConnection(self, connection_id, current_time): 
         if amfast.log_debug is True: 
