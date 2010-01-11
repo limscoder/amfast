@@ -262,11 +262,21 @@ class StreamingTornadoChannel(TornadoChannel):
 
     def startStream(self, msg, request_handler):
         """Get this stream rolling!"""
+
         connection = self.channel_set.connection_manager.getConnection(msg.headers.get(msg.FLEX_CLIENT_ID_HEADER))
+
+        if self.channel_set.notify_connections is True:
+            poller = None
+        else:
+            # Call _notify multiple times if polling.
+            poller = PeriodicCallback(None, float(self.poll_interval) / 1000, IOLoop.instance())
 
         # Handle new message.
 	def _notify():
             if connection.connected is False:
+                if poller is not None:
+                    poller.stop()
+
 	        connection.unSetNotifyFunc()
 		if request_handler.request.connection.stream.closed() is False:
 		    msg = messaging.StreamingMessage.getDisconnectMsg()
@@ -275,11 +285,18 @@ class StreamingTornadoChannel(TornadoChannel):
 		return
 		    
 	    msgs = self.channel_set.subscription_manager.pollConnection(connection)
-	    self.sendMsgs(msgs, request_handler)
+            if len(msgs) > 0:
+	        self.sendMsgs(msgs, request_handler)
 	connection.setNotifyFunc(_notify)
+
+        if poller is not None:
+           poller.callback = _notify
+           poller.start() 
 
         # Handle dropped connection.
 	def _connectionLost():
+            if poller is not None:
+                poller.stop()
 	    self.channel_set.disconnect(connection)
 	    connection.unSetNotifyFunc()   
         request_handler.request.connection.stream.set_close_callback(_connectionLost)
