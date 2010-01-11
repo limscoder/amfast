@@ -304,7 +304,14 @@ class StreamingTwistedChannel(TwistedChannel):
 
     def startStream(self, msg, request):
         """Get this stream rolling!"""
+
         connection = self.channel_set.connection_manager.getConnection(msg.headers.get(msg.FLEX_CLIENT_ID_HEADER))
+
+        if self.channel_set.notify_connections is True:
+            poller = None
+        else:
+            # Repeatedly poll for messages.
+            poller = task.LoopingCall(None)
 
         # Remove notify function if client drops connection.
         _connectionLost = request.connectionLost
@@ -317,7 +324,9 @@ class StreamingTwistedChannel(TwistedChannel):
         # This function gets called when a message is published.
         def _notify():
             if connection.connected is False:
-                # Connection is disconnected
+                if poller is not None:
+                    poller.stop()
+
                 connection.unSetNotifyFunc()
                 msg = messaging.StreamingMessage.getDisconnectMsg()
                 request.write(messaging.StreamingMessage.prepareMsg(msg, self.endpoint))
@@ -328,6 +337,10 @@ class StreamingTwistedChannel(TwistedChannel):
             for msg in msgs:
                 request.write(messaging.StreamingMessage.prepareMsg(msg, self.endpoint))
         connection.setNotifyFunc(_notify)
+
+        if poller is not None:
+            poller.f = _notify
+            poller.start(float(self.poll_interval) / 1000) 
 
         # Acknowledge connection
         response = msg.acknowledge()

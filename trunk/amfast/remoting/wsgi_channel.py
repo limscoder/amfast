@@ -183,6 +183,7 @@ class StreamingWsgiChannel(WsgiChannel):
             # Wait for new messages.
             event = threading.Event()
             connection.setNotifyFunc(event.set)
+            poll_secs = float(self.poll_interval) / 1000
             while True:
 
                 if connection.connected is False:
@@ -195,9 +196,13 @@ class StreamingWsgiChannel(WsgiChannel):
                         pass
                     # Stop stream
                     return []
- 
-                # Block until new message
-                event.wait()
+
+                if self.channel_set.notify_connections is True: 
+                    # Block until notification of new message
+                    event.wait()
+                else:
+                    # Block until poll_interval is reached
+                    event.wait(poll_secs)
 
                 # Message has been published,
                 # or it's time for a heart beat
