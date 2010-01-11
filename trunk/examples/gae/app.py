@@ -1,10 +1,12 @@
 import logging
+import os
 import traceback
 
 from google.appengine.ext.webapp.util import run_wsgi_app
 from google.appengine.api import apiproxy_stub_map
 
 import amfast
+from amfast.remoting.memcache_subscription_manager import MemcacheSubscriptionManager
 from amfast.remoting.gae_channel import GaeChannelSet, GaeChannel
 
 import autoretry
@@ -12,8 +14,15 @@ import autoretry
 # Setup AmFast here.
 # This code gets run once per webserver.
 amfast.log_debug = False # Set to True to log AmFast debug messages
-channel_set = GaeChannelSet()
-channel_set.mapChannel(GaeChannel('amf'))
+channel_set = GaeChannelSet(subscription_manager=MemcacheSubscriptionManager())
+
+if os.environ['SERVER_SOFTWARE'].find('Development') >= 0:
+    # Use regular polling when running under development server.
+    # Long poll setup does not seem to work correctly in development server.
+    channel_set.mapChannel(GaeChannel('amf'))
+else:
+    # User long polling when running on GAE.
+    channel_set.mapChannel(GaeChannel('amf', wait_interval=20000, poll_interval=500))
 
 def main():
     """
