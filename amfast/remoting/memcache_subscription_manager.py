@@ -264,7 +264,7 @@ class MemcacheSubscriptionManager(SubscriptionManager, memcache_manager.Memcache
         try:
             messages = self.mc.get(key)
             if messages is None:
-                messages = []
+                messages = [] 
             messages.append(msg)
             self.mc.set(key, messages)
         finally:
