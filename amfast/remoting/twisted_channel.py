@@ -82,7 +82,6 @@ class TwistedChannel(Resource, HttpChannel):
             d.addCallbacks(self.checkComplete, self.fail, callbackArgs=(request,), errbackArgs=(request,))
             d.callback(int(request.getHeader('Content-Length')))
 
-            request.setHeader('Content-Type', self.CONTENT_TYPE)
             return server.NOT_DONE_YET
 
     def decode(self, raw_request, request):
@@ -159,6 +158,7 @@ class TwistedChannel(Resource, HttpChannel):
 
     def finish(self, raw_response, request):
         """Send response to client when message is complete."""
+        request.setHeader('Content-Type', self.CONTENT_TYPE)
         request.write(raw_response)
         request.finish()
 
