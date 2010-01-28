@@ -96,6 +96,10 @@ int type_list(PyObject* class_def, PyObject *mapper,
 
             PyObject *typed_item = get_typed_val(mapper, callable, item);
             Py_DECREF(callable);
+            if (typed_item == NULL) {
+                Py_DECREF(types);
+                return 0;
+            }
 
             int result = PySequence_SetItem(val_list, i, typed_item);
             Py_DECREF(typed_item);
@@ -147,6 +151,10 @@ int type_dict(PyObject* class_def, PyObject *mapper, PyObject* dict, int type)
         PyObject *val = PyDict_GetItem(dict, attr);
         if (val != NULL) {
             PyObject *typed_item = get_typed_val(mapper, converter, val);
+            if (typed_item == NULL) {
+                Py_DECREF(types);
+                return 0;
+            }
 
             if (PyDict_SetItem(dict, attr, typed_item) == -1) {
                 Py_DECREF(types);
