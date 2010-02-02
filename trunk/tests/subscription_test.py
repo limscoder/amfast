@@ -129,7 +129,7 @@ class SubscriptionTestCase(unittest.TestCase):
         """TODO: re-write this test.
 
         Expired messages now are cleaned
-        in different ways depending in the
+        in different ways depending on the
         subscription manager."""
         pass  
         #cutoff_time = time.time() * 1000

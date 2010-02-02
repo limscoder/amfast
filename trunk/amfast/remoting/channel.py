@@ -329,8 +329,8 @@ class ChannelSet(object):
             # Perhaps iterate through messages and delete expired
             # similar to how connection cleaning works??
             #
-            # Some subscriptions managers auto-delete expired messages,
-            # others require a method to be called.
+            # Currently, some subscriptions managers auto-delete
+            # expired messages, while others require a method to be called.
             self.subscription_manager.deleteExpiredMessages(current_time)
 
     def cleanConnection(self, connection_id, current_time): 
