@@ -59,8 +59,16 @@ class SubscriptionManager(object):
 
         self.persistMessage(msg)
 
-    def pollConnection(self, connection):
-        """Retrieves all waiting messages for a specific connection."""
+    def pollConnection(self, connection, soft_touch=False):
+        """Retrieves all waiting messages for a specific connection.
+
+        parameters
+        ===========
+         * connection - Connection, connection to poll.
+         * soft_touch - boolean, True to call connection.touchSoftPolled,
+             False to call connection.touchPolled. Default = False
+
+        """
 
         current_time = time.time() * 1000
         polled_msgs = []
@@ -70,7 +78,10 @@ class SubscriptionManager(object):
                 for msg in self.pollMessages(subscription.topic, \
                     connection.last_polled, current_time)])
 
-        connection.touchPolled()
+        if soft_touch is True:
+            connection.softTouchPolled()
+        else:
+            connection.touchPolled()
         return polled_msgs
 
 class MemorySubscriptionManager(SubscriptionManager):
