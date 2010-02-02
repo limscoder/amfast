@@ -1,3 +1,4 @@
+import amfast
 from gae_connection_manager import GaeConnectionManager
 from gae_subscription_manager import GaeSubscriptionManager
 from pyamf_endpoint import PyAmfEndpoint
@@ -35,10 +36,7 @@ class GaeChannelSet(WsgiChannelSet):
         pass
 
     def scheduleClean(self):
-        """You must configure cron.yaml
-        to access the url: self.CLEAN_URL to
-        clean-up any stale connections."""
-        pass
+        amfast.logger.warn("Cron.yaml must be configured to access the URL: self.CLEAN_URL to clean-up any stale connections.")
 
 class GaeChannel(WsgiChannel):
     def __init__(self, *args, **kwargs):

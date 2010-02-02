@@ -58,11 +58,19 @@ class GaeChannelModel(db.Model):
     count = db.IntegerProperty(required=True)
 
 class GaeConnectionManager(ConnectionManager):
-    """Manages connections stored by Google DataStore."""
+    """Manages connections stored by Google DataStore.
 
-    def __init__(self, connection_class=GaeConnection, connection_params=None):
+    attributes
+    =============
+     * touch_time - int, minimum time in milliseconds between writes to 'last_active' field.
+    """
+
+    def __init__(self, connection_class=GaeConnection, connection_params=None, touch_time=10000):
         ConnectionManager.__init__(self, connection_class=connection_class,
             connection_params=connection_params)
+
+        # Reduces number of writes to 'last_active' field.
+        self.touch_time = touch_time
 
     def reset(self):
         query = GaeConnectionModel.all(keys_only=True)
@@ -234,17 +242,22 @@ class GaeConnectionManager(ConnectionManager):
 
     def touchConnection(self, connection):
         if connection.model is not None:
-            last_active = GaeConnectionLastActive(key_name=connection.id,
-                value=(time.time() * 1000))
-            last_active.put()
-            connection.model.last_active = last_active
+            now = time.time() * 1000
+            diff = now - connection.model.last_active.value
+            connection.model.last_active.value = now
+            if diff > self.touch_time:
+                # last_active value is only written periodically
+                # to save time writing to data_store.
+                connection.model.last_active.put()
 
     def touchPolled(self, connection):
+        self.softTouchPolled(connection);
         if connection.model is not None:
-            last_polled = GaeConnectionLastPolled(key_name=connection.id,
-                value=(time.time() * 1000))
-            last_polled.put()
-            connection.model.last_polled = last_polled
+            connection.model.last_polled.put()
+
+    def softTouchPolled(self, connection):
+        if connection.model is not None:
+            connection.model.last_polled.value = time.time() * 1000
 
     def authenticateConnection(self, connection, user):
         if connection.model is not None:

@@ -200,18 +200,27 @@ class HttpChannel(Channel):
 
         Synchronous servers should override this method.
         """
+        # If True, don't store persistent 'last_polled' value every poll operation.
+        soft_touch = hasattr(self.channel_set.connection_manager, "softTouchPolled")
+
         total_time = 0
         poll_secs = float(self.poll_interval) / 1000
         wait_secs = float(self.wait_interval) / 1000
         while True:
             event = threading.Event()
             event.wait(poll_secs)
-            msgs = self.channel_set.subscription_manager.pollConnection(connection)
+            msgs = self.channel_set.subscription_manager.pollConnection(connection, soft_touch)
             if len(msgs) > 0:
+                if soft_touch is True:
+                    # Store 'last_polled' value.
+                    connection.touchPolled()            
                 return msgs
             
             total_time += poll_secs
             if total_time > wait_secs or connection.connected is False:
+                if soft_touch is True:
+                    # Store 'last_polled' value.
+                    connection.touchPolled()
                 return ()
 
 class ChannelSet(object):

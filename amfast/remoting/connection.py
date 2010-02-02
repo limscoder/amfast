@@ -112,6 +112,13 @@ class Connection(object):
         """Update last_polled."""
         self._manager.touchPolled(self)
 
+    def softTouchPolled(self):
+        """Update last_polled without persisting value.
+  
+        Useful when ChannelSet calls _pollForMessage.
+        """
+        self._manager.softTouchPolled(self)
+
     def connect(self):
         """Set connected=True."""
         self._manager.connectConnection(self)
