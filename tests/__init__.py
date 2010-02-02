@@ -1,5 +1,8 @@
 import unittest
 
+import amfast
+amfast.use_dummy_threading = True
+
 def suite():
     import amf3_encoder_test
     import amf0_encoder_test
