@@ -9,6 +9,7 @@ from amfast.class_def import ClassDefMapper
 import connection_manager as cm
 import subscription_manager as sm
 import flex_messages as messaging
+import thread_pool
 
 class ChannelError(amfast.AmFastError):
     pass
@@ -406,11 +407,11 @@ class ChannelSet(object):
 
         arguments:
         ===========
-         * msg - AbstractMessage, the Flex message that was published.
+         * topic - string, topic to notify
+         * sub_topic - string, sub_topic to notify
         """
-
-        thread = threading.Thread(target=self._notifyConnections, args=(topic, sub_topic))
-        thread.run()
+       
+        thread_pool.GlobalThreadPool().addTask(self._notifyConnections, args=(topic, sub_topic)) 
 
     def _notifyConnections(self, topic, sub_topic):
         """Do the real work of notifyConnections."""
