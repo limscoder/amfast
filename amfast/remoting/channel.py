@@ -316,12 +316,12 @@ class ChannelSet(object):
             amfast.logger.warn('Connection cleaning was NOT scheduled.')
             return
 
+        thread = threading.Timer(self.clean_freq, None)
+        thread.daemon = True
         def _clean():
             self.clean()
-            self.scheduleClean()
-
-        thread = threading.Timer(self.clean_freq, _clean)
-        thread.daemon = True
+            thread.start()
+        thread.function = _clean
         thread.start()
 
     def clean(self):
