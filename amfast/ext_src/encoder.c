@@ -589,7 +589,7 @@ static int encode_dict_AMF3(EncoderObj *context, PyObject *value)
     if (!serialize_class_def_AMF3(context, Py_None)) {
         return 0;
     }
-    
+
     return encode_dynamic_dict_AMF3(context, value);
 }
 
@@ -662,6 +662,11 @@ static int encode_date(EncoderObj *context, PyObject *value)
 static int encode_reference_AMF3(EncoderObj *context, RefObj *ref_context,
     PyObject *value, int bit)
 {
+    if (ref_context == NULL) {
+        PyErr_SetString(amfast_EncodeError, "Reference indexer is NULL.");
+        return 0;
+    }
+
     // Using references is an option set in the context
     if (context->use_refs == Py_True) {
         int idx = Ref_ret(ref_context, value);
@@ -909,7 +914,7 @@ static int encode_object_AMF3(EncoderObj *context, PyObject *value)
         Py_DECREF(class_def);
         return 0;
     }
-    
+
     Py_ssize_t static_attr_len = PySequence_Size(static_attrs);
     if (static_attr_len == -1) {
         Py_DECREF(class_def);
@@ -1416,8 +1421,8 @@ static PyObject* static_attr_vals_from_class_def(EncoderObj *context, PyObject *
     if (!static_attrs)
         return NULL;
 
-    if (!PyList_Check(static_attrs)) {
-        PyErr_SetString(amfast_EncodeError, "ClassDef.getStaticAttrVals must return a list.");
+    if (!PySequence_Check(static_attrs)) {
+        PyErr_SetString(amfast_EncodeError, "ClassDef.getStaticAttrVals must return a sequence.");
         Py_DECREF(static_attrs);
         return NULL;
     }
@@ -1606,49 +1611,12 @@ static int encode_packet(EncoderObj *context, PyObject *value)
     if (!client_type)
         return 0;
 
-    PyObject *flash_8 = PyObject_GetAttrString(value, "FLASH_8");
-    if (!flash_8) {
-        Py_DECREF(client_type);
+    short amf_client_type = (short) PyInt_AsLong(client_type);
+    Py_DECREF(client_type); 
+    if (amf_client_type < 0)
         return 0;
-    }
 
-    PyObject *flash_com = PyObject_GetAttrString(value, "FLASH_COM");
-    if (!flash_com) {
-        Py_DECREF(client_type);
-        Py_DECREF(flash_8);
-        return 0;
-    }
-
-    PyObject *flash_9 = PyObject_GetAttrString(value, "FLASH_9");
-    if (!flash_9) {
-        Py_DECREF(client_type);
-        Py_DECREF(flash_8);
-        Py_DECREF(flash_com);
-        return 0;
-    }
-
-    // Set client type
-    unsigned short amf_client_type;
-    if (PyUnicode_Compare(client_type, flash_8) == 0) {
-        amf_client_type = FLASH_8;
-    } else if (PyUnicode_Compare(client_type, flash_com) == 0) {
-        amf_client_type = FLASH_COM;
-    } else if (PyUnicode_Compare(client_type, flash_9) == 0) {
-        amf_client_type = FLASH_9;
-    } else {
-        PyErr_SetString(amfast_EncodeError, "Unknown client type.");
-        Py_DECREF(client_type);
-        Py_DECREF(flash_8);
-        Py_DECREF(flash_com);
-        Py_DECREF(flash_9);
-        return 0;
-    }
-
-    Py_DECREF(client_type);
-    Py_DECREF(flash_8);
-    Py_DECREF(flash_com);
-    Py_DECREF(flash_9);
-    if (!encode_ushort(context, amf_client_type))
+    if (!encode_ushort(context, (unsigned short)amf_client_type))
         return 0;
 
     // write headers
@@ -1656,11 +1624,15 @@ static int encode_packet(EncoderObj *context, PyObject *value)
     if (!headers)
         return 0;
 
-    Py_ssize_t header_count = PySequence_Size(headers);
-    if (header_count == -1) {
-        Py_DECREF(headers);
-        return 0;
+    Py_ssize_t header_count = 0;
+    if (PySequence_Check(headers)) {
+        header_count = PySequence_Size(headers);
+        if (header_count == -1) {
+            Py_DECREF(headers);
+            return 0;
+        }
     }
+
     if (!encode_ushort(context, (unsigned short)header_count)) {
         Py_DECREF(headers);
         return 0;
@@ -1713,7 +1685,6 @@ static int encode_packet(EncoderObj *context, PyObject *value)
         }
     }
     Py_DECREF(messages);
-
     return 1;
 }
 
@@ -1802,19 +1773,23 @@ static int encode_packet_message_AMF0(EncoderObj *context, PyObject *value)
     }
 
     // Encode message body with a new context, so references are reset
-    EncoderObj *new_context = (EncoderObj*)Encoder_copy(context, 0, 1);
-
+    EncoderObj *new_context;
     if (PySequence_Size(response) > 0 && (PyList_Check(body) || PyTuple_Check(body))) {
         // We're encoding a request,
         // Don't count argument list 
         // in reference count.
+
+        // Always use AMF0 context!
+        new_context = (EncoderObj*)Encoder_copy(context, 0, 1);
         result = write_list_AMF0(new_context, body, 0);
     } else {
         if (context->amf3 == Py_True) {
+            new_context = (EncoderObj*)Encoder_copy(context, 1, 1);
             if (!Encoder_writeByte(new_context, AMF3_AMF0))
                 return 0;
             result = encode_AMF3(new_context, body);
         } else {
+            new_context = (EncoderObj*)Encoder_copy(context, 0, 1);
             result = encode_AMF0(new_context, body);
         }
     }
