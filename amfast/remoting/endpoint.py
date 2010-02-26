@@ -3,10 +3,10 @@
 import amfast
 
 class Endpoint(object):
-    def logRaw(label, raw):
+    def logRaw(self, label, raw):
         if hasattr(raw, "upper"):
             amfast.logger.debug("<%s>%s</%s>" %
-                    (label, amfast.format_byte_string(raw_packet), label))
+                    (label, repr(raw), label))
 
 class AmfEndpoint(Endpoint):
     """An Endpoint that can encode/decode AMF packets.
