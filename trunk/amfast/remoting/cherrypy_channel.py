@@ -100,7 +100,7 @@ class StreamingCherryPyChannel(CherryPyChannel):
             msg.parseBody(body)
         except (KeyboardInterrupt, SystemExit):
             raise
-        except:
+        except Exception, exc:
             amfast.log_exc(exc)
             raise ChannelError("AMF server error.")
 
@@ -217,6 +217,7 @@ class StreamingCherryPyChannel(CherryPyChannel):
 
     def stopStream(self, msg):
         """Stop a streaming connection."""
+
         connection = self.channel_set.getConnection(msg.headers.get(msg.FLEX_CLIENT_ID_HEADER))
         connection.disconnect()
         if hasattr(connection, "notify_func") and connection.notify_func is not None:

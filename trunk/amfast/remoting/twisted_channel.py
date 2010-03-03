@@ -20,39 +20,44 @@ class TwistedChannelSet(ChannelSet):
         return channel.render_POST(request)
 
     def scheduleClean(self):
-        reactor.callLater(self.clean_freq, self.clean)
+        cleaner = task.LoopingCall(self.clean)
+        cleaner.start(self.clean_freq, False)
 
     def notifyConnections(self, topic, sub_topic):
-        reactor.callLater(0.1, self._notifyConnections, topic, sub_topic)
+        reactor.callLater(0, self._notifyConnections, topic, sub_topic)
 
     def _notifyConnections(self, topic, sub_topic):
-        for connection_id in self.subscription_manager.iterSubscribers(topic, sub_topic):
+        iter = self.subscription_manager.iterSubscribers(topic, sub_topic)
+        def _notify():
             try:
-                connection = self.connection_manager.getConnection(connection_id, False)
-            except cm.NotConnectedError:
-                continue
-
-            if connection.notify_func is not None:
-                reactor.callLater(0.1, connection.notify_func)
+                connection_id = iter.next()
+                try:
+                    connection = self.connection_manager.getConnection(connection_id, False)
+                except cm.NotConnectedError:
+                    pass
+                else:
+                    if connection.notify_func is not None:
+                        reactor.callLater(0, connection.notify_func)
+                reactor.callLater(0, _notify)
+            except StopIteration:
+                pass
+        reactor.callLater(0, _notify)
 
     def clean(self):
-        amfast.logger.debug("Cleaning connections.")
+        if amfast.log_debug is True:
+            amfast.logger.debug("Cleaning channel.")
 
         current_time = time.time()
-        deferreds = []
-        for connection_id in self.connection_manager.iterConnectionIds():
-            d = defer.Deferred()
-            d.addCallbacks(self.cleanConnection, callbackArgs=(current_time,))
-            reactor.callLater(0.3, d.callback, connection_id)
+        iter = self.connection_manager.iterConnectionIds()
 
-        if len(deferreds) > 0:
-            def _scheduleClean(val):
-                self.scheduleClean()
-
-            deferredList = defer.DeferredList(deferreds)
-            deferredList.addCallback(self.scheduleClean)
-        else:
-            self.scheduleClean()
+        def _clean():
+            try:
+                connection_id = iter.next()
+                reactor.callLater(0, self.cleanConnection, connection_id, current_time)
+                reactor.callLater(0, _clean)
+            except StopIteration:
+                pass
+        reactor.callLater(0, _clean)
 
 class TwistedChannel(Resource, HttpChannel):
     """An AMF messaging channel that can be used with Twisted Web."""
@@ -340,7 +345,7 @@ class StreamingTwistedChannel(TwistedChannel):
 
         if poller is not None:
             poller.f = _notify
-            poller.start(float(self.poll_interval) / 1000) 
+            poller.start(float(self.poll_interval) / 1000, False) 
 
         # Acknowledge connection
         response = msg.acknowledge()
@@ -369,4 +374,4 @@ class StreamingTwistedChannel(TwistedChannel):
             request.write(chr(messaging.StreamingMessage.NULL_BYTE))
 
         looper.f = _beat
-        looper.start(self.heart_interval)
+        looper.start(self.heart_interval, False)
