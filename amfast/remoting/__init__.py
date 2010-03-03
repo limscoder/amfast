@@ -266,9 +266,9 @@ class Packet(object):
      * messages - list, a list of messages that belong to the packet.
     """
 
-    FLASH_8 = "FLASH_8"
-    FLASH_COM = "FLASH_COM"
-    FLASH_9 = "FLASH_9"
+    FLASH_8 = 0x00
+    FLASH_COM = 0x01
+    FLASH_9 = 0x03
 
     def __init__(self, client_type=None, headers=None, messages=None):
         if client_type is None:

@@ -131,7 +131,7 @@ class MemoryConnectionManager(ConnectionManager):
             self._lock.release()
 
     def iterConnectionIds(self):
-        return self._connections.keys()
+        return self._connections.keys().__iter__()
 
     # --- proxies for connection properties --- #
 

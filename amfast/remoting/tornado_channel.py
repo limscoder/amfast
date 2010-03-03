@@ -17,16 +17,21 @@ class TornadoChannelSet(ChannelSet):
         cleaner.start()
 
     def clean(self):
-        amfast.logger.debug("Cleaning connections.")
+        if amfast.log_debug is True:
+            amfast.logger.debug("Cleaning channel.")
 
         current_time = time.time()
-        for connection_id in self.connection_manager.iterConnectionIds():
-            self.cleanConnection(connection_id, current_time)
-
-    def cleanConnection(self, connection_id, current_time):
-        def _callback():
-            ChannelSet.cleanConnection(self, connection_id, current_time)
-        IOLoop.instance().add_callback(_callback)
+        iter = self.connection_manager.iterConnectionIds()
+        def _clean():
+            try:
+                connection_id = iter.next()
+                def _callback():
+                    self.cleanConnection(connection_id, current_time)
+                IOLoop.instance().add_callback(_callback)
+                IOLoop.instance().add_callback(_clean)
+            except StopIteration:
+                pass
+        _clean()
 
     def notifyConnections(self, topic, sub_topic):
         for connection_id in self.subscription_manager.iterSubscribers(topic, sub_topic):

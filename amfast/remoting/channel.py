@@ -327,7 +327,8 @@ class ChannelSet(object):
 
     def clean(self):
         """Clean out expired connections."""
-        amfast.logger.debug("Cleaning connections.")
+        if amfast.log_debug is True:
+            amfast.logger.debug("Cleaning channel.")
 
         current_time = time.time() * 1000
         for connection_id in self.connection_manager.iterConnectionIds():
