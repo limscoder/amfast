@@ -1,6 +1,17 @@
 CHANGES
 ========
 
+0.5.0
+======
+ * Improvements to GAE adapters
+ * Improvements for Memcache support
+ * Added messaging polling option
+ * Fixed raw byte logging problems
+ * Fixed AMF0->AMF3 context bug
+ * Added ThreadPool for performing background tasks (connection and message cleaning)
+ * Improved tests for ConnectionManager and SubscriptionManager
+ * Bug fixes for tickets: #51, #52, #54, #55
+
 0.4.2
 ======
  * Bug fixes for tickets #39, #40, #41, #42, #43, #46.
