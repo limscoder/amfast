@@ -11,12 +11,37 @@ class WorkerTask(object):
     def __call__(self):
         self.function(*self.args, **self.kwargs)
 
+class RepeatingThread(threading.Thread):
+    """A thread that repeats the same task over and over."""
+
+    def __init__(self, duration=None, task=None):
+        threading.Thread.__init__(self)
+        self.setDaemon(True)
+        self.duration = duration
+        self.task = task
+        self._stop = False
+        self._event = None
+
+    def run(self):
+        if self._stop is False:
+            self._event = threading.Event()
+            while True:
+                self._event.wait(self.duration)
+                if self._stop is True:
+                    return
+                self.task()
+
+    def stop(self):
+        self._stop = True
+        if self._event is not None:
+            self._event.set()
+
 class WorkerThread(threading.Thread):
     """A thread managed by a thread pool."""
 
     def __init__(self, pool):
         threading.Thread.__init__(self)
-        self.daemon = True
+        self.setDaemon(True)
         self.pool = pool
         self.busy = False
         self._started = False
@@ -63,11 +88,12 @@ class ThreadPool(object):
                 worker_thread = thread
                 break
 
-        if worker_thread is None and len(self._threads) < self.max_pool_size:
+        if worker_thread is None and len(self._threads) <= self.max_pool_size:
             worker_thread = WorkerThread(self)
             self._threads.append(worker_thread)
 
-        worker_thread.work()
+        if worker_thread is not None:
+            worker_thread.work()
 
     def addTask(self, function, args=(), kwargs={}):
         self._addTask(WorkerTask(function, args, kwargs))
