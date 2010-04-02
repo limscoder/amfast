@@ -49,27 +49,30 @@ class WorkerThread(threading.Thread):
 
     def work(self):
         if self._started is True:
-            if self._event is not None:
+            if self._event is not None and not self._event.isSet():
                 self._event.set()
         else:
             self._started = True
             self.start()
 
     def run(self):
-        self.busy = True
-        while len(self.pool._tasks) > 0:
-            try:
-                task = self.pool._tasks.pop()
-                task()
-            except IndexError:
-                # Just in case another thread grabbed the task 1st.
-                pass
+        while True:
+            self.busy = True
+            while len(self.pool._tasks) > 0:
+                try:
+                    task = self.pool._tasks.pop()
+                    task()
+                except IndexError:
+                    # Just in case another thread grabbed the task 1st.
+                    pass
 
-        # Sleep until needed again
-        self.busy = False 
-        self._event = threading.Event()
-        self._event.wait()
-        self.run()
+            # Sleep until needed again
+            self.busy = False
+            if self._event is None:
+                self._event = threading.Event()
+            else:
+                self._event.clear()
+            self._event.wait()
 
 class ThreadPool(object):
     """Executes queued tasks in the background."""
