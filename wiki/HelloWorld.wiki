@@ -36,3 +36,11 @@ The WSGI example does not serve the Flash file, so you will have to manually ope
 {{{
 hello_world/flex/deploy/hello_world.html
 }}}
+
+== Django Example ==
+
+Use the Django Development server to serve the example over http with the following command:
+
+{{{
+python hello_world/django_amf_example/manage.py runserver 8000
+}}}
