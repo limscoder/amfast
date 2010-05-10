@@ -14,6 +14,17 @@ from amfast.remoting.channel import ChannelSet, Channel
 #logger.addHandler(handler)
 #amfast.log_debug = True
 
+class _mappingObj(object):
+    """Used to test Target.mapObject."""
+    def __init__(self):
+        self.foo = 'bar'
+
+    def _private(self):
+        pass
+
+    def public(self):
+        pass
+
 class RemotingTestCase(unittest.TestCase):
 
     def setUp(self):
@@ -47,6 +58,27 @@ class RemotingTestCase(unittest.TestCase):
         self.assertEquals(self.arg['userid'], credentials['userid'])
         self.assertEquals(self.arg['password'], credentials['password'])
         return True
+
+    def testMapObjectExcludesAttr(self):
+        test_service = remoting.Service('test')
+        remoting.CallableTarget.mapObject(test_service, _mappingObj())
+        self.assertEquals(None, test_service.getTarget('foo'))
+
+    def testMapObjectExcludesPrivate(self):
+        test_service = remoting.Service('test')
+        remoting.CallableTarget.mapObject(test_service, _mappingObj())
+        self.assertEquals(None, test_service.getTarget('_private'))
+
+    def testMapObjectExcludesSpecial(self):
+        test_service = remoting.Service('test')
+        remoting.CallableTarget.mapObject(test_service, _mappingObj())
+        self.assertEquals(None, test_service.getTarget('__init__'))
+
+    def testMapObjectIncludesMethods(self):
+        test_service = remoting.Service('test')
+        remoting.CallableTarget.mapObject(test_service, _mappingObj(), map_private=True)
+        self.assertTrue(isinstance(test_service.getTarget('_private'), remoting.Target))
+        self.assertTrue(isinstance(test_service.getTarget('public'), remoting.Target))
 
     def testDecodeRpcPacket(self):
         encoded = '\x00\x00' # AMF0 version marker
