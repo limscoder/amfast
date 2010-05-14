@@ -154,6 +154,12 @@ class StreamingCherryPyChannel(CherryPyChannel):
 
                     bytes = messaging.StreamingMessage.prepareMsg(response, self.endpoint)
                     inited = True
+
+                    # Prime request with 256 bytes
+                    # This will cause buffer flush
+                    # on WebKit browsers, which is needed
+                    # to trigger data received event.
+                    bytes += chr(messaging.StreamingMessage.NULL_BYTE) * 256
                     yield bytes
  
                 if self.channel_set.notify_connections is True:
