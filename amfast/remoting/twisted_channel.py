@@ -352,10 +352,17 @@ class StreamingTwistedChannel(TwistedChannel):
         response.body = connection.id
         self.sendMsg(request, response)
 
+        # Prime request with 256 bytes
+        # This will cause buffer flush
+        # on WebKit browsers, which is needed
+        # to trigger data received event.
+        request.write(chr(messaging.StreamingMessage.NULL_BYTE) * 256)
+ 
         self.startBeat(connection, request)
 
     def sendMsg(self, request, msg):
         """Send a message to the client."""
+
         request.write(messaging.StreamingMessage.prepareMsg(msg, self.endpoint))
 
     def stopStream(self, msg, request):

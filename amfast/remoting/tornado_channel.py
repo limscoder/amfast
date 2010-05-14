@@ -311,6 +311,13 @@ class StreamingTornadoChannel(TornadoChannel):
 	response.body = connection.id
 	self.sendMsgs((response,), request_handler)
 
+        # Prime request with 256 bytes
+        # This will cause buffer flush
+        # on WebKit browsers, which is needed
+        # to trigger data received event.
+        request_handler.write(chr(messaging.StreamingMessage.NULL_BYTE) * 256)
+        request_handler.flush()
+
 	self.startBeat(connection, request_handler)
 
     def sendMsgs(self, msgs, request_handler):
