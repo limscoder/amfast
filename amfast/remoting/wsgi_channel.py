@@ -170,11 +170,7 @@ class StreamingWsgiChannel(WsgiChannel):
                 bytes = messaging.StreamingMessage.prepareMsg(response, self.endpoint)
                 write(bytes)
 
-                # Prime request with 256 bytes
-                # This will cause buffer flush
-                # on WebKit browsers, which is needed
-                # to trigger data received event.
-                write(chr(messaging.StreamingMessage.NULL_BYTE) * 256)
+                write(chr(messaging.StreamingMessage.NULL_BYTE) * self.KICKSTART_BYTES)
 
             except (KeyboardInterrupt, SystemExit):
                 raise

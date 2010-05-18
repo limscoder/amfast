@@ -138,6 +138,14 @@ class HttpChannel(Channel):
     # Content type for amf messages
     CONTENT_TYPE = 'application/x-amf'
 
+    # These bytes need to be sent to 'kickstart'
+    # streaming connections so that the client 
+    # will respond to incoming message. In reality
+    # this value is browser specific, but for now
+    # we're just using the maximum required byte length
+    # which is for IE.
+    KICKSTART_BYTES = 2048
+
     def __init__(self, name, max_connections=-1, endpoint=None,
         wait_interval=0, poll_interval=500):
 

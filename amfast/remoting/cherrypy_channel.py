@@ -90,6 +90,7 @@ class StreamingCherryPyChannel(CherryPyChannel):
             return CherryPyChannel.__call__(self)
 
         # Create streaming message command
+        cherrypy.response.headers['Content-Type'] = self.CONTENT_TYPE
         cherrypy.response.stream = True
         try:
             msg = messaging.StreamingMessage()
@@ -155,11 +156,7 @@ class StreamingCherryPyChannel(CherryPyChannel):
                     bytes = messaging.StreamingMessage.prepareMsg(response, self.endpoint)
                     inited = True
 
-                    # Prime request with 256 bytes
-                    # This will cause buffer flush
-                    # on WebKit browsers, which is needed
-                    # to trigger data received event.
-                    bytes += chr(messaging.StreamingMessage.NULL_BYTE) * 256
+                    bytes += chr(messaging.StreamingMessage.NULL_BYTE) * self.KICKSTART_BYTES
                     yield bytes
  
                 if self.channel_set.notify_connections is True:
