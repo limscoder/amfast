@@ -4,17 +4,23 @@ import cPickle as pickle
 import sqlalchemy as sa
 from sqlalchemy.sql import func, and_
 
+if sa.__version__.startswith('0.5'):
+    BINARY_TYPE = sa.Binary
+elif sa.__version__.startswith('0.6'):
+    BINARY_TYPE = sa.LargeBinary
+
 from subscription_manager import Subscription, SubscriptionManager
 import flex_messages as messaging
 
 class SaSubscriptionManager(SubscriptionManager):
     """Manages subscriptions in a database, uses SqlAlchemy to talk to the DB."""
 
-    def __init__(self, engine, metadata, secure=False, ttl=30000):
+    def __init__(self, engine, metadata, secure=False, ttl=30000, table_prefix=''):
         SubscriptionManager.__init__(self, secure=secure, ttl=ttl)
 
         self.engine = engine
         self.metadata = metadata
+        self.table_prefix = table_prefix and "%s_" % table_prefix.rstrip('_') or table_prefix
         self.mapTables()
 
     def reset(self):
@@ -24,13 +30,13 @@ class SaSubscriptionManager(SubscriptionManager):
         db.close()
 
     def mapTables(self):
-        self.subscriptions = sa.Table('subscriptions', self.metadata,
+        self.subscriptions = sa.Table('%ssubscriptions' % self.table_prefix, self.metadata,
             sa.Column('connection_id', sa.String(36), primary_key=True),
             sa.Column('client_id', sa.String(36), primary_key=True),
             sa.Column('topic', sa.String(128), primary_key=True)
         )
 
-        self.messages = sa.Table('messages', self.metadata,
+        self.messages = sa.Table('%smessages' % self.table_prefix, self.metadata,
             sa.Column('id', sa.Integer, primary_key=True),
             sa.Column('topic', sa.String(256), index=True),
             sa.Column('clientId', sa.String(128), nullable=True),
@@ -39,8 +45,8 @@ class SaSubscriptionManager(SubscriptionManager):
             sa.Column('destination', sa.String(128), nullable=True),
             sa.Column('timestamp', sa.Float(), nullable=True),
             sa.Column('timeToLive', sa.Float(), nullable=True),
-            sa.Column('headers', sa.Binary(), nullable=True),
-            sa.Column('body', sa.Binary(), nullable=False)
+            sa.Column('headers', BINARY_TYPE(), nullable=True),
+            sa.Column('body', BINARY_TYPE(), nullable=False)
         )
 
     def createTables(self):

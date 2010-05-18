@@ -1,5 +1,6 @@
 """Provides an interface for performing remoting calls."""
 
+import collections
 import threading
 
 import amfast
@@ -73,6 +74,33 @@ class Target(object):
      * name - string, name of the target.
      * secure - boolean, True to require login.
     """
+
+    @classmethod
+    def mapObject(cls, service, obj, secure=False, map_private=False,\
+        map_special=False):
+        """Maps all instance methods of an object.
+
+        arguments:
+        ============
+         * service - Service, the service to map to.
+         * obj - object, the object instance to map methods from.
+         * secure - boolean, True to require login. Default = False.
+         * map_private - boolean, True to map methods starting with '_'.
+                         Default = False
+         * map_special - boolean, True to map methods starting with '__'.
+                         Default = False
+        """
+
+        for attr in dir(obj):
+            if map_special is False and attr.startswith('__'):
+                continue
+            if map_private is False and attr.startswith('_'):
+                continue
+
+            val = getattr(obj, attr, None)
+            if isinstance(val, collections.Callable):
+                service.mapTarget(cls(callable=val, name=attr, secure=secure))
+
     def __init__(self, name, secure=False):
         self.name = name
         self.secure = secure
@@ -102,6 +130,7 @@ class CallableTarget(Target):
      * secure - boolean, True to require login.
      * callable - callable, a callable that can be invoked.
     """
+
     def __init__(self, callable, name, secure=False):
         Target.__init__(self, name, secure)
         self.callable = callable

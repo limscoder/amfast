@@ -255,6 +255,7 @@ class StreamingTornadoChannel(TornadoChannel):
 	    # Regular AMF message
 	    return TornadoChannel.processRequest(self, request_handler)
 
+        request_handler.set_header('Content-Type', self.CONTENT_TYPE)
         msg = messaging.StreamingMessage()
 	msg.parseArgs(request_handler.request.arguments)
 
@@ -310,6 +311,9 @@ class StreamingTornadoChannel(TornadoChannel):
 	response = msg.acknowledge()
 	response.body = connection.id
 	self.sendMsgs((response,), request_handler)
+
+        request_handler.write(chr(messaging.StreamingMessage.NULL_BYTE) * self.KICKSTART_BYTES)
+        request_handler.flush()
 
 	self.startBeat(connection, request_handler)
 

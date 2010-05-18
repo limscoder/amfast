@@ -4,18 +4,25 @@ import cPickle as pickle
 import sqlalchemy as sa
 from sqlalchemy.sql import func, and_
 
+if sa.__version__.startswith('0.5'):
+    BINARY_TYPE = sa.Binary
+elif sa.__version__.startswith('0.6'):
+    BINARY_TYPE = sa.LargeBinary
+
 from connection import Connection
 from connection_manager import NotConnectedError, ConnectionManager, SessionAttrError
 
 class SaConnectionManager(ConnectionManager):
     """Manages connections in a database, uses SqlAlchemy to talk to the DB."""
 
-    def __init__(self, engine, metadata, connection_class=Connection, connection_params=None):
+    def __init__(self, engine, metadata, connection_class=Connection, connection_params=None,
+                 table_prefix=''):
         ConnectionManager.__init__(self, connection_class=connection_class,
             connection_params=connection_params)
 
         self.engine = engine
         self.metadata = metadata
+        self.table_prefix = table_prefix and "%s_" % table_prefix.rstrip('_') or table_prefix
         self.mapTables()
 
     def reset(self):
@@ -25,7 +32,7 @@ class SaConnectionManager(ConnectionManager):
         db.close()
 
     def mapTables(self):
-        self.connections = sa.Table('connections', self.metadata,
+        self.connections = sa.Table('%sconnections' % self.table_prefix, self.metadata,
             sa.Column('id', sa.String(36), primary_key=True),
             sa.Column('channel_name', sa.String(128), nullable=False),
             sa.Column('timeout', sa.Float(), nullable=False),
@@ -37,12 +44,12 @@ class SaConnectionManager(ConnectionManager):
             sa.Column('notify_func_id', sa.Integer(), nullable=True)
         )
 
-        self.session_attrs = sa.Table('session_attrs', self.metadata,
+        self.session_attrs = sa.Table('%ssession_attrs' % self.table_prefix, self.metadata,
             sa.Column('connection_id', sa.String(36),
-                sa.ForeignKey('connections.id'),
+                sa.ForeignKey('%sconnections.id' % self.table_prefix),
                 primary_key=True, index=True),
             sa.Column('name', sa.String(128), primary_key=True),
-            sa.Column('value', sa.Binary(), nullable=False)
+            sa.Column('value', BINARY_TYPE(), nullable=False)
         )
 
     def createTables(self):

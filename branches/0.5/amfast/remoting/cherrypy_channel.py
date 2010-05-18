@@ -90,6 +90,7 @@ class StreamingCherryPyChannel(CherryPyChannel):
             return CherryPyChannel.__call__(self)
 
         # Create streaming message command
+        cherrypy.response.headers['Content-Type'] = self.CONTENT_TYPE
         cherrypy.response.stream = True
         try:
             msg = messaging.StreamingMessage()
@@ -154,6 +155,8 @@ class StreamingCherryPyChannel(CherryPyChannel):
 
                     bytes = messaging.StreamingMessage.prepareMsg(response, self.endpoint)
                     inited = True
+
+                    bytes += chr(messaging.StreamingMessage.NULL_BYTE) * self.KICKSTART_BYTES
                     yield bytes
  
                 if self.channel_set.notify_connections is True:
