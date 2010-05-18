@@ -293,6 +293,8 @@ class StreamingTwistedChannel(TwistedChannel):
             # Regular AMF message
             return TwistedChannel.render_POST(self, request)
 
+        request.setHeader('Content-Type', self.CONTENT_TYPE)
+
         # Create streaming message command
         msg = messaging.StreamingMessage()
         msg.parseArgs(request.args)
@@ -352,11 +354,9 @@ class StreamingTwistedChannel(TwistedChannel):
         response.body = connection.id
         self.sendMsg(request, response)
 
-        # Prime request with 256 bytes
-        # This will cause buffer flush
-        # on WebKit browsers, which is needed
-        # to trigger data received event.
-        request.write(chr(messaging.StreamingMessage.NULL_BYTE) * 256)
+        # Prime request with bytes so 
+        # client will start responding.
+        request.write(chr(messaging.StreamingMessage.NULL_BYTE) * self.KICKSTART_BYTES)
  
         self.startBeat(connection, request)
 
