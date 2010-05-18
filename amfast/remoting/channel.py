@@ -138,6 +138,14 @@ class HttpChannel(Channel):
     # Content type for amf messages
     CONTENT_TYPE = 'application/x-amf'
 
+    # These bytes need to be sent to 'kickstart'
+    # streaming connections so that the client 
+    # will respond to incoming message. In reality
+    # this value is browser specific, but for now
+    # we're just using the maximum required byte length
+    # which is for IE.
+    KICKSTART_BYTES = 2048
+
     def __init__(self, name, max_connections=-1, endpoint=None,
         wait_interval=0, poll_interval=500):
 
@@ -316,14 +324,9 @@ class ChannelSet(object):
         if amfast.use_dummy_threading is True:
             amfast.logger.warn('Connection cleaning was NOT scheduled.')
             return
-
-        thread = threading.Timer(self.clean_freq, None)
-        thread.daemon = True
-        def _clean():
-            self.clean()
-            thread.start()
-        thread.function = _clean
-        thread.start()
+        
+        repeater = thread_pool.RepeatingThread(self.clean_freq, self.clean)
+        repeater.start()
 
     def clean(self):
         """Clean out expired connections."""
@@ -336,6 +339,8 @@ class ChannelSet(object):
 
         if hasattr(self.subscription_manager, 'deleteExpiredMessages'):
             # TODO: better interface for deleting expired messages.
+            #
+            # Work on this once async messaging support is dropped.
             #
             # Perhaps iterate through messages and delete expired
             # similar to how connection cleaning works??

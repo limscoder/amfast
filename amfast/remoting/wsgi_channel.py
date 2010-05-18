@@ -169,6 +169,9 @@ class StreamingWsgiChannel(WsgiChannel):
             try:
                 bytes = messaging.StreamingMessage.prepareMsg(response, self.endpoint)
                 write(bytes)
+
+                write(chr(messaging.StreamingMessage.NULL_BYTE) * self.KICKSTART_BYTES)
+
             except (KeyboardInterrupt, SystemExit):
                 raise
             except Exception, exc:

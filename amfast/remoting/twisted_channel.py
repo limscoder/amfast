@@ -293,6 +293,8 @@ class StreamingTwistedChannel(TwistedChannel):
             # Regular AMF message
             return TwistedChannel.render_POST(self, request)
 
+        request.setHeader('Content-Type', self.CONTENT_TYPE)
+
         # Create streaming message command
         msg = messaging.StreamingMessage()
         msg.parseArgs(request.args)
@@ -352,10 +354,15 @@ class StreamingTwistedChannel(TwistedChannel):
         response.body = connection.id
         self.sendMsg(request, response)
 
+        # Prime request with bytes so 
+        # client will start responding.
+        request.write(chr(messaging.StreamingMessage.NULL_BYTE) * self.KICKSTART_BYTES)
+ 
         self.startBeat(connection, request)
 
     def sendMsg(self, request, msg):
         """Send a message to the client."""
+
         request.write(messaging.StreamingMessage.prepareMsg(msg, self.endpoint))
 
     def stopStream(self, msg, request):
