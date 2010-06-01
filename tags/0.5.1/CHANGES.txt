@@ -1,0 +1,96 @@
+CHANGES
+========
+
+0.5.0
+======
+ * Improvements to GAE adapters
+ * Improvements for Memcache support
+ * Added messaging polling option
+ * Fixed raw byte logging problems
+ * Fixed AMF0->AMF3 context bug
+ * Added ThreadPool for performing background tasks (connection and message cleaning)
+ * Improved tests for ConnectionManager and SubscriptionManager
+ * Bug fixes for tickets: #51, #52, #54, #55
+
+0.4.2
+======
+ * Bug fixes for tickets #39, #40, #41, #42, #43, #46.
+
+0.4.1
+======
+ * Added TornadoChannelSet and TornadoChannel for compatibility with Tornado server/framework.
+ * Added no_proxy_as_attrs to SaClassDef to optionally use Arrays instead of
+       ArrayCollections on client side, and updated SqlAlchemy example.
+ * Added amfastlib Flash client lib for use with SqlAlchemy.
+ * Added support for PyAmf 0.5.
+
+0.4.0
+======
+ * Added GaeChannelSet and GaeChannel to work with Google App Engine.
+ * Added live Google App Engine demo app (http://amfastchat.appspot.com/flash/chat.html).
+ * Added DjangoChannel to work with Django framework.
+ * Published messages are now dispatched to clients that subscribe
+   after the message is published (assuming the message has not expired yet).
+ * Added ConnectionManager and SubscriptionManager classes.
+  - Sub-class these classes to customize how connection and message data is
+    persisted between requests.
+  - Built-in managers allow data to be stored in memory, Memcache,
+    SQL database (via SqlAlchemy), or Google DataStore.
+ * Added HTTP Streaming to CherryPyChannel
+ * Added CherryPyChannelSet, TwistedChannelSet, and WsgiChannelSet to
+   work better with the respective frameworks.
+ * Added notify_connection attribute to ChannelSet to avoid un-needed overhead
+   when long-polling or streaming is not being used.
+
+0.3.5
+======
+ * Fixed AttributeError in TwistedChannel (ticket: 21).
+ * Fixed setuptools bootstrapping (ticket: 22).
+ * Fixed ChannelSet.__iter__ returning incorrect iterator (ticket: 23).
+ * Fixed Visual Studio 2008 compatability (ticket: 24).
+
+0.3.4
+======
+ * Fixed some thread synchronization issues (ticket: 19).
+ * Improved long polling performance for threaded channels. 
+
+0.3.3
+======
+ * Allow Target objects to return twisted.defer.Deferred objects when using TwistedChannel.
+ * Eliminated Channel.max_interval. Set Channel.wait_interval to a non-zero value instead.
+ * Ignore 0x11 AMF3 marker byte during AMF3 decoding. 
+
+0.3.2
+======
+ * Added http long-polling and http streaming channels.
+
+0.3.1
+======
+ * Added ez_setup.py script for installing uuid.
+
+0.3.0
+======
+
+remoting
+---------
+ * Producer/Consumer messaging via HTTP polling.
+ * Channels and ChannelSets allow resources to be exposed in multiple ways.
+ * Built in Channels for CherryPy, Twisted Web, and straight-up WSGI.
+ * Easy to configure authentication for NetConnection and RemoteObject.
+ * Connection objects hold session attributes tied to Flex client id.
+ * Customizable Endpoints to encode/decode messages with external encoding/decoding libraries.
+ * PyAmfEndpoint to encode/decode messages with pure Python, with no C compiler dependencies.
+
+encode/decode
+--------------
+ * Read and write to file-like-objects or strings (using strings is much faster).
+ * Automatic type conversion:
+     * Use amfast.class_def.ClassDef.encode_types to convert object attributes to custom types before encoding.
+     * Use amfast.class_def.ClassDef.decode_types to convert object attribute to custom types after decoding.
+ * amfast.class_def.as_types.AsProxy and amfast.class_def.as_types.AsNoProxy allow overriding 
+     'use_collections' and 'use_proxies' settings for a individual objects.
+ * readExternal and writeExternal methods of the IEXTERNALIZABLE interface accept different parameters
+     to make custom encodings easier.
+ * amfast.encoder.Encoder and amfast.decoder.Decoder:
+     Wrappers around amfast.encode and amfast.decode, so you don't need to pass the same arguments every
+     time you encode or decode. 
