@@ -1,6 +1,10 @@
 CHANGES
 ========
 
+0.5.1
+======
+ * Fixes for tickets: 57, 58, 59, 61, 62.
+
 0.5.0
 ======
  * Improvements to GAE adapters
