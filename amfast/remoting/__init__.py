@@ -1,6 +1,5 @@
 """Provides an interface for performing remoting calls."""
 
-import collections
 import threading
 
 import amfast
@@ -98,7 +97,7 @@ class Target(object):
                 continue
 
             val = getattr(obj, attr, None)
-            if isinstance(val, collections.Callable):
+            if hasattr(val, '__call__'):
                 service.mapTarget(cls(callable=val, name=attr, secure=secure))
 
     def __init__(self, name, secure=False):
