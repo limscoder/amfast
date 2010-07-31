@@ -5,6 +5,10 @@ import calendar
 from datetime import datetime
 import logging
 
+from amfast import version
+version = version.Version('amfast', 0, 5, 2)
+__version__ = version.short()
+
 class AmFastError(Exception):
     """Base exception for this package."""
 
