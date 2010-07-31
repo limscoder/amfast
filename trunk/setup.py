@@ -8,6 +8,8 @@ from setuptools import setup, Feature
 from distutils.core import setup, Extension
 from distutils.command.build_ext import build_ext
 
+from amfast import __version__
+
 extensions = Feature(
     "AMF encoder/decoder C extension.",
     standard = True,
@@ -26,7 +28,7 @@ extensions = Feature(
     ])
 
 setup(name="AmFast",
-    version = "0.5.2",
+    version = __version__,
     description = "Flash remoting framework. Includes support for NetConnection, RemoteObject, IExternizeable, Flex Producer/Consumer messaging, custom type serialization, and a C-based AMF encoder/decoder.",
     url = "http://code.google.com/p/amfast/",
     author = "Dave Thompson",
