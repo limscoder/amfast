@@ -334,8 +334,9 @@ class ChannelSet(object):
             amfast.logger.debug("Cleaning channel.")
 
         current_time = time.time() * 1000
-        for connection_id in self.connection_manager.iterConnectionIds():
-            self.cleanConnection(connection_id, current_time)
+        if self.connection_manager.iterConnectionIds():
+            for connection_id in self.connection_manager.iterConnectionIds():
+                self.cleanConnection(connection_id, current_time)
 
         if hasattr(self.subscription_manager, 'deleteExpiredMessages'):
             # TODO: better interface for deleting expired messages.
