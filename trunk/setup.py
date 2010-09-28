@@ -17,18 +17,14 @@ extensions = Feature(
     ext_modules = [
         Extension('amfast.encode',
             sources = [os.path.join('amfast', 'ext_src', 'encoder.c'),
-                os.path.join('amfast', 'ext_src', 'amf.c'),
-                os.path.join('amfast', 'ext_src', 'amf.h')]),
+                os.path.join('amfast', 'ext_src', 'amf.c')]),
         Extension('amfast.decode',
             sources = [os.path.join('amfast', 'ext_src', 'decoder.c'),
-                os.path.join('amfast', 'ext_src', 'amf.c'),
-                os.path.join('amfast', 'ext_src', 'amf.h')]),
+                os.path.join('amfast', 'ext_src', 'amf.c')]),
         Extension('amfast.buffer',
-            sources = [os.path.join('amfast', 'ext_src', 'buffer.c'),
-                os.path.join('amfast', 'ext_src', 'buffer.h')]),
+            sources = [os.path.join('amfast', 'ext_src', 'buffer.c')]),
         Extension('amfast.context',
-            sources = [os.path.join('amfast', 'ext_src', 'context.c'),
-                os.path.join('amfast', 'ext_src', 'context.h')])
+            sources = [os.path.join('amfast', 'ext_src', 'context.c')])
     ])
 
 setup(name="AmFast",
