@@ -242,7 +242,12 @@ static int serialize_unicode_AMF3(EncoderObj *context, PyObject *value)
 static int encode_unicode_AMF3(EncoderObj *context, PyObject *value)
 {
     PyObject *PyString_value = PyUnicode_AsUTF8String(value);
-    return encode_string(context, PyString_value);
+    if (!PyString_value)
+        return 0;
+
+    int result = encode_string(context, PyString_value);
+    Py_DECREF(PyString_value);
+    return result;
 }
 
 /* Serialize a PyString. */
