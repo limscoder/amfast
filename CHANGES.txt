@@ -1,6 +1,10 @@
 CHANGES
 ========
 
+0.5.2
+======
+ * Fixes for tickets: 63, 64, 65, 66, 68, 69
+
 0.5.1
 ======
  * Fixes for tickets: 57, 58, 59, 61, 62.
