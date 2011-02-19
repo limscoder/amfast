@@ -5,8 +5,9 @@ import sqlalchemy as sa
 from sqlalchemy.sql import func, and_
 
 if sa.__version__.startswith('0.5'):
+    # 0.5 is lowest supported version
     BINARY_TYPE = sa.Binary
-elif sa.__version__.startswith('0.6'):
+else:
     BINARY_TYPE = sa.LargeBinary
 
 from subscription_manager import Subscription, SubscriptionManager
