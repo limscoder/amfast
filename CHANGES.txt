@@ -1,6 +1,11 @@
 CHANGES
 ========
 
+0.5.3
+=======
+ * Fixes for tickets: 75
+ * Addition of Django streaming channel (thanks qihangzp)
+
 0.5.2
 ======
  * Fixes for tickets: 63, 64, 65, 66, 68, 69
