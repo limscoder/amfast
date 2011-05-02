@@ -193,9 +193,8 @@ static int decode_anon_obj_AMF3(DecoderObj *context, PyObject *obj_val, PyObject
     // directly, because we have to setup a reference to the 
     // object before decoding it.
     PyObject *decoded_attrs = decode_obj_attrs_AMF3(context, class_def_dict);
-    if (!decoded_attrs) {
+    if (!decoded_attrs)
         return 0;
-    }
 
     int result = PyDict_Merge(obj_val, decoded_attrs, 1);
     Py_DECREF(decoded_attrs);
@@ -467,14 +466,11 @@ static int decode_dynamic_dict_AMF3(DecoderObj *context, PyObject *dict)
             return 0;
         }
 
-        if (PyDict_SetItem(dict, key, val) != 0) {
-            Py_DECREF(key);
-            Py_DECREF(val);
-            return 0;
-        }
-
+        int result = PyDict_SetItem(dict, key, val);
         Py_DECREF(key);
         Py_DECREF(val);
+        if (result != 0)
+            return 0;
     }
 }
 
@@ -1071,11 +1067,11 @@ static int decode_dynamic_dict_AMF0(DecoderObj *context, PyObject *dict)
             return 0;
         }
 
-        if (PyDict_SetItem(dict, key, val) != 0) {
-            Py_DECREF(key);
-            Py_DECREF(val);
+        int result = PyDict_SetItem(dict, key, val);
+        Py_DECREF(key);
+        Py_DECREF(val);
+        if (result != 0)
             return 0;
-        }
     }
 }
 
