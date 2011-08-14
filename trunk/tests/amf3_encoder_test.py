@@ -497,9 +497,6 @@ class Amf3EncoderTestCase(unittest.TestCase):
 
         self.assertEquals(result, buf)
 
-    def testUnknownRaisesError(self):
-        self.assertRaises(AttributeError, encode.encode, set())
-
 def suite():
     return unittest.TestLoader().loadTestsFromTestCase(Amf3EncoderTestCase)
 

@@ -305,15 +305,16 @@ def get_dynamic_attr_vals(obj, ignore_attrs=None, include_private=False):
     """ 
     vals = {}
 
-    for attr, val in obj.__dict__.iteritems():
-        if ignore_attrs is not None:
-            if attr in ignore_attrs:
+    if hasattr(obj, '__dict__'):
+        for attr, val in obj.__dict__.iteritems():
+            if ignore_attrs is not None:
+                if attr in ignore_attrs:
+                    continue
+
+            if (include_private is False) and (attr.startswith('_')):
                 continue
 
-        if (include_private is False) and (attr.startswith('_')):
-            continue
-
-        vals[attr] = val
+            vals[attr] = val
 
     return vals
 
