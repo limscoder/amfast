@@ -277,3 +277,4 @@ class StreamingWsgiChannel(WsgiChannel):
         connection.disconnect()
         if hasattr(connection, "notify_func") and connection.notify_func is not None:
             connection.notify_func()
+        return []

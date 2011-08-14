@@ -1,0 +1,203 @@
+
+# /
+/*.pyc
+
+# /amfast/
+/amfast/*.pyc
+
+# /amfast/class_def/
+/amfast/class_def/*.pyc
+
+# /amfast/ext_src/
+/amfast/ext_src/*.pyc
+
+# /amfast/remoting/
+/amfast/remoting/*.pyc
+
+# /demos/
+/demos/*.pyc
+
+# /examples/
+/examples/*.pyc
+
+# /examples/addressbook/
+/examples/addressbook/*.pyc
+
+# /examples/addressbook/flex/
+/examples/addressbook/flex/*.pyc
+
+# /examples/addressbook/flex/deploy/
+/examples/addressbook/flex/deploy/*.pyc
+
+# /examples/addressbook/flex/deploy/history/
+/examples/addressbook/flex/deploy/history/*.pyc
+
+# /examples/addressbook/flex/src/
+/examples/addressbook/flex/src/*.pyc
+
+# /examples/addressbook/flex/src/components/
+/examples/addressbook/flex/src/components/*.pyc
+
+# /examples/addressbook/flex/src/models/
+/examples/addressbook/flex/src/models/*.pyc
+
+# /examples/addressbook/python/
+/examples/addressbook/python/*.pyc
+
+# /examples/auth/
+/examples/auth/*.pyc
+
+# /examples/auth/flex/
+/examples/auth/flex/*.pyc
+
+# /examples/auth/flex/.settings/
+/examples/auth/flex/.settings/*.pyc
+
+# /examples/auth/flex/deploy/
+/examples/auth/flex/deploy/*.pyc
+
+# /examples/auth/flex/deploy/history/
+/examples/auth/flex/deploy/history/*.pyc
+
+# /examples/auth/flex/src/
+/examples/auth/flex/src/*.pyc
+
+# /examples/auth/python/
+/examples/auth/python/*.pyc
+
+# /examples/echo/
+/examples/echo/*.pyc
+
+# /examples/echo/flex/
+/examples/echo/flex/*.pyc
+
+# /examples/echo/flex/.settings/
+/examples/echo/flex/.settings/*.pyc
+
+# /examples/echo/flex/deploy/
+/examples/echo/flex/deploy/*.pyc
+
+# /examples/echo/flex/deploy/history/
+/examples/echo/flex/deploy/history/*.pyc
+
+# /examples/echo/python/
+/examples/echo/python/*.pyc
+
+# /examples/gae/
+/examples/gae/*.pyc
+
+# /examples/gae/flex/
+/examples/gae/flex/*.pyc
+
+# /examples/gae/flex/.settings/
+/examples/gae/flex/.settings/*.pyc
+
+# /examples/gae/flex/deploy/
+/examples/gae/flex/deploy/*.pyc
+
+# /examples/gae/flex/deploy/history/
+/examples/gae/flex/deploy/history/*.pyc
+
+# /examples/gae/flex/src/
+/examples/gae/flex/src/*.pyc
+
+# /examples/hello_world/
+/examples/hello_world/*.pyc
+
+# /examples/hello_world/flex/
+/examples/hello_world/flex/*.pyc
+
+# /examples/hello_world/flex/.settings/
+/examples/hello_world/flex/.settings/*.pyc
+
+# /examples/hello_world/flex/deploy/
+/examples/hello_world/flex/deploy/*.pyc
+
+# /examples/hello_world/flex/deploy/history/
+/examples/hello_world/flex/deploy/history/*.pyc
+
+# /examples/hello_world/flex/src/
+/examples/hello_world/flex/src/*.pyc
+
+# /examples/hello_world/python/
+/examples/hello_world/python/*.pyc
+
+# /examples/hello_world/python/django_amf_example/
+/examples/hello_world/python/django_amf_example/*.pyc
+
+# /examples/hello_world/python/django_amf_example/hello_world/
+/examples/hello_world/python/django_amf_example/hello_world/*.pyc
+
+# /examples/messaging/
+/examples/messaging/*.pyc
+
+# /examples/messaging/flex/
+/examples/messaging/flex/*.pyc
+
+# /examples/messaging/flex/.settings/
+/examples/messaging/flex/.settings/*.pyc
+
+# /examples/messaging/flex/deploy/
+/examples/messaging/flex/deploy/*.pyc
+
+# /examples/messaging/flex/deploy/history/
+/examples/messaging/flex/deploy/history/*.pyc
+
+# /examples/messaging/flex/src/
+/examples/messaging/flex/src/*.pyc
+
+# /examples/messaging/python/
+/examples/messaging/python/*.pyc
+
+# /examples/pyamf/
+/examples/pyamf/*.pyc
+
+# /examples/pyamf/flex/
+/examples/pyamf/flex/*.pyc
+
+# /examples/pyamf/flex/.settings/
+/examples/pyamf/flex/.settings/*.pyc
+
+# /examples/pyamf/flex/deploy/
+/examples/pyamf/flex/deploy/*.pyc
+
+# /examples/pyamf/flex/deploy/history/
+/examples/pyamf/flex/deploy/history/*.pyc
+
+# /examples/pyamf/flex/src/
+/examples/pyamf/flex/src/*.pyc
+
+# /examples/pyamf/python/
+/examples/pyamf/python/*.pyc
+
+# /examples/streaming/
+/examples/streaming/*.pyc
+
+# /examples/streaming/flex/
+/examples/streaming/flex/*.pyc
+
+# /examples/streaming/flex/.settings/
+/examples/streaming/flex/.settings/*.pyc
+
+# /examples/streaming/flex/deploy/
+/examples/streaming/flex/deploy/*.pyc
+
+# /examples/streaming/flex/deploy/history/
+/examples/streaming/flex/deploy/history/*.pyc
+
+# /examples/streaming/flex/src/
+/examples/streaming/flex/src/*.pyc
+
+# /examples/streaming/python/
+/examples/streaming/python/*.pyc
+
+# /tests/
+/tests/*.pyc
+
+*.so
+
+/build
+
+*egg*
+
+*.db
