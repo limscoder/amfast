@@ -76,7 +76,7 @@ class StreamingCherryPyChannel(CherryPyChannel):
     """Allows HTTP streaming."""
 
     def __init__(self, name, max_connections=-1, endpoint=None,
-        wait_interval=0, heart_interval=30):
+        wait_interval=0, heart_interval=30000):
         CherryPyChannel.__init__(self, name, max_connections=max_connections,
             endpoint=endpoint, wait_interval=wait_interval)
 
@@ -128,7 +128,7 @@ class StreamingCherryPyChannel(CherryPyChannel):
 
         try:
             # Start heart beat
-            timer = threading.Timer(self.heart_interval, self.beat, (connection, ))
+            timer = threading.Timer(float(self.heart_interval) / 1000, self.beat, (connection, ))
             timer.daemon = True
             timer.start()
 
@@ -235,6 +235,6 @@ class StreamingCherryPyChannel(CherryPyChannel):
             return
 
         # Create timer for next beat
-        timer = threading.Timer(self.heart_interval, self.beat, (connection, ))
+        timer = threading.Timer(float(self.heart_interval) / 1000, self.beat, (connection, ))
         timer.daemon = True
         timer.start()

@@ -66,7 +66,7 @@ class StreamingDjangoChannel(DjangoChannel):
     """Experimental support for streaming with Django."""
 
     def __init__(self, name, max_connections=-1, endpoint=None,
-        wait_interval=0, heart_interval=30):
+        wait_interval=0, heart_interval=30000):
         DjangoChannel.__init__(self, name, max_connections=max_connections,
             endpoint=endpoint, wait_interval=wait_interval)
             
@@ -106,7 +106,7 @@ class StreamingDjangoChannel(DjangoChannel):
             raise ChannelError('Http streaming operation unknown: %s' % msg.operation)
         
         try:
-            timer = threading.Timer(self.heart_interval, self.beat, (connection, ))
+            timer = threading.Timer(float(self.heart_interval) / 1000, self.beat, (connection, ))
             timer.daemon = True
             timer.start()
 
@@ -214,6 +214,6 @@ class StreamingDjangoChannel(DjangoChannel):
             return
 
         # Create timer for next beat
-        timer = threading.Timer(self.heart_interval, self.beat, (connection, ))
+        timer = threading.Timer(float(self.heart_interval) / 1000, self.beat, (connection, ))
         timer.daemon = True
         timer.start()

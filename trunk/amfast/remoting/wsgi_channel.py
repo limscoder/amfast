@@ -114,7 +114,7 @@ class WsgiChannel(HttpChannel):
 class StreamingWsgiChannel(WsgiChannel):
     """WsgiChannel that opens a persistent connection with the client to serve messages."""
 
-    def __init__(self, name, max_connections=-1, endpoint=None, wait_interval=0, heart_interval=30):
+    def __init__(self, name, max_connections=-1, endpoint=None, wait_interval=0, heart_interval=30000):
         WsgiChannel.__init__(self, name, max_connections=max_connections,
             endpoint=endpoint, wait_interval=wait_interval)
 
@@ -179,7 +179,7 @@ class StreamingWsgiChannel(WsgiChannel):
                 return []
 
             # Start heart beat
-            timer = threading.Timer(self.heart_interval, self.beat, (connection, ))
+            timer = threading.Timer(float(self.heart_interval) / 1000, self.beat, (connection, ))
             timer.daemon = True
             timer.start()
 
@@ -267,7 +267,7 @@ class StreamingWsgiChannel(WsgiChannel):
             return
 
         # Create timer for next beat
-        timer = threading.Timer(self.heart_interval, self.beat, (connection, ))
+        timer = threading.Timer(float(self.heart_interval) / 1000, self.beat, (connection, ))
         timer.daemon = True
         timer.start()
 
