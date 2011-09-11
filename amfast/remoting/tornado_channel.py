@@ -187,9 +187,10 @@ class TornadoChannel(HttpChannel):
             self.finishPoll(request, packet, message, messages)
 
         # Setup timeout
+        timeout_call = None
         if self.wait_interval > -1:
             timeout_call = IOLoop.instance().add_timeout(
-                time.time() + float(self.wait_interval) / 1000, _notify)
+                time.time() + self.wait_interval, _notify)
 
         def _notifyTimeout():
             # Notifies, plus cancels the timeout
@@ -209,7 +210,7 @@ class TornadoChannel(HttpChannel):
         request = self.setupPollRequest(packet)
 
         # Polls for messages every self.poll_interval
-        poller = PeriodicCallback(None, float(self.poll_interval) / 1000, IOLoop.instance())
+        poller = PeriodicCallback(None, self.poll_interval, IOLoop.instance())
 
         def _timeout():
             # Executed when timeout is reached.
@@ -219,7 +220,7 @@ class TornadoChannel(HttpChannel):
 
         if self.wait_interval > -1:
             timeout_call = IOLoop.instance().add_timeout(
-                time.time() + float(self.wait_interval) / 1000, _timeout)
+                time.time() + self.wait_interval, _timeout)
         else:
             timeout_call = None
 
@@ -244,7 +245,7 @@ class StreamingTornadoChannel(TornadoChannel):
     """Handles streaming http connections."""
 
     def __init__(self, name, max_connections=-1, endpoint=None,
-        timeout=1200, wait_interval=0, heart_interval=5):
+        timeout=1200, wait_interval=0, heart_interval=30000):
         TornadoChannel.__init__(self, name, max_connections, endpoint,
             timeout, wait_interval)
 
@@ -275,7 +276,7 @@ class StreamingTornadoChannel(TornadoChannel):
             poller = None
         else:
             # Call _notify multiple times if polling.
-            poller = PeriodicCallback(None, float(self.poll_interval) / 1000, IOLoop.instance())
+            poller = PeriodicCallback(None, self.poll_interval, IOLoop.instance())
 
         # Handle new message.
 	def _notify():

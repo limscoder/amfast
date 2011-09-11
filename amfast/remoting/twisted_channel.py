@@ -280,7 +280,7 @@ class StreamingTwistedChannel(TwistedChannel):
     """Handles streaming http connections."""
 
     def __init__(self, name, max_connections=-1, endpoint=None,
-        timeout=1200, wait_interval=0, heart_interval=5):
+        timeout=1200, wait_interval=0, heart_interval=30000):
         TwistedChannel.__init__(self, name, max_connections, endpoint,
             timeout, wait_interval)
 
@@ -381,4 +381,4 @@ class StreamingTwistedChannel(TwistedChannel):
             request.write(chr(messaging.StreamingMessage.NULL_BYTE))
 
         looper.f = _beat
-        looper.start(self.heart_interval, False)
+        looper.start(float(self.heart_interval) / 1000, False)
