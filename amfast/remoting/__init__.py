@@ -265,7 +265,7 @@ class Message(object):
 
     def convertFail(self, exc):
         """Convert a successful message into a failure."""
-        self.target.replace(self.SUCCESS_TARGET, self.FAILED_TARGET)
+        self.target = self.target.replace(self.SUCCESS_TARGET, self.FAILED_TARGET)
         
         if self.is_flex_msg:
             self.body = self.body.convertFail(exc=exc)
