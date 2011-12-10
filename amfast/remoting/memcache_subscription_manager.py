@@ -311,5 +311,7 @@ class MemcacheSubscriptionManager(SubscriptionManager, memcache_manager.Memcache
 
             if set is True:
                 self.mc.set(key, msgs)
-        finally:
+        except:
             self._lock.release(lock_name)
+            raise
+        self._lock.release(lock_name)

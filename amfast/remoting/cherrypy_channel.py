@@ -142,11 +142,8 @@ class StreamingCherryPyChannel(CherryPyChannel):
                 if connection.connected is False:
                     # Connection is no longer active
                     msg = messaging.StreamingMessage.getDisconnectMsg()
-                    try:
-                        yield messaging.StreamingMessage.prepareMsg(msg, self.endpoint)
-                    finally:
-                        # Client may have already disconnected
-                        return
+                    yield messaging.StreamingMessage.prepareMsg(msg, self.endpoint)
+                    return 
 
                 if inited is False:
                     # Send acknowledge message

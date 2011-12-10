@@ -247,5 +247,7 @@ class MemorySubscriptionManager(SubscriptionManager):
                     idx += 1
                     if msg.timestamp > cutoff_time:
                         yield msg
-        finally:
+        except:
             self._lock.release()
+            raise
+        self._lock.release()

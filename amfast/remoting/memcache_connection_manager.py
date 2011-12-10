@@ -128,7 +128,7 @@ class MemcacheConnectionManager(ConnectionManager, memcache_manager.MemcacheMana
         connection_ids = self.mc.get(self.CONNECTIONS_ATTR)
         if connection_ids != None:
           return connection_ids.__iter__()
-   else:
+        else:
           return None 
 
     # --- proxies for connection properties --- #
