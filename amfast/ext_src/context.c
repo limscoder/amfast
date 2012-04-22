@@ -635,7 +635,16 @@ static PyObject* Decoder_readPyString(DecoderObj *self, int len)
         return NULL;
     self->_buf_str = PyObject_CallMethodObjArgs(self->buf, self->read_name, py_len, NULL);
     Py_DECREF(py_len);
+    Py_ssize_t buf_str_len = PyString_Size(self->_buf_str);
     Py_XDECREF(tmp); // Decrement reference to OLD string.
+
+    if (buf_str_len < len) {
+        char error_str[100];
+        sprintf(error_str, "Attempted to read %d bytes. Received %d", len, buf_str_len);
+        PyErr_SetString(amfast_ContextError, error_str);
+        return NULL;
+   }
+
     return self->_buf_str;
 }
 
@@ -650,6 +659,9 @@ static PyObject* PyDecoder_readPyString(DecoderObj *self, PyObject *args, PyObje
         return NULL;
 
     PyObject *result = Decoder_readPyString(self, len);
+    if (!result)
+        return NULL;
+
     Py_XINCREF(result);
     return result;
 }
