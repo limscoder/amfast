@@ -46,9 +46,9 @@ setup(name="AmFast",
     test_suite = "tests.suite",
     packages = ['amfast', 'amfast.class_def', 'amfast.remoting'],
     features = {'extensions': extensions},
-    install_requires = {
-        'uuid': 'uuid>=1.3.0'
-    },
+    install_requires = [
+        'uuid>=1.3.0',
+    ],
     classifiers = [
         "Programming Language :: Python :: 2.4",
         "Programming Language :: Python :: 2.5",
